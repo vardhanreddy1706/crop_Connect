@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
-import { AuthContext } from "../AuthContext.jsx";
+import { AuthContext } from "../context/AuthContext.jsx";
 import "../App.css";
 import Footer from "./Footer.jsx";
 import FarmerCarousel from "../caurosel/Caurosel.jsx";

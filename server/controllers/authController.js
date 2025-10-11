@@ -6,12 +6,27 @@ const generateToken = require("../utils/generateToken");
 // @access  Public
 exports.register = async (req, res) => {
 	try {
+		console.log("📝 Registration attempt:", {
+			email: req.body.email,
+			role: req.body.role,
+		});
+
 		const { name, email, password, phone, role, address } = req.body;
+
+		// Validation
+		if (!name || !email || !password || !phone || !role) {
+			console.log("❌ Missing required fields");
+			return res.status(400).json({
+				success: false,
+				message: "Please provide all required fields",
+			});
+		}
 
 		// Check if user exists
 		const userExists = await User.findOne({ email });
 
 		if (userExists) {
+			console.log("❌ User already exists:", email);
 			return res.status(400).json({
 				success: false,
 				message: "User already exists with this email",
@@ -25,10 +40,14 @@ exports.register = async (req, res) => {
 			password,
 			phone,
 			role,
-			address,
+			address: address || {},
 		});
 
+		console.log("✅ User created successfully:", user.email);
+
 		if (user) {
+			const token = generateToken(user._id);
+
 			res.status(201).json({
 				success: true,
 				message: "User registered successfully",
@@ -40,10 +59,11 @@ exports.register = async (req, res) => {
 					role: user.role,
 					address: user.address,
 				},
-				token: generateToken(user._id),
+				token,
 			});
 		}
 	} catch (error) {
+		console.error("❌ Registration error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message || "Server error during registration",
@@ -56,12 +76,24 @@ exports.register = async (req, res) => {
 // @access  Public
 exports.login = async (req, res) => {
 	try {
+		console.log("🔐 Login attempt:", { email: req.body.email });
+
 		const { email, password } = req.body;
+
+		// Validation
+		if (!email || !password) {
+			console.log("❌ Missing email or password");
+			return res.status(400).json({
+				success: false,
+				message: "Please provide email and password",
+			});
+		}
 
 		// Check for user
 		const user = await User.findOne({ email }).select("+password");
 
 		if (!user) {
+			console.log("❌ User not found:", email);
 			return res.status(401).json({
 				success: false,
 				message: "Invalid email or password",
@@ -72,11 +104,16 @@ exports.login = async (req, res) => {
 		const isMatch = await user.matchPassword(password);
 
 		if (!isMatch) {
+			console.log("❌ Invalid password for:", email);
 			return res.status(401).json({
 				success: false,
 				message: "Invalid email or password",
 			});
 		}
+
+		console.log("✅ Login successful:", user.email);
+
+		const token = generateToken(user._id);
 
 		res.status(200).json({
 			success: true,
@@ -89,9 +126,10 @@ exports.login = async (req, res) => {
 				role: user.role,
 				address: user.address,
 			},
-			token: generateToken(user._id),
+			token,
 		});
 	} catch (error) {
+		console.error("❌ Login error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message || "Server error during login",

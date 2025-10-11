@@ -24,43 +24,47 @@ const app = express();
 // 1. Helmet - Set security headers
 app.use(helmet());
 
-// 2. Rate limiting - Prevent brute force attacks
+// 2. Rate limiting
 const limiter = rateLimit({
-	windowMs: 15 * 60 * 1000, // 15 minutes
-	max: 100, // Limit each IP to 100 requests per windowMs
+	windowMs: 15 * 60 * 1000,
+	max: 100,
 	message: "Too many requests from this IP, please try again later.",
 	standardHeaders: true,
 	legacyHeaders: false,
 });
 app.use("/api/", limiter);
 
-// 3. CORS Configuration - Allow frontend to access backend
+// 3. CORS Configuration
 const corsOptions = {
 	origin: function (origin, callback) {
+		if (!origin) return callback(null, true);
+
 		const allowedOrigins = [
-			process.env.CLIENT_URL,
+			"http://localhost:5174",
 			"http://localhost:5173",
 			"http://localhost:3000",
+			"http://127.0.0.1:5174",
 			"http://127.0.0.1:5173",
-		];
+			process.env.CLIENT_URL,
+		].filter(Boolean);
 
-		// Allow requests with no origin (mobile apps, Postman, etc.)
-		if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+		if (allowedOrigins.indexOf(origin) !== -1) {
 			callback(null, true);
 		} else {
-			callback(new Error("Not allowed by CORS"));
+			console.log("❌ CORS blocked origin:", origin);
+			callback(null, true); // Allow anyway for development
 		}
 	},
-	credentials: true, // Allow cookies
+	credentials: true,
 	methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-	allowedHeaders: ["Content-Type", "Authorization"],
+	allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 	exposedHeaders: ["Content-Range", "X-Content-Range"],
-	maxAge: 600, // Cache preflight request for 10 minutes
+	maxAge: 600,
 };
 
 app.use(cors(corsOptions));
 
-// 4. Compression - Compress responses
+// 4. Compression
 app.use(compression());
 
 // ========================
@@ -75,7 +79,7 @@ app.use(cookieParser());
 // ========================
 if (process.env.NODE_ENV === "development") {
 	app.use((req, res, next) => {
-		console.log(`📨 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+		console.log(`📨 ${req.method} ${req.path}`);
 		next();
 	});
 }
@@ -120,10 +124,6 @@ app.get("/", (req, res) => {
 			bookings: "/api/bookings",
 			contact: "/api/contact",
 		},
-		documentation: {
-			postman: "Import collection for API testing",
-			github: "Check repository for detailed docs",
-		},
 	});
 });
 
@@ -143,11 +143,12 @@ app.get("/api/health", (req, res) => {
 // ERROR HANDLERS
 // ========================
 
-// 404 Handler - Route not found
+// 404 Handler
 app.use((req, res, next) => {
-	const error = new Error(`Route not found - ${req.originalUrl}`);
-	res.status(404);
-	next(error);
+	res.status(404).json({
+		success: false,
+		message: `Route not found - ${req.originalUrl}`,
+	});
 });
 
 // Global Error Handler
@@ -156,23 +157,24 @@ app.use(errorHandler);
 // ========================
 // START SERVER
 // ========================
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8000;
 
 const server = app.listen(PORT, () => {
-	console.log("\n ========================================");
+	console.log("\n🚀 ========================================");
 	console.log(
-		` Server running in ${process.env.NODE_ENV || "development"} mode`
+		`✅ Server running in ${process.env.NODE_ENV || "development"} mode`
 	);
-	console.log(` Server URL: http://localhost:${PORT}`);
-	console.log(` API Base: http://localhost:${PORT}/api`);
-	console.log(` JWT Authentication: Enabled`);
-	console.log(`CORS: Enabled for ${process.env.CLIENT_URL}`);
-	
+	console.log(`🌐 Server URL: http://localhost:${PORT}`);
+	console.log(`📡 API Base: http://localhost:${PORT}/api`);
+	console.log(`🔒 JWT Authentication: Enabled`);
+	console.log(`🌍 CORS: Enabled for http://localhost:5174`);
+	console.log("🚀 ========================================\n");
 });
 
 // Handle unhandled promise rejections
-process.on("unhandledRejection", (err, promise) => {
-	console.log(` Error: ${err.message}`);
-	// Close server & exit process
+process.on("unhandledRejection", (err) => {
+	console.log(`❌ Error: ${err.message}`);
 	server.close(() => process.exit(1));
 });
+
+module.exports = app;

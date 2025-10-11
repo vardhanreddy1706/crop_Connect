@@ -20,7 +20,7 @@ import {
 	
 	UserPlus,
 } from "lucide-react";
-import logo from "../public/cc.png"; // Import the logo image
+import logo from "/cc.png"; // Import the logo image
 
 function CropConnectLanding() {
 	const navigate = useNavigate();

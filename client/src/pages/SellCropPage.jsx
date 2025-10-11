@@ -1,5 +1,6 @@
 // src/pages/SellCropPage.jsx
 import React, { useState } from "react";
+import { cropService } from "../services/cropService";
 import { useNavigate } from "react-router-dom";
 import {
 	DollarSign,
@@ -60,8 +61,8 @@ function SellCropPage() {
 		mobile: "",
 		payment: "",
 	});
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [message, setMessage] = useState("");
+	const [isSubmitting] = useState(false);
+	const [message] = useState("");
 
 	const handleChange = (e) => {
 		const { name, value, files } = e.target;
@@ -74,45 +75,39 @@ function SellCropPage() {
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-		setIsSubmitting(true);
-		setMessage("");
 
 		try {
-			const formDataToSend = new FormData();
-			Object.keys(formData).forEach((key) => {
-				if (formData[key]) {
-					formDataToSend.append(key, formData[key]);
-				}
-			});
+			const result = await cropService.createCrop(formData);
 
-			// TODO: Replace with your actual API endpoint
-			// const response = await fetch('http://localhost:8080/api/crops/sell', {
-			//   method: 'POST',
-			//   headers: {
-			//     'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-			//   },
-			//   body: formDataToSend
-			// });
-
-			// Simulate API call delay
-			await new Promise((resolve) => setTimeout(resolve, 2000));
-
-			setIsSubmitting(false);
-			setMessage(
-				"Your crop listing has been submitted successfully for verification!"
-			);
-			console.log("Form submitted with ", formData);
-
-			// Optionally redirect after success
-			setTimeout(() => {
+			if (result.success) {
+				alert("Crop listed successfully! 🌾");
+				setFormData({
+					cropName: "",
+					variety: "",
+					quantity: "",
+					unit: "quintal",
+					pricePerUnit: "",
+					location: {
+						village: "",
+						district: "",
+						state: "",
+						pincode: "",
+					},
+					harvestDate: "",
+					quality: "Standard",
+					description: "",
+					contactNumber: "",
+				});
 				navigate("/crops");
-			}, 2000);
+			}
 		} catch (error) {
-			setIsSubmitting(false);
-			setMessage("Error submitting crop listing. Please try again.");
-			console.error("Error:", error);
+			alert(
+				error.response?.data?.message ||
+					"Failed to list crop. Please try again."
+			);
 		}
 	};
+
 
 	return (
 		<div
