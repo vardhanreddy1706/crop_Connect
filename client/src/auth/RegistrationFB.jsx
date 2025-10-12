@@ -1,3 +1,5 @@
+import api from "../config/api";
+
 import React, { useState } from "react";
 import {
 	User,
@@ -10,22 +12,22 @@ import {
 	ChevronDown,
 	Award,
 	Users,
-	Settings,
-	Clipboard,
-	Code,
 	X,
 } from "lucide-react";
 
-// Helper component for styled inputs with icons
-const IconInput = ({
+const FormInput = ({
 	label,
 	name,
 	type = "text",
 	icon: Icon,
+	placeholder,
+	required = false,
+	maxLength,
+	min,
+	value,
+	onChange,
 	children,
-	...props
 }) => {
-	// Determine if the input is a select/dropdown based on the presence of children
 	const isDropdown = !!children;
 
 	return (
@@ -33,27 +35,32 @@ const IconInput = ({
 			<label className="block mb-1 font-semibold text-gray-700 flex items-center">
 				{Icon && <Icon className="w-5 h-5 mr-2 text-green-600" />}
 				{label}
+				{required && <span className="text-red-500 ml-1">*</span>}
 			</label>
 			<div className="relative">
 				{isDropdown ? (
 					<>
-						{/* Clone child (the select element) and add classes to hide native arrow and add padding */}
 						{React.cloneElement(children, {
-							name: name,
-							// appearance-none hides the native arrow. pr-10 adds space for our custom arrow.
+							name,
 							className:
 								"w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 appearance-none bg-white pr-10",
-							...props,
+							value,
+							onChange,
+							required,
 						})}
-						{/* Custom Chevron Down Icon positioned inside the select box */}
 						<ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 pointer-events-none" />
 					</>
 				) : (
 					<input
 						type={type}
 						name={name}
+						value={value}
+						onChange={onChange}
+						placeholder={placeholder}
+						required={required}
+						maxLength={maxLength}
+						min={min}
 						className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-						{...props}
 					/>
 				)}
 			</div>
@@ -61,448 +68,512 @@ const IconInput = ({
 	);
 };
 
-// Changed function definition to remove 'export default'
-function Register() {
-	const [showForm, setShowForm] = useState(false);
-	const [userType, setUserType] = useState(""); // 'farmer' or 'buyer'
+const RegisterFB = () => {
+	const [currentStep, setCurrentStep] = useState("roleSelect");
+	const [selectedRole, setSelectedRole] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [submissionMessage, setSubmissionMessage] = useState(null);
-	const [isDrawerOpen, setIsDrawerOpen] = useState(false); // State for the settings drawer
-	const [copyMessage, setCopyMessage] = useState(null);
+	const [message, setMessage] = useState(null);
 
-	const [form, setForm] = useState({
+	// Common Fields
+	const [commonForm, setCommonForm] = useState({
 		name: "",
-		gender: "",
+		email: "",
+		password: "",
 		phone: "",
+		age: "",
+		gender: "",
+		address: {
+			village: "",
+			district: "",
+			state: "",
+			pincode: "",
+		},
+	});
+
+	// Farmer-specific
+	const [farmerForm, setFarmerForm] = useState({
 		soilType: "",
 		noOfAcres: "",
 		farmingExperience: "",
-		transportVehicle: "",
 	});
 
-	// Utility function to safely copy text to clipboard
-	const handleCopy = (text, successMsg) => {
-		// Fallback for secure context issues
-		const textarea = document.createElement("textarea");
-		textarea.value = text;
-		document.body.appendChild(textarea);
-		textarea.select();
-		try {
-			const successful = document.execCommand("copy");
-			if (successful) {
-				setCopyMessage({ type: "success", text: successMsg });
-			} else {
-				setCopyMessage({
+	// Buyer-specific
+	const [buyerForm, setBuyerForm] = useState({
+		transportVehicle: "",
+		businessExperience: "",
+		companyName: "",
+	});
+
+	const handleCommonChange = (e) => {
+		const { name, value } = e.target;
+		if (["village", "district", "state", "pincode"].includes(name)) {
+			setCommonForm((prev) => ({
+				...prev,
+				address: { ...prev.address, [name]: value },
+			}));
+		} else {
+			setCommonForm((prev) => ({ ...prev, [name]: value }));
+		}
+	};
+
+	const handleFarmerChange = (e) => {
+		const { name, value } = e.target;
+		setFarmerForm((prev) => ({ ...prev, [name]: value }));
+	};
+
+	const handleBuyerChange = (e) => {
+		const { name, value } = e.target;
+		setBuyerForm((prev) => ({ ...prev, [name]: value }));
+	};
+
+	const validateEmail = (email) => /^\S+@\S+\.\S+$/.test(email);
+	const validatePhone = (phone) => /^[0-9]{10}$/.test(phone);
+
+	const validateCommonFields = () => {
+		const { name, email, password, phone, age, gender, address } = commonForm;
+		if (!name?.trim()) {
+			setMessage({ type: "error", text: "Name is required" });
+			return false;
+		}
+		if (!email?.trim()) {
+			setMessage({ type: "error", text: "Email is required" });
+			return false;
+		}
+		if (!validateEmail(email)) {
+			setMessage({ type: "error", text: "Invalid email format" });
+			return false;
+		}
+		if (!password?.trim()) {
+			setMessage({ type: "error", text: "Password is required" });
+			return false;
+		}
+		if (password.length < 6) {
+			setMessage({
+				type: "error",
+				text: "Password must be at least 6 characters",
+			});
+			return false;
+		}
+		if (!phone?.trim()) {
+			setMessage({ type: "error", text: "Phone is required" });
+			return false;
+		}
+		if (!validatePhone(phone)) {
+			setMessage({ type: "error", text: "Phone must be 10 digits" });
+			return false;
+		}
+		if (!age || age < 1) {
+			setMessage({ type: "error", text: "Valid age is required" });
+			return false;
+		}
+		if (!gender) {
+			setMessage({ type: "error", text: "Gender is required" });
+			return false;
+		}
+		if (
+			!address.village?.trim() ||
+			!address.district?.trim() ||
+			!address.state?.trim() ||
+			!address.pincode?.trim()
+		) {
+			setMessage({ type: "error", text: "All address fields are required" });
+			return false;
+		}
+		return true;
+	};
+
+	const handleSubmit = async (e) => {
+		e.preventDefault();
+		setMessage(null);
+		if (!validateCommonFields()) return;
+		setIsSubmitting(true);
+		let payload = {
+			...commonForm,
+			role: selectedRole,
+		};
+		// Validate and add role-specific fields
+		if (selectedRole === "farmer") {
+			if (
+				!farmerForm.soilType ||
+				!farmerForm.noOfAcres ||
+				!farmerForm.farmingExperience
+			) {
+				setMessage({ type: "error", text: "All farmer fields are required" });
+				setIsSubmitting(false);
+				return;
+			}
+			if (farmerForm.noOfAcres <= 0) {
+				setMessage({
 					type: "error",
-					text: "Copy failed. Please copy manually.",
+					text: "Number of acres must be greater than 0",
+				});
+				setIsSubmitting(false);
+				return;
+			}
+			payload = { ...payload, ...farmerForm };
+		} else if (selectedRole === "buyer") {
+			if (
+				!buyerForm.transportVehicle ||
+				!buyerForm.businessExperience ||
+				!buyerForm.companyName
+			) {
+				setMessage({ type: "error", text: "All buyer fields are required" });
+				setIsSubmitting(false);
+				return;
+			}
+			payload = { ...payload, ...buyerForm };
+		}
+		try {
+			// 🚀 ACTUAL API CALL
+			const res = await api.post("/auth/register", payload);
+			setIsSubmitting(false);
+			if (res.data.success) {
+				setMessage({
+					type: "success",
+					text: `Successfully registered as ${
+						selectedRole === "farmer" ? "Farmer" : "Buyer"
+					}!`,
+				});
+				// Optionally redirect to login or clear form
+				setTimeout(() => {
+					setCurrentStep("roleSelect");
+					setSelectedRole("");
+					setCommonForm({
+						name: "",
+						email: "",
+						password: "",
+						phone: "",
+						age: "",
+						gender: "",
+						address: { village: "", district: "", state: "", pincode: "" },
+					});
+					setFarmerForm({
+						soilType: "",
+						noOfAcres: "",
+						farmingExperience: "",
+					});
+					setBuyerForm({
+						transportVehicle: "",
+						businessExperience: "",
+						companyName: "",
+					});
+					setMessage(null);
+				}, 2000);
+			} else {
+				setMessage({
+					type: "error",
+					text: res.data.message || "Registration failed",
 				});
 			}
-		// eslint-disable-next-line no-unused-vars
 		} catch (err) {
-			setCopyMessage({
-				type: "error",
-				text: "Copy failed. Please copy manually.",
-			});
-		}
-		document.body.removeChild(textarea);
-
-		setTimeout(() => setCopyMessage(null), 3000);
-	};
-
-	const handleExportData = () => {
-		const exportData = { userType, ...form };
-		const jsonString = JSON.stringify(exportData, null, 2);
-		handleCopy(jsonString, "Form data copied to clipboard as JSON!");
-	};
-
-	const handleExportCode = () => {
-		// Simulate copying the entire component code content (simplified for brevity here)
-		// Note: The structure here reflects the new export style
-		const codeContent = `import React, { useState } from "react";
-// ... (rest of the imports and logic)
-
-function Register() {
-  // ... (component logic)
-}
-
-export default Register;
-`;
-		handleCopy(
-			codeContent,
-			"Component code (Register.jsx) copied to clipboard!"
-		);
-	};
-
-	const handleInputChange = (e) => {
-		const { name, value } = e.target;
-
-		// Custom logic for phone number to allow only digits
-		if (name === "phone") {
-			const cleanedValue = value.replace(/\D/g, ""); // Remove non-digits
-			setForm((prev) => ({ ...prev, [name]: cleanedValue }));
-		} else {
-			setForm((prev) => ({ ...prev, [name]: value }));
-		}
-	};
-
-	const handleUserTypeChange = (e) => {
-		setUserType(e.target.value);
-		setForm((prev) => ({
-			...prev,
-			// Clear conditional fields when user type changes
-			soilType: "",
-			noOfAcres: "",
-			farmingExperience: "",
-			transportVehicle: "",
-		}));
-	};
-
-	const resetForm = () => {
-		setForm({
-			name: "",
-			gender: "",
-			phone: "",
-			soilType: "",
-			noOfAcres: "",
-			farmingExperience: "",
-			transportVehicle: "",
-		});
-		setUserType("");
-	};
-
-	const submit = (e) => {
-		e.preventDefault();
-		setIsSubmitting(true);
-		setSubmissionMessage(null);
-
-		// Simulate registration API call
-		setTimeout(() => {
 			setIsSubmitting(false);
-			// Successful registration message
-			setSubmissionMessage({
-				type: "success",
-				text: `Successfully registered as a ${userType.toUpperCase()}. You are now logged in!`,
+			setMessage({
+				type: "error",
+				text: err.response?.data?.message || "Registration failed",
 			});
-
-			// Log data for preview
-			console.log(`Registered as ${userType}:`, form);
-
-			// Reset form and hide it after successful submission
-			resetForm();
-			// Keep form visible after submission to see the message, but hide after a delay
-			setTimeout(() => setShowForm(false), 3000);
-		}, 1500);
+		}
 	};
+
+	if (currentStep === "roleSelect") {
+		return (
+			<div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-6">
+				<div className="max-w-2xl w-full">
+					<div className="text-center mb-12">
+						<h1 className="text-4xl font-bold text-green-800 mb-3">
+							Crop Connect
+						</h1>
+						<p className="text-gray-600 text-lg">
+							Select your registration role
+						</p>
+					</div>
+
+					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<button
+							onClick={() => {
+								setSelectedRole("farmer");
+								setCurrentStep("form");
+							}}
+							className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition border-2 border-transparent hover:border-green-500 text-left"
+						>
+							<Leaf className="w-12 h-12 text-green-600 mb-4" />
+							<h2 className="text-2xl font-bold text-gray-800 mb-2">Farmer</h2>
+							<p className="text-gray-600">Sell your agricultural produce</p>
+						</button>
+
+						<button
+							onClick={() => {
+								setSelectedRole("buyer");
+								setCurrentStep("form");
+							}}
+							className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition border-2 border-transparent hover:border-green-500 text-left"
+						>
+							<Truck className="w-12 h-12 text-green-600 mb-4" />
+							<h2 className="text-2xl font-bold text-gray-800 mb-2">Buyer</h2>
+							<p className="text-gray-600">Buy fresh products directly</p>
+						</button>
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
-		<div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6 relative overflow-hidden">
-			{/* Settings Icon Button */}
-			<button
-				onClick={() => setIsDrawerOpen(!isDrawerOpen)}
-				className="fixed top-4 right-4 z-50 p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition transform hover:scale-110"
-				aria-label="Toggle Settings Drawer"
-			>
-				<Settings className="w-6 h-6" />
-			</button>
-
-			{/* Copy Notification (Fixed Position) */}
-			{copyMessage && (
-				<div
-					className={`fixed top-4 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 p-3 rounded-lg font-medium shadow-xl flex items-center ${
-						copyMessage.type === "success"
-							? "bg-blue-100 border border-blue-500 text-blue-700"
-							: "bg-red-100 border border-red-500 text-red-700"
-					}`}
-				>
-					{copyMessage.type === "success" ? (
-						<Clipboard className="w-5 h-5 mr-2" />
-					) : (
-						<XCircle className="w-5 h-5 mr-2" />
-					)}
-					{copyMessage.text}
-				</div>
-			)}
-
-			{/* Settings Drawer */}
-			<div
-				className={`fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-40 transform transition-transform duration-300 ease-in-out p-6 border-l-4 border-green-500/50 ${
-					isDrawerOpen ? "translate-x-0" : "translate-x-full"
-				}`}
-			>
-				<div className="flex justify-between items-center mb-6">
-					<h3 className="text-xl font-bold text-green-700 flex items-center space-x-2">
-						<Settings className="w-6 h-6" />
-						<span>Export Options</span>
-					</h3>
+		<div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-6 py-12">
+			<div className="bg-white p-8 rounded-3xl shadow-2xl max-w-xl w-full border-4 border-green-500/10">
+				<div className="flex items-center justify-between mb-6">
+					<h2 className="text-3xl font-bold text-green-700">
+						{selectedRole === "farmer" ? "Farmer" : "Buyer"} Registration
+					</h2>
 					<button
-						onClick={() => setIsDrawerOpen(false)}
-						className="p-2 text-gray-500 hover:text-red-500 rounded-full hover:bg-gray-100 transition"
-						aria-label="Close Drawer"
+						onClick={() => setCurrentStep("roleSelect")}
+						className="text-gray-500 hover:text-red-500 transition"
 					>
 						<X className="w-6 h-6" />
 					</button>
 				</div>
 
-				<p className="text-sm text-gray-600 mb-6 border-b pb-4">
-					Use these options to export the current data state or the component
-					code.
-				</p>
-
-				{/* Export Data Button */}
-				<div className="mb-4">
-					<button
-						onClick={handleExportData}
-						className="w-full flex items-center justify-center p-3 rounded-xl bg-blue-500 text-white font-semibold hover:bg-blue-600 transition shadow-md space-x-2 disabled:opacity-50"
-						disabled={!showForm}
+				{message && (
+					<div
+						className={`flex items-center p-4 mb-6 rounded-xl font-medium ${
+							message.type === "success"
+								? "bg-green-100 border border-green-500 text-green-700"
+								: "bg-red-100 border border-red-500 text-red-700"
+						}`}
 					>
-						<Clipboard className="w-5 h-5" />
-						<span>Export Form Data (JSON)</span>
-					</button>
-					<p className="text-xs text-gray-500 mt-1 pl-2">
-						Copies current form values to clipboard.
-					</p>
-				</div>
+						{message.type === "success" ? (
+							<CheckCircle className="w-5 h-5 mr-3" />
+						) : (
+							<XCircle className="w-5 h-5 mr-3" />
+						)}
+						{message.text}
+					</div>
+				)}
 
-				{/* Export Code Button */}
-				<div className="mb-4">
-					<button
-						onClick={handleExportCode}
-						className="w-full flex items-center justify-center p-3 rounded-xl bg-gray-700 text-white font-semibold hover:bg-gray-800 transition shadow-md space-x-2"
-					>
-						<Code className="w-5 h-5" />
-						<span>Export Code File (Register.jsx)</span>
-					</button>
-					<p className="text-xs text-gray-500 mt-1 pl-2">
-						Copies the component code to clipboard.
-					</p>
-				</div>
-			</div>
+				<form onSubmit={handleSubmit}>
+					<div className="mb-6 pb-6 border-b-2 border-gray-200">
+						<h3 className="text-lg font-bold text-green-700 mb-4">
+							Basic Information
+						</h3>
 
-			{/* Main Content Area */}
+						<FormInput
+							label="Full Name"
+							name="name"
+							icon={User}
+							placeholder="Your full name"
+							value={commonForm.name}
+							onChange={handleCommonChange}
+							required
+						/>
 
-			{/* Initial Button */}
-			{!showForm && (
-				<div className="text-center">
-					<h1 className="text-4xl font-extrabold mb-4 text-green-800">
-						Welcome to Crop Connect
-					</h1>
-					<p className="text-gray-600 mb-8">
-						Join our platform to connect farmers and buyers directly.
-					</p>
-					<button
-						onClick={() => {
-							setShowForm(true);
-							setSubmissionMessage(null); // Clear previous messages
-						}}
-						className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-10 py-4 rounded-full shadow-xl hover:shadow-2xl transition transform hover:-translate-y-1 font-bold text-lg"
-					>
-						Start Registration
-					</button>
-				</div>
-			)}
+						<FormInput
+							label="Email Address"
+							name="email"
+							type="email"
+							icon={User}
+							placeholder="you@example.com"
+							value={commonForm.email}
+							onChange={handleCommonChange}
+							required
+						/>
 
-			{/* Registration Form */}
-			{showForm && (
-				<form
-					onSubmit={submit}
-					className="bg-white p-8 rounded-3xl shadow-2xl max-w-lg w-full border-4 border-green-500/10 z-10"
-				>
-					<h2 className="text-4xl font-bold text-center mb-8 text-green-700 flex items-center justify-center space-x-2">
-						<Users className="w-8 h-8 text-green-500" />
-						<span>User Registration</span>
-					</h2>
+						<FormInput
+							label="Password"
+							name="password"
+							type="password"
+							icon={User}
+							placeholder="Minimum 6 characters"
+							value={commonForm.password}
+							onChange={handleCommonChange}
+							required
+						/>
 
-					{/* Submission Message Display */}
-					{submissionMessage && (
-						<div
-							className={`flex items-center p-4 mb-6 rounded-xl font-medium shadow-md ${
-								submissionMessage.type === "success"
-									? "bg-green-100 border border-green-500 text-green-700"
-									: "bg-red-100 border border-red-500 text-red-700"
-							}`}
-							role="alert"
+						<FormInput
+							label="Phone Number"
+							name="phone"
+							type="tel"
+							icon={Phone}
+							placeholder="10-digit number"
+							maxLength="10"
+							value={commonForm.phone}
+							onChange={handleCommonChange}
+							required
+						/>
+
+						<FormInput
+							label="Age"
+							name="age"
+							type="number"
+							icon={Award}
+							placeholder="Must be 18+"
+							min="18"
+							value={commonForm.age}
+							onChange={handleCommonChange}
+							required
+						/>
+
+						<FormInput
+							label="Gender"
+							name="gender"
+							icon={User}
+							value={commonForm.gender}
+							onChange={handleCommonChange}
+							required
 						>
-							{submissionMessage.type === "success" ? (
-								<CheckCircle className="w-5 h-5 mr-3" />
-							) : (
-								<XCircle className="w-5 h-5 mr-3" />
-							)}
-							{submissionMessage.text}
-						</div>
-					)}
+							<select>
+								<option value="">Select Gender</option>
+								<option value="male">Male</option>
+								<option value="female">Female</option>
+								<option value="other">Other</option>
+							</select>
+						</FormInput>
+					</div>
 
-					{/* Name Input */}
-					<IconInput
-						label="Full Name"
-						name="name"
-						icon={User}
-						placeholder="Your full name"
-						value={form.name}
-						onChange={handleInputChange}
-						required
-					/>
+					<div className="mb-6 pb-6 border-b-2 border-gray-200">
+						<h3 className="text-lg font-bold text-green-700 mb-4">Address</h3>
 
-					{/* Gender Select */}
-					<IconInput
-						label="Gender"
-						name="gender"
-						icon={ChevronDown}
-						value={form.gender}
-						onChange={handleInputChange}
-						required
-					>
-						<select>
-							<option value="" disabled>
-								Select gender
-							</option>
-							<option value="male">Male</option>
-							<option value="female">Female</option>
-							<option value="other">Other</option>
-						</select>
-					</IconInput>
+						<FormInput
+							label="Village"
+							name="village"
+							icon={Home}
+							placeholder="Village name"
+							value={commonForm.address.village}
+							onChange={handleCommonChange}
+							required
+						/>
 
-					{/* Phone Number Input */}
-					<IconInput
-						label="Phone Number"
-						name="phone"
-						type="tel"
-						icon={Phone}
-						placeholder="10 digit phone number"
-						value={form.phone}
-						onChange={handleInputChange}
-						required
-						maxLength="10"
-						inputMode="numeric"
-					/>
+						<FormInput
+							label="District"
+							name="district"
+							icon={Home}
+							placeholder="District"
+							value={commonForm.address.district}
+							onChange={handleCommonChange}
+							required
+						/>
 
-					{/* User Type Select Dropdown */}
-					<IconInput
-						label="I am registering as a:"
-						name="userType"
-						icon={Users} // Keeping Users icon for label
-						value={userType}
-						onChange={handleUserTypeChange}
-						required
-					>
-						<select>
-							<option value="" disabled>
-								Select User Type
-							</option>
-							<option value="farmer">Farmer</option>
-							<option value="buyer">Buyer</option>
-						</select>
-					</IconInput>
+						<FormInput
+							label="State"
+							name="state"
+							icon={Home}
+							placeholder="State"
+							value={commonForm.address.state}
+							onChange={handleCommonChange}
+							required
+						/>
 
-					{/* Conditional Fields for FARMER */}
-					{userType === "farmer" && (
-						<div className="space-y-4 pt-2">
-							<h3 className="text-lg font-bold text-green-700 border-b pb-2">
-								Farmer Details
+						<FormInput
+							label="Pincode"
+							name="pincode"
+							icon={Home}
+							placeholder="6-digit pincode"
+							value={commonForm.address.pincode}
+							onChange={handleCommonChange}
+							required
+						/>
+					</div>
+
+					{selectedRole === "farmer" && (
+						<div className="mb-6 pb-6 border-b-2 border-gray-200">
+							<h3 className="text-lg font-bold text-green-700 mb-4">
+								Farming Details
 							</h3>
 
-							<IconInput
+							<FormInput
 								label="Soil Type"
 								name="soilType"
 								icon={Leaf}
-								placeholder="E.g., Loam, Red, Black"
-								value={form.soilType}
-								onChange={handleInputChange}
+								placeholder="e.g., Loam, Red, Black, Clay"
+								value={farmerForm.soilType}
+								onChange={handleFarmerChange}
 								required
 							/>
-							<IconInput
+
+							<FormInput
 								label="Number of Acres"
 								name="noOfAcres"
 								type="number"
 								icon={Home}
-								placeholder="E.g., 2"
 								min="0"
-								value={form.noOfAcres}
-								onChange={handleInputChange}
+								placeholder="e.g., 2.5"
+								value={farmerForm.noOfAcres}
+								onChange={handleFarmerChange}
 								required
 							/>
-							<IconInput
-								label="Experience in Farming (Years)"
+
+							<FormInput
+								label="Farming Experience (Years)"
 								name="farmingExperience"
 								type="number"
 								icon={Award}
-								placeholder="E.g., 5"
 								min="0"
-								value={form.farmingExperience}
-								onChange={handleInputChange}
+								placeholder="e.g., 10"
+								value={farmerForm.farmingExperience}
+								onChange={handleFarmerChange}
 								required
 							/>
 						</div>
 					)}
 
-					{/* Conditional Fields for BUYER */}
-					{userType === "buyer" && (
-						<div className="space-y-4 pt-2">
-							<h3 className="text-lg font-bold text-green-700 border-b pb-2">
-								Buyer Details
+					{selectedRole === "buyer" && (
+						<div className="mb-6 pb-6 border-b-2 border-gray-200">
+							<h3 className="text-lg font-bold text-green-700 mb-4">
+								Business Details
 							</h3>
-							<IconInput
-								label="Primary Transport Vehicle"
+
+							<FormInput
+								label="Transport Vehicle"
 								name="transportVehicle"
 								icon={Truck}
-								placeholder="E.g., Truck, Pickup Van, Tractor"
-								value={form.transportVehicle}
-								onChange={handleInputChange}
+								placeholder="e.g., Truck, Van, Pickup"
+								value={buyerForm.transportVehicle}
+								onChange={handleBuyerChange}
+								required
+							/>
+
+							<FormInput
+								label="Business Experience (Years)"
+								name="businessExperience"
+								type="number"
+								icon={Award}
+								min="0"
+								placeholder="e.g., 5"
+								value={buyerForm.businessExperience}
+								onChange={handleBuyerChange}
+								required
+							/>
+
+							<FormInput
+								label="Company/Market/Trader Name"
+								name="companyName"
+								icon={Users}
+								placeholder="Business name"
+								value={buyerForm.companyName}
+								onChange={handleBuyerChange}
 								required
 							/>
 						</div>
 					)}
 
-					<div className="flex justify-between items-center mt-8 space-x-4">
+					<div className="flex gap-4">
 						<button
 							type="submit"
-							disabled={isSubmitting || !userType}
-							className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold text-lg px-6 py-3 rounded-full shadow-xl hover:from-green-700 hover:to-emerald-700 transition transform hover:-translate-y-0.5 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed"
+							disabled={isSubmitting}
+							className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold py-3 rounded-full hover:from-green-700 hover:to-emerald-700 transition disabled:from-gray-400 disabled:to-gray-500"
 						>
-							{isSubmitting ? (
-								<>
-									<svg
-										className="animate-spin h-5 w-5 text-white"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											className="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											strokeWidth="4"
-										></circle>
-										<path
-											className="opacity-75"
-											fill="currentColor"
-											d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-										></path>
-									</svg>
-									<span>Registering...</span>
-								</>
-							) : (
-								<span>Register</span>
-							)}
+							{isSubmitting ? "Registering..." : "Register"}
 						</button>
-
 						<button
 							type="button"
-							onClick={() => {
-								setShowForm(false);
-								setSubmissionMessage(null);
-								resetForm();
-							}}
-							className="text-gray-500 font-semibold px-4 py-3 rounded-full hover:bg-gray-100 transition"
+							onClick={() => setCurrentStep("roleSelect")}
+							className="flex-1 bg-gray-200 text-gray-700 font-bold py-3 rounded-full hover:bg-gray-300 transition"
 						>
-							Cancel
+							Back
 						</button>
 					</div>
 				</form>
-			)}
+			</div>
 		</div>
 	);
-}
+};
 
-export default Register;
+export default RegisterFB;

@@ -1,6 +1,9 @@
 // src/pages/dashboards/BuyerDashboard.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
+
 import {
 	ShoppingCart,
 	Package,
@@ -13,6 +16,7 @@ import {
 	ArrowLeft,
 	Eye,
 	Plus,
+	Icon,
 } from "lucide-react";
 
 const mockOrders = [
@@ -62,13 +66,13 @@ const mockWishlist = [
 	},
 ];
 
-const StatCard = ({  title, value, unit, color }) => (
+const StatCard = ({ title, value, unit, color }) => (
 	<div
 		className={`p-4 bg-white border-l-4 ${color} shadow-lg rounded-xl transition hover:shadow-xl`}
 	>
 		<div className="flex items-center justify-between">
 			<div className="text-sm font-medium text-gray-500">{title}</div>
-			<Icon className="w-6 h-6 text-gray-400" />
+		
 		</div>
 		<p className="mt-1 text-3xl font-bold text-gray-900">
 			{value}
@@ -80,6 +84,7 @@ const StatCard = ({  title, value, unit, color }) => (
 );
 
 function BuyerDashboard() {
+	const { logout } = useAuth();
 	const navigate = useNavigate();
 	const [searchTerm, setSearchTerm] = useState("");
 	const [filterStatus, setFilterStatus] = useState("all");
@@ -92,6 +97,11 @@ function BuyerDashboard() {
 			filterStatus === "all" || order.status === filterStatus;
 		return matchesSearch && matchesStatus;
 	});
+
+	const handleLogout = () => {
+		logout();
+		navigate("/landing", { replace: true }); // 'replace' prevents back button from returning
+	};
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -115,6 +125,7 @@ function BuyerDashboard() {
 						<Plus className="w-5 h-5" />
 						<span>Browse Crops</span>
 					</button>
+					<button onClick={handleLogout}>Logout</button>
 				</div>
 			</header>
 

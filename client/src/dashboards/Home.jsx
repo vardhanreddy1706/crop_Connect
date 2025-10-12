@@ -2,10 +2,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
 import { AuthContext } from "../context/AuthContext.jsx";
 import "../App.css";
-import Footer from "./Footer.jsx";
+import Footer from "../pages/Footer.jsx";
 import FarmerCarousel from "../caurosel/Caurosel.jsx";
 
-export default function Home() {
+export default function FarmerDashboard() {
 	const { user, logout } = useContext(AuthContext);
 	const nav = useNavigate();
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);

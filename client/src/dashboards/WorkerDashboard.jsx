@@ -1,5 +1,7 @@
 // src/pages/dashboards/WorkerDashboard.jsx
 import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+
 import { useNavigate } from "react-router-dom";
 import {
 	User,
@@ -54,7 +56,7 @@ const StatCard = ({  title, value, unit, color }) => (
 	>
 		<div className="flex items-center justify-between">
 			<div className="text-sm font-medium text-gray-500">{title}</div>
-			<Icon className="w-6 h-6 text-gray-400" />
+			
 		</div>
 		<p className="mt-1 text-3xl font-bold text-gray-900">
 			{value}
@@ -181,6 +183,7 @@ const WorkerForm = ({ formData, handleChange, handleSubmit, handleClose }) => (
 function WorkerDashboard() {
 	const navigate = useNavigate();
 	const [showForm, setShowForm] = useState(false);
+	const { user, logout } = useAuth();
 	const [formData, setFormData] = useState({
 		name: "John Doe",
 		age: "35",
@@ -192,6 +195,12 @@ function WorkerDashboard() {
 		chargePerDay: "120",
 	});
 	const [posts, setPosts] = useState([]);
+
+	// Logout logic: sessionStorage, redirect, block back
+	const handleLogout = () => {
+		logout();
+		navigate("/", { replace: true });
+	};
 
 	const handleChange = (e) =>
 		setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -232,6 +241,14 @@ function WorkerDashboard() {
 							Worker Dashboard
 						</h1>
 					</div>
+					{user && (
+						<button
+							onClick={handleLogout}
+							className="px-4 py-2 rounded-md text-white font-medium bg-red-600 hover:bg-red-700 transition-colors"
+						>
+							Logout
+						</button>
+					)}
 					<button
 						onClick={() => setShowForm(true)}
 						className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-xl font-medium hover:bg-green-600 transition shadow-md active:scale-95"

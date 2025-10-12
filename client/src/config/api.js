@@ -10,7 +10,7 @@ const api = axios.create({
 	withCredentials: true,
 });
 
-// Request interceptor
+// Request interceptor - Add token to every request
 api.interceptors.request.use(
 	(config) => {
 		const token = localStorage.getItem("token");
@@ -26,7 +26,7 @@ api.interceptors.request.use(
 	}
 );
 
-// Response interceptor
+// Response interceptor - Handle errors and token refresh
 api.interceptors.response.use(
 	(response) => {
 		console.log(
@@ -40,10 +40,25 @@ api.interceptors.response.use(
 	(error) => {
 		console.error("❌ API Error:", error.response?.data || error.message);
 
+		// Handle 401 Unauthorized - Token expired or invalid
 		if (error.response?.status === 401) {
 			localStorage.removeItem("token");
 			localStorage.removeItem("user");
-			window.location.href = "/login";
+
+			// Don't redirect if already on login page
+			if (window.location.pathname !== "/login") {
+				window.location.href = "/login";
+			}
+		}
+
+		// Handle 403 Forbidden - User doesn't have permission
+		if (error.response?.status === 403) {
+			console.warn("Access denied: User lacks required permissions");
+		}
+
+		// Handle 500 Server Error
+		if (error.response?.status === 500) {
+			console.error("Server error: Please contact support");
 		}
 
 		return Promise.reject(error);

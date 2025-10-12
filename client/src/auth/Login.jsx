@@ -23,28 +23,31 @@ function Login() {
 			if (result.success) {
 				const { user } = result;
 
-				// Redirect based on role
+				// Redirect based on role with replace: true to prevent back button
 				switch (user.role) {
 					case "farmer":
-						navigate("/");
+						navigate("/farmer-dashboard", { replace: true });
 						break;
 					case "buyer":
-						navigate("/buyer-dashboard");
+						navigate("/buyer-dashboard", { replace: true });
 						break;
-					case "tractor_owner":
-						navigate("/tractor-dashboard");
+					case "tractorowner":
+						navigate("/tractor-dashboard", { replace: true });
 						break;
 					case "worker":
-						navigate("/worker-dashboard");
+						navigate("/worker-dashboard", { replace: true });
 						break;
 					default:
-						navigate("/");
+						navigate("/landing", { replace: true });
 				}
 			} else {
-				setError(result.message);
+				setError(result.message || "Login failed. Please try again.");
 			}
 		} catch (err) {
-			setError(err||"An unexpected error occurred. Please try again.");
+			console.error("Login error:", err);
+			setError(
+				err.message || "An unexpected error occurred. Please try again."
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -53,7 +56,7 @@ function Login() {
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 flex items-center justify-center p-4">
 			<Link
-				to="/landing"
+				to="/"
 				className="absolute top-6 left-6 flex items-center gap-2 text-green-700 hover:text-green-800 transition-colors group"
 			>
 				<ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -139,7 +142,7 @@ function Login() {
 						<p className="text-sm text-gray-600">
 							Don't have an account?{" "}
 							<Link
-								to="/register-farmer-buyer"
+								to="/"
 								className="text-green-600 hover:text-green-700 font-semibold"
 							>
 								Sign up

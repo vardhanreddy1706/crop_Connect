@@ -1,3 +1,4 @@
+// authController.js
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 
@@ -5,49 +6,78 @@ const generateToken = require("../utils/generateToken");
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res) => {
+	 console.log("REGISTER ENDPOINT HIT:", req.body);
 	try {
-		console.log("📝 Registration attempt:", {
-			email: req.body.email,
-			role: req.body.role,
-		});
+		// Extract all possible fields from req.body
+		const {
+			name,
+			email,
+			password,
+			phone,
+			role,
+			address,
+			age,
+			gender,
+			soilType,
+			noOfAcres,
+			farmingExperience,
+			transportVehicle,
+			businessExperience,
+			companyName,
+			workerExperience,
+			aadhaarNumber,
+			drivingExperience,
+			tractorRegistrationNumber,
+			ownerAadhaarNumber,
+			licenseFile,
+			vehicleType,
+		} = req.body;
 
-		const { name, email, password, phone, role, address } = req.body;
-
-		// Validation
-		if (!name || !email || !password || !phone || !role) {
-			console.log("❌ Missing required fields");
+		// Basic validation for required fields
+		if (!name || !email || !password || !phone || !role || !address) {
 			return res.status(400).json({
 				success: false,
 				message: "Please provide all required fields",
 			});
 		}
 
-		// Check if user exists
+		// Check if user already exists
 		const userExists = await User.findOne({ email });
-
 		if (userExists) {
-			console.log("❌ User already exists:", email);
 			return res.status(400).json({
 				success: false,
 				message: "User already exists with this email",
 			});
 		}
 
-		// Create user
+		// Create user with all fields
 		const user = await User.create({
 			name,
 			email,
 			password,
 			phone,
 			role,
-			address: address || {},
+			address,
+			age,
+			gender,
+			soilType,
+			noOfAcres,
+			farmingExperience,
+			transportVehicle,
+			businessExperience,
+			companyName,
+			workerExperience,
+			aadhaarNumber,
+			drivingExperience,
+			tractorRegistrationNumber,
+			ownerAadhaarNumber,
+			licenseFile,
+			vehicleType,
 		});
 
-		console.log("✅ User created successfully:", user.email);
-
+		// Respond with user info and token
 		if (user) {
 			const token = generateToken(user._id);
-
 			res.status(201).json({
 				success: true,
 				message: "User registered successfully",
@@ -58,6 +88,21 @@ exports.register = async (req, res) => {
 					phone: user.phone,
 					role: user.role,
 					address: user.address,
+					age: user.age,
+					gender: user.gender,
+					soilType: user.soilType,
+					noOfAcres: user.noOfAcres,
+					farmingExperience: user.farmingExperience,
+					transportVehicle: user.transportVehicle,
+					businessExperience: user.businessExperience,
+					companyName: user.companyName,
+					workerExperience: user.workerExperience,
+					aadhaarNumber: user.aadhaarNumber,
+					drivingExperience: user.drivingExperience,
+					tractorRegistrationNumber: user.tractorRegistrationNumber,
+					ownerAadhaarNumber: user.ownerAadhaarNumber,
+					licenseFile: user.licenseFile,
+					vehicleType: user.vehicleType,
 				},
 				token,
 			});
@@ -70,6 +115,8 @@ exports.register = async (req, res) => {
 		});
 	}
 };
+
+// ... (rest of your authController.js, e.g. login, getMe, updateProfile, etc.)
 
 // @desc    Login user
 // @route   POST /api/auth/login

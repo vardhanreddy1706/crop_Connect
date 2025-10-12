@@ -32,11 +32,36 @@ const userSchema = new mongoose.Schema(
 			required: [true, "Please specify user role"],
 		},
 		address: {
-			village: String,
-			district: String,
-			state: String,
-			pincode: String,
+			village: { type: String },
+			district: { type: String },
+			state: { type: String },
+			pincode: { type: String },
 		},
+		// Common extra fields
+		age: { type: Number },
+		gender: { type: String, enum: ["male", "female", "other"] },
+
+		// Farmer-specific
+		soilType: { type: String },
+		noOfAcres: { type: Number },
+		farmingExperience: { type: Number },
+
+		// Buyer-specific
+		transportVehicle: { type: String },
+		businessExperience: { type: Number },
+		companyName: { type: String },
+
+		// Worker-specific
+		workerExperience: { type: Number },
+		aadhaarNumber: { type: String },
+
+		// Tractor owner-specific
+		drivingExperience: { type: Number },
+		tractorRegistrationNumber: { type: String },
+		ownerAadhaarNumber: { type: String },
+		licenseFile: { type: String }, // Store file path or URL
+		vehicleType: { type: String },
+
 		isVerified: {
 			type: Boolean,
 			default: false,
@@ -54,10 +79,11 @@ const userSchema = new mongoose.Schema(
 // Hash password before saving
 userSchema.pre("save", async function (next) {
 	if (!this.isModified("password")) {
-		next();
+		return next();
 	}
 	const salt = await bcrypt.genSalt(10);
 	this.password = await bcrypt.hash(this.password, salt);
+	next();
 });
 
 // Compare password method
