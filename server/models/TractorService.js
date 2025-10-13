@@ -78,6 +78,13 @@ const tractorServiceSchema = new mongoose.Schema(
 				type: String,
 			},
 		],
+		// Add these fields inside your schema:
+		status: {
+			type: String,
+			enum: ["active", "cancelled", "maintenance"],
+			default: "active",
+		},
+		cancelledAt: { type: Date },
 	},
 	{
 		timestamps: true,

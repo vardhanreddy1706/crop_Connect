@@ -1,91 +1,135 @@
-const WorkerService = require("../models/workerService");
+const WorkerService = require("../models/WorkerService");
 
-// @desc    Create worker service
-// @route   POST /api/workers
-// @access  Private (Worker)
-exports.createWorkerService = async (req, res) => {
+// @desc    Worker posts their availability
+// @route   POST /api/workers/post-availability
+// @access  Private (Worker only)
+const postWorkerAvailability = async (req, res) => {
 	try {
-		const workerService = await WorkerService.create({
-			...req.body,
+		const {
+			workerType,
+			experience,
+			chargePerDay,
+			workingHours,
+			location,
+			availability,
+			availableDates,
+			skills,
+			contactNumber,
+		} = req.body;
+
+		// Check if worker already has an active post
+		const existingPost = await WorkerService.findOne({
 			worker: req.user._id,
+			availability: true,
 		});
+
+		if (existingPost) {
+			return res.status(400).json({
+				success: false,
+				message:
+					"You already have an active availability post. Please update or delete it first.",
+			});
+		}
+
+		// Create new worker availability
+		const workerService = await WorkerService.create({
+			worker: req.user._id,
+			workerType,
+			experience,
+			chargePerDay,
+			workingHours,
+			location,
+			availability: availability !== undefined ? availability : true,
+			availableDates,
+			skills,
+			contactNumber,
+		});
+
+		// Populate worker details
+		await workerService.populate("worker", "name email phone");
 
 		res.status(201).json({
 			success: true,
-			message: "Worker service added successfully",
+			message: "Availability posted successfully!",
 			workerService,
 		});
 	} catch (error) {
-		res.status(500).json({
+		console.error("Error posting worker availability:", error);
+		res.status(400).json({
 			success: false,
-			message: error.message,
+			message: error.message || "Failed to post availability",
 		});
 	}
 };
 
-// @desc    Get all worker services
-// @route   GET /api/workers
+// @desc    Get all available workers (For Farmers to browse)
+// @route   GET /api/workers/available
 // @access  Public
-exports.getAllWorkerServices = async (req, res) => {
+const getAvailableWorkers = async (req, res) => {
 	try {
-		const { workerType, location, availability } = req.query;
+		const { workerType, location, maxCharge, minExperience } = req.query;
 
-		let query = {};
+		const query = { availability: true };
 
-		if (workerType) query.workerType = workerType;
-		if (location) query["location.district"] = new RegExp(location, "i");
-		if (availability) query.availability = availability === "true";
+		if (workerType) {
+			query.workerType = workerType;
+		}
 
-		const workerServices = await WorkerService.find(query)
+		if (location) {
+			query["location.district"] = new RegExp(location, "i");
+		}
+
+		if (maxCharge) {
+			query.chargePerDay = { $lte: Number(maxCharge) };
+		}
+
+		if (minExperience) {
+			query.experience = { $gte: Number(minExperience) };
+		}
+
+		const workers = await WorkerService.find(query)
 			.populate("worker", "name phone email")
 			.sort({ createdAt: -1 });
 
 		res.status(200).json({
 			success: true,
-			count: workerServices.length,
-			workerServices,
+			count: workers.length,
+			workers,
 		});
 	} catch (error) {
-		res.status(500).json({
+		res.status(400).json({
 			success: false,
 			message: error.message,
 		});
 	}
 };
 
-// @desc    Get single worker service
-// @route   GET /api/workers/:id
-// @access  Public
-exports.getWorkerServiceById = async (req, res) => {
+// @desc    Get worker's own availability posts
+// @route   GET /api/workers/my-posts
+// @access  Private (Worker)
+const getMyWorkerPosts = async (req, res) => {
 	try {
-		const workerService = await WorkerService.findById(req.params.id).populate(
-			"worker",
-			"name phone email address"
-		);
-
-		if (!workerService) {
-			return res.status(404).json({
-				success: false,
-				message: "Worker service not found",
-			});
-		}
+		const workerPosts = await WorkerService.find({
+			worker: req.user._id,
+		}).sort({ createdAt: -1 });
 
 		res.status(200).json({
 			success: true,
-			workerService,
+			count: workerPosts.length,
+			workerPosts,
 		});
 	} catch (error) {
-		res.status(500).json({
+		res.status(400).json({
 			success: false,
 			message: error.message,
 		});
 	}
 };
 
-// @desc    Update worker service
-// @route   PUT /api/workers/:id
-// @access  Private (Worker only)
-exports.updateWorkerService = async (req, res) => {
+// @desc    Update worker availability
+// @route   PUT /api/workers/availability/:id
+// @access  Private (Worker)
+const updateWorkerAvailability = async (req, res) => {
 	try {
 		let workerService = await WorkerService.findById(req.params.id);
 
@@ -96,10 +140,11 @@ exports.updateWorkerService = async (req, res) => {
 			});
 		}
 
+		// Check ownership
 		if (workerService.worker.toString() !== req.user._id.toString()) {
 			return res.status(403).json({
 				success: false,
-				message: "Not authorized",
+				message: "Not authorized to update this service",
 			});
 		}
 
@@ -107,25 +152,25 @@ exports.updateWorkerService = async (req, res) => {
 			req.params.id,
 			req.body,
 			{ new: true, runValidators: true }
-		);
+		).populate("worker", "name email phone");
 
 		res.status(200).json({
 			success: true,
-			message: "Worker service updated successfully",
+			message: "Availability updated successfully",
 			workerService,
 		});
 	} catch (error) {
-		res.status(500).json({
+		res.status(400).json({
 			success: false,
 			message: error.message,
 		});
 	}
 };
 
-// @desc    Delete worker service
-// @route   DELETE /api/workers/:id
-// @access  Private (Worker only)
-exports.deleteWorkerService = async (req, res) => {
+// @desc    Delete worker availability
+// @route   DELETE /api/workers/availability/:id
+// @access  Private (Worker)
+const deleteWorkerAvailability = async (req, res) => {
 	try {
 		const workerService = await WorkerService.findById(req.params.id);
 
@@ -136,10 +181,11 @@ exports.deleteWorkerService = async (req, res) => {
 			});
 		}
 
+		// Check ownership
 		if (workerService.worker.toString() !== req.user._id.toString()) {
 			return res.status(403).json({
 				success: false,
-				message: "Not authorized",
+				message: "Not authorized to delete this service",
 			});
 		}
 
@@ -147,34 +193,21 @@ exports.deleteWorkerService = async (req, res) => {
 
 		res.status(200).json({
 			success: true,
-			message: "Worker service deleted successfully",
+			message: "Worker availability deleted successfully",
 		});
 	} catch (error) {
-		res.status(500).json({
+		res.status(400).json({
 			success: false,
 			message: error.message,
 		});
 	}
 };
 
-// @desc    Get my worker services
-// @route   GET /api/workers/my-services
-// @access  Private (Worker)
-exports.getMyWorkerServices = async (req, res) => {
-	try {
-		const workerServices = await WorkerService.find({
-			worker: req.user._id,
-		}).sort({ createdAt: -1 });
-
-		res.status(200).json({
-			success: true,
-			count: workerServices.length,
-			workerServices,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
+// Export all functions
+module.exports = {
+	postWorkerAvailability,
+	getAvailableWorkers,
+	getMyWorkerPosts,
+	updateWorkerAvailability,
+	deleteWorkerAvailability,
 };

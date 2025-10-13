@@ -1,6 +1,7 @@
 // src/pages/dashboards/WorkerDashboard.jsx
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import api from "../config/api";
 
 import { useNavigate } from "react-router-dom";
 import {
@@ -205,25 +206,37 @@ function WorkerDashboard() {
 	const handleChange = (e) =>
 		setFormData({ ...formData, [e.target.name]: e.target.value });
 
-	const handleSubmit = (e) => {
+	const handleSubmit = async (e) => {
 		e.preventDefault();
-		const newPost = {
-			...formData,
-			id: Date.now(),
-			datePosted: new Date().toLocaleDateString(),
-		};
-		setPosts([newPost, ...posts]);
-		setFormData({
-			name: newPost.name,
-			age: newPost.age,
-			gender: newPost.gender,
-			phone: newPost.phone,
-			experience: newPost.experience,
-			workerType: "",
-			hours: "",
-			chargePerDay: "",
-		});
-		setShowForm(false);
+
+		try {
+			const token = localStorage.getItem("token");
+			const response = await api.post(
+				"/workers/post-availability",
+				{
+					workerType: formData.workerType,
+					experience: formData.experience,
+					chargePerDay: formData.chargePerDay,
+					workingHours: formData.hours,
+					contactNumber: formData.phone,
+					availability: true,
+				},
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				}
+			);
+
+			if (response.data.success) {
+				alert("Availability posted successfully!");
+				setPosts([response.data.workerService, ...posts]);
+				setShowForm(false);
+			}
+		} catch (error) {
+			console.error("Error posting availability:", error);
+			alert(error.response?.data?.message || "Failed to post availability");
+		}
 	};
 
 	return (

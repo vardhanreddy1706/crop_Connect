@@ -76,4 +76,7 @@ const workerServiceSchema = new mongoose.Schema(
 	}
 );
 
-module.exports = mongoose.model("WorkerService", workerServiceSchema);
+// ✅ FIX: Check if model exists before creating
+module.exports =
+	mongoose.models.WorkerService ||
+	mongoose.model("WorkerService", workerServiceSchema);

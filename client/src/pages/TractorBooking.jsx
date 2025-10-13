@@ -1,621 +1,893 @@
-import { useState } from "react";
+/* eslint-disable no-unused-vars */
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { bookingService } from "../services/bookingService";
-import { tractorService } from "../services/tractorService";
+import { useAuth } from "../context/AuthContext";
+import api from "../config/api";
+import {
+	Tractor,
+	MapPin,
+	Clock,
+	DollarSign,
+	Search,
+	Calendar,
+	Phone,
+	CheckCircle,
+	ArrowLeft,
+	FileText,
+} from "lucide-react";
 
-// --- Constants ---
-const workTypes = [
-	"Plowing",
-	"Harvesting",
-	"Spraying",
-	"Hauling",
-	"Land Preparation",
-];
+const TractorBooking = () => {
+	const navigate = useNavigate();
+	const { user } = useAuth();
 
-const landTypes = ["Dry", "Wet", "Hilly", "Plain"];
+	// Tab State - 'requirement' or 'search'
+	const [activeTab, setActiveTab] = useState("search");
 
-const vehicleTypes = [
-	"Small Tractor",
-	"Medium Tractor",
-	"Heavy Duty Tractor",
-	"Specialized Tractor",
-];
+	// Search State
+	const [searchLocation, setSearchLocation] = useState({
+		village: "",
+		district: "",
+		state: "",
+	});
+	const [tractors, setTractors] = useState([]);
+	const [filteredTractors, setFilteredTractors] = useState([]);
+	const [loading, setLoading] = useState(false);
+	const [searchPerformed, setSearchPerformed] = useState(false);
 
-// Reusable Success/Error Notification Component
-const StatusNotification = ({ status, onClose }) => {
-	if (!status) return null;
+	// Booking State
+	const [selectedTractor, setSelectedTractor] = useState(null);
+	const [showBookingModal, setShowBookingModal] = useState(false);
+	const [bookingData, setBookingData] = useState({
+		bookingDate: "",
+		duration: 1,
+		location: "",
+		workType: "Plowing",
+		landSize: "",
+		notes: "",
+	});
+	const [bookingLoading, setBookingLoading] = useState(false);
+	const [message, setMessage] = useState(null);
 
-	const { type, message, data } = status;
-	const isSuccess = type === "success";
+	// Tractor Requirement State
+	const [requirementData, setRequirementData] = useState({
+		workType: "Plowing",
+		landType: "Plain",
+		landSize: "",
+		expectedDate: "",
+		duration: "",
+		village: "",
+		district: "",
+		state: "",
+		maxBudget: "",
+		urgency: "normal",
+		notes: "",
+	});
+	const [requirementLoading, setRequirementLoading] = useState(false);
 
-	// Icon SVG based on status
-	const Icon = () => (
-		<svg
-			className={`w-6 h-6 ${isSuccess ? "text-green-500" : "text-red-500"}`}
-			fill="none"
-			viewBox="0 0 24 24"
-			stroke="currentColor"
-		>
-			{isSuccess ? (
-				<path
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					strokeWidth={2}
-					d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-				/>
-			) : (
-				<path
-					strokeLinecap="round"
-					strokeLinejoin="round"
-					strokeWidth={2}
-					d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-				/>
-			)}
-		</svg>
-	);
+	// Fetch all tractors on component mount
+	useEffect(() => {
+		if (activeTab === "search") {
+			fetchAllTractors();
+		}
+	}, [activeTab]);
+
+	const fetchAllTractors = async () => {
+		try {
+			setLoading(true);
+			const token = localStorage.getItem("token");
+			const response = await api.get("/tractors", {
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			});
+
+			if (response.data.success) {
+				const availableTractors = response.data.tractorServices.filter(
+					(t) => t.availability
+				);
+				setTractors(availableTractors);
+				setFilteredTractors(availableTractors);
+			}
+		} catch (error) {
+			console.error("Error fetching tractors:", error);
+			setMessage({
+				type: "error",
+				text: "Failed to fetch tractors",
+			});
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleSearch = () => {
+		setSearchPerformed(true);
+
+		if (!searchLocation.district && !searchLocation.state) {
+			setFilteredTractors(tractors);
+			return;
+		}
+
+		const filtered = tractors.filter((tractor) => {
+			const matchesDistrict =
+				!searchLocation.district ||
+				tractor.location?.district
+					?.toLowerCase()
+					.includes(searchLocation.district.toLowerCase());
+
+			const matchesState =
+				!searchLocation.state ||
+				tractor.location?.state
+					?.toLowerCase()
+					.includes(searchLocation.state.toLowerCase());
+
+			const matchesVillage =
+				!searchLocation.village ||
+				tractor.location?.village
+					?.toLowerCase()
+					.includes(searchLocation.village.toLowerCase());
+
+			return matchesDistrict && matchesState && matchesVillage;
+		});
+
+		setFilteredTractors(filtered);
+	};
+
+	const handleBookNow = (tractor) => {
+		setSelectedTractor(tractor);
+		setShowBookingModal(true);
+	};
+
+	const handleBookingSubmit = async (e) => {
+		e.preventDefault();
+		setBookingLoading(true);
+		setMessage(null);
+
+		try {
+			const token = localStorage.getItem("token");
+
+			const bookingPayload = {
+				serviceType: "tractor",
+				serviceId: selectedTractor._id,
+				bookingDate: new Date(bookingData.bookingDate).toISOString(),
+				duration: parseInt(bookingData.duration),
+				location: bookingData.location,
+				workType: bookingData.workType,
+				landSize: bookingData.landSize,
+				notes: bookingData.notes,
+			};
+
+			const response = await api.post("/bookings/create", bookingPayload, {
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (response.data.success) {
+				setMessage({
+					type: "success",
+					text: "Tractor booked successfully!",
+				});
+				setShowBookingModal(false);
+				setBookingData({
+					bookingDate: "",
+					duration: 1,
+					location: "",
+					workType: "Plowing",
+					landSize: "",
+					notes: "",
+				});
+
+				setTimeout(() => {
+					navigate("/farmer-dashboard");
+				}, 2000);
+			}
+		} catch (error) {
+			console.error("Booking error:", error);
+			setMessage({
+				type: "error",
+				text:
+					error.response?.data?.message ||
+					"Failed to book tractor. Please try again.",
+			});
+		} finally {
+			setBookingLoading(false);
+		}
+	};
+
+	// TRACTOR REQUIREMENT HANDLERS
+	const handleRequirementChange = (e) => {
+		const { name, value } = e.target;
+		setRequirementData((prev) => ({
+			...prev,
+			[name]: value,
+		}));
+	};
+
+	const handlePostRequirement = async (e) => {
+		e.preventDefault();
+		setRequirementLoading(true);
+		setMessage(null);
+
+		try {
+			const token = localStorage.getItem("token");
+
+			const payload = {
+				workType: requirementData.workType,
+				landType: requirementData.landType,
+				landSize: parseFloat(requirementData.landSize),
+				expectedDate: new Date(requirementData.expectedDate).toISOString(),
+				duration: requirementData.duration,
+				location: {
+					village: requirementData.village,
+					district: requirementData.district,
+					state: requirementData.state,
+				},
+				maxBudget: parseFloat(requirementData.maxBudget),
+				urgency: requirementData.urgency,
+				additionalNotes: requirementData.notes,
+				status: "open",
+			};
+
+			const response = await api.post("/tractor-requirements", payload, {
+				headers: {
+					Authorization: `Bearer ${token}`,
+					"Content-Type": "application/json",
+				},
+			});
+
+			if (response.data.success) {
+				setMessage({
+					type: "success",
+					text: "Tractor requirement posted successfully! Tractor owners will contact you.",
+				});
+
+				// Reset form
+				setRequirementData({
+					workType: "Plowing",
+					landType: "Plain",
+					landSize: "",
+					expectedDate: "",
+					duration: "",
+					village: "",
+					district: "",
+					state: "",
+					maxBudget: "",
+					urgency: "normal",
+					notes: "",
+				});
+
+				setTimeout(() => {
+					navigate("/farmer-dashboard");
+				}, 2000);
+			}
+		} catch (error) {
+			console.error("Post requirement error:", error);
+			setMessage({
+				type: "error",
+				text:
+					error.response?.data?.message ||
+					"Failed to post requirement. Please try again.",
+			});
+		} finally {
+			setRequirementLoading(false);
+		}
+	};
 
 	return (
-		<div className="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
-			<div className="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full transform transition-all duration-300 scale-100">
-				<div className="flex justify-between items-start mb-4">
-					<div className="flex items-center">
-						<Icon />
-						<h3
-							className={`ml-3 text-lg font-bold ${
-								isSuccess ? "text-green-700" : "text-red-700"
-							}`}
-						>
-							{isSuccess ? "Booking Successful!" : "Submission Error"}
-						</h3>
-					</div>
+		<div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 py-8 px-4">
+			<div className="max-w-7xl mx-auto">
+				{/* Header */}
+				<div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
 					<button
-						onClick={onClose}
-						className="text-gray-400 hover:text-gray-600"
+						onClick={() => navigate(-1)}
+						className="flex items-center text-gray-600 hover:text-gray-800 mb-4 transition"
 					>
-						<svg
-							className="w-6 h-6"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M6 18L18 6M6 6l12 12"
-							/>
-						</svg>
+						<ArrowLeft className="w-5 h-5 mr-2" />
+						Back
+					</button>
+					<h1 className="text-3xl font-bold text-gray-900 flex items-center">
+						<Tractor className="w-8 h-8 mr-3 text-green-600" />
+						Book a Tractor
+					</h1>
+					<p className="text-gray-600 mt-2">
+						Post your requirement or search for available tractors
+					</p>
+				</div>
+
+				{/* Tab Navigation */}
+				<div className="bg-white rounded-xl shadow-lg p-2 mb-6 flex space-x-2">
+					<button
+						onClick={() => setActiveTab("requirement")}
+						className={`flex-1 py-3 px-6 rounded-lg font-semibold transition ${
+							activeTab === "requirement"
+								? "bg-green-600 text-white"
+								: "text-gray-600 hover:bg-gray-100"
+						}`}
+					>
+						<FileText className="w-5 h-5 inline mr-2" />
+						Post Requirement
+					</button>
+					<button
+						onClick={() => setActiveTab("search")}
+						className={`flex-1 py-3 px-6 rounded-lg font-semibold transition ${
+							activeTab === "search"
+								? "bg-green-600 text-white"
+								: "text-gray-600 hover:bg-gray-100"
+						}`}
+					>
+						<Search className="w-5 h-5 inline mr-2" />
+						Search Tractors
 					</button>
 				</div>
-				<p className="text-gray-600 mb-4">{message}</p>
 
-				{data && isSuccess && (
-					<div className="bg-green-50 p-3 rounded-lg text-sm text-gray-700 max-h-40 overflow-y-auto">
-						<h4 className="font-semibold mb-1 text-green-800">
-							Booking Details:
-						</h4>
-						<ul className="space-y-1">
-							<li>
-								<strong>Booking ID:</strong> {data._id}
-							</li>
-							<li>
-								<strong>Date:</strong>{" "}
-								{new Date(data.bookingDate).toLocaleDateString()}
-							</li>
-							<li>
-								<strong>Work Type:</strong> {data.workType}
-							</li>
-							<li>
-								<strong>Total Cost:</strong> ₹{data.totalCost}
-							</li>
-							<li>
-								<strong>Status:</strong>{" "}
-								<span className="capitalize">{data.status}</span>
-							</li>
-						</ul>
+				{/* Success/Error Message */}
+				{message && (
+					<div
+						className={`mb-6 p-4 rounded-lg border-l-4 ${
+							message.type === "success"
+								? "bg-green-50 border-green-500 text-green-700"
+								: "bg-red-50 border-red-500 text-red-700"
+						}`}
+					>
+						{message.text}
 					</div>
 				)}
 
-				<button
-					onClick={onClose}
-					className="mt-5 w-full bg-green-700 text-white py-2 rounded-xl hover:bg-green-800 transition shadow-md"
-				>
-					Close
-				</button>
+				{/* POST REQUIREMENT TAB */}
+				{activeTab === "requirement" && (
+					<TractorRequirementForm
+						formData={requirementData}
+						onChange={handleRequirementChange}
+						onSubmit={handlePostRequirement}
+						loading={requirementLoading}
+					/>
+				)}
+
+				{/* SEARCH TAB */}
+				{activeTab === "search" && (
+					<>
+						{/* Search Section */}
+						<div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+							<h2 className="text-xl font-semibold mb-4 flex items-center">
+								<Search className="w-5 h-5 mr-2 text-green-600" />
+								Search by Location
+							</h2>
+							<div className="grid md:grid-cols-4 gap-4">
+								<input
+									type="text"
+									placeholder="Village (optional)"
+									value={searchLocation.village}
+									onChange={(e) =>
+										setSearchLocation({
+											...searchLocation,
+											village: e.target.value,
+										})
+									}
+									className="px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+								/>
+								<input
+									type="text"
+									placeholder="District"
+									value={searchLocation.district}
+									onChange={(e) =>
+										setSearchLocation({
+											...searchLocation,
+											district: e.target.value,
+										})
+									}
+									className="px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+								/>
+								<input
+									type="text"
+									placeholder="State"
+									value={searchLocation.state}
+									onChange={(e) =>
+										setSearchLocation({
+											...searchLocation,
+											state: e.target.value,
+										})
+									}
+									className="px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+								/>
+								<button
+									onClick={handleSearch}
+									className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center"
+								>
+									<Search className="w-5 h-5 mr-2" />
+									Search
+								</button>
+							</div>
+						</div>
+
+						{/* Results Section */}
+						<div>
+							{loading ? (
+								<div className="text-center py-12">
+									<div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+									<p className="mt-4 text-gray-600">Loading tractors...</p>
+								</div>
+							) : filteredTractors.length === 0 && searchPerformed ? (
+								<div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+									<Tractor className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+									<h3 className="text-xl font-semibold text-gray-700 mb-2">
+										No Tractors Found
+									</h3>
+									<p className="text-gray-500">
+										Try searching with different location criteria
+									</p>
+								</div>
+							) : (
+								<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{filteredTractors.map((tractor) => (
+										<TractorCard
+											key={tractor._id}
+											tractor={tractor}
+											onBook={handleBookNow}
+										/>
+									))}
+								</div>
+							)}
+						</div>
+					</>
+				)}
+
+				{/* Booking Modal */}
+				{showBookingModal && (
+					<BookingModal
+						tractor={selectedTractor}
+						bookingData={bookingData}
+						setBookingData={setBookingData}
+						onSubmit={handleBookingSubmit}
+						onClose={() => setShowBookingModal(false)}
+						loading={bookingLoading}
+					/>
+				)}
 			</div>
 		</div>
 	);
 };
 
-// Main Application Component
-export default function TractorBookingForm() {
-	const navigate = useNavigate();
+// Tractor Card Component
+const TractorCard = ({ tractor, onBook }) => (
+	<div className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition">
+		<div className="flex items-start justify-between mb-4">
+			<div>
+				<h3 className="text-xl font-bold text-gray-900">
+					{tractor.brand} {tractor.model}
+				</h3>
+				<p className="text-sm text-gray-500">{tractor.typeOfPlowing}</p>
+			</div>
+			<div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
+				Available
+			</div>
+		</div>
 
-	const [form, setForm] = useState({
-		location: "",
-		district: "",
-		state: "",
-		pincode: "",
-		workType: "",
-		landType: "",
-		vehicleType: "",
-		landSize: "",
-		date: new Date().toISOString().split("T")[0],
-		time: "08:00",
-		duration: 4,
-		additionalInfo: "",
-	});
+		<div className="space-y-3 mb-4">
+			<div className="flex items-center text-gray-600">
+				<Tractor className="w-4 h-4 mr-2" />
+				<span className="text-sm">{tractor.vehicleNumber}</span>
+			</div>
+			<div className="flex items-center text-gray-600">
+				<DollarSign className="w-4 h-4 mr-2" />
+				<span className="text-sm font-semibold text-green-700">
+					₹{tractor.chargePerAcre}/acre
+				</span>
+			</div>
+			<div className="flex items-center text-gray-600">
+				<MapPin className="w-4 h-4 mr-2" />
+				<span className="text-sm">
+					{tractor.location?.village}, {tractor.location?.district},{" "}
+					{tractor.location?.state}
+				</span>
+			</div>
+			<div className="flex items-center text-gray-600">
+				<Phone className="w-4 h-4 mr-2" />
+				<span className="text-sm">{tractor.contactNumber}</span>
+			</div>
+		</div>
 
-	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [submitStatus, setSubmitStatus] = useState(null);
-	const [availableTractors, setAvailableTractors] = useState([]);
-	const [selectedTractor, setSelectedTractor] = useState(null);
-
-	const handleChange = (e) => {
-		const { name, value } = e.target;
-		if (name === "duration" || name === "landSize") {
-			setForm((prev) => ({ ...prev, [name]: parseInt(value) || 0 }));
-		} else {
-			setForm((prev) => ({ ...prev, [name]: value }));
-		}
-	};
-
-	// Search for available tractors based on criteria
-	const handleSearchTractors = async () => {
-		try {
-			const filters = {
-				typeOfPlowing: form.workType,
-				landType: form.landType,
-				availability: true,
-			};
-
-			const result = await tractorService.getAllTractorServices(filters);
-
-			if (result.success) {
-				setAvailableTractors(result.tractorServices);
-				if (result.tractorServices.length === 0) {
-					setSubmitStatus({
-						type: "error",
-						message: "No tractors available for the selected criteria.",
-					});
-				}
-			}
-		} catch (error) {
-			setSubmitStatus({
-				type: "error",
-				message:
-					error.response?.data?.message ||
-					"Failed to fetch tractors. Please try again.",
-			});
-		}
-	};
-
-	const handleSubmit = async (e) => {
-		e.preventDefault();
-		if (isSubmitting) return;
-
-		// Validation
-		if (!selectedTractor) {
-			setSubmitStatus({
-				type: "error",
-				message: "Please select a tractor before booking.",
-			});
-			return;
-		}
-
-		if (!form.landSize || form.landSize <= 0) {
-			setSubmitStatus({
-				type: "error",
-				message: "Please enter a valid land size.",
-			});
-			return;
-		}
-
-		setIsSubmitting(true);
-		setSubmitStatus(null);
-
-		try {
-			const bookingData = {
-				serviceType: "tractor",
-				serviceId: selectedTractor._id,
-				bookingDate: `${form.date}T${form.time}:00.000Z`,
-				duration: form.duration,
-				workType: form.workType,
-				landSize: form.landSize,
-				location: {
-					village: form.location,
-					district: form.district,
-					state: form.state,
-					pincode: form.pincode,
-				},
-				notes: form.additionalInfo,
-			};
-
-			const result = await bookingService.createBooking(bookingData);
-
-			if (result.success) {
-				setSubmitStatus({
-					type: "success",
-					message: "Booking confirmed successfully! 🚜",
-					data: result.booking,
-				});
-
-				// Reset form
-				setForm({
-					location: "",
-					district: "",
-					state: "",
-					pincode: "",
-					workType: "",
-					landType: "",
-					vehicleType: "",
-					landSize: "",
-					date: new Date().toISOString().split("T")[0],
-					time: "08:00",
-					duration: 4,
-					additionalInfo: "",
-				});
-				setSelectedTractor(null);
-				setAvailableTractors([]);
-
-				// Redirect after 3 seconds
-				setTimeout(() => navigate("/my-bookings"), 3000);
-			}
-		} catch (error) {
-			setSubmitStatus({
-				type: "error",
-				message:
-					error.response?.data?.message || "Booking failed. Please try again.",
-			});
-		} finally {
-			setIsSubmitting(false);
-		}
-	};
-
-	// Tractor Icon SVG
-	const TractorIcon = () => (
-		<svg
-			className="w-8 h-8 text-green-600"
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="2"
-			strokeLinecap="round"
-			strokeLinejoin="round"
+		<button
+			onClick={() => onBook(tractor)}
+			className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center"
 		>
-			<path d="M12 18H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-7z" />
-			<path d="M5 11V7a2 2 0 0 1 2-2h4l2 2h4l2-2h4a2 2 0 0 1 2 2v4" />
-			<circle cx="7" cy="16" r="3" />
-			<circle cx="18" cy="16" r="3" />
-			<rect x="10" y="8" width="4" height="4" rx="1" />
-		</svg>
-	);
+			<CheckCircle className="w-5 h-5 mr-2" />
+			Book Now
+		</button>
+	</div>
+);
 
-	return (
-		<div className="min-h-screen bg-gray-50 p-4 sm:p-8 flex items-start justify-center font-sans">
-			<div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-6 sm:p-8">
-				{/* Header */}
-				<div className="flex items-center space-x-3 mb-6 pb-4 border-b">
-					<TractorIcon />
-					<h2 className="text-3xl font-extrabold text-green-700">
-						Book a Tractor
-					</h2>
+// Tractor Requirement Form Component
+const TractorRequirementForm = ({ formData, onChange, onSubmit, loading }) => (
+	<div className="bg-white rounded-2xl shadow-lg p-8">
+		<h2 className="text-2xl font-bold mb-6">Post Tractor Requirement</h2>
+		<p className="text-gray-600 mb-6">
+			Fill in your requirements and tractor owners in your area will contact you
+		</p>
+
+		<form onSubmit={onSubmit} className="space-y-6">
+			{/* Work Details */}
+			<div className="grid md:grid-cols-2 gap-4">
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Type of Work *
+					</label>
+					<select
+						name="workType"
+						value={formData.workType}
+						onChange={onChange}
+						required
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					>
+						<option value="Plowing">Plowing</option>
+						<option value="Harvesting">Harvesting</option>
+						<option value="Spraying">Spraying</option>
+						<option value="Hauling">Hauling</option>
+						<option value="Land Preparation">Land Preparation</option>
+					</select>
 				</div>
-
-				<form
-					onSubmit={handleSubmit}
-					className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5"
-				>
-					{/* Location Details */}
-					<div className="sm:col-span-2">
-						<h3 className="text-lg font-semibold text-gray-700 mb-3">
-							Location Details
-						</h3>
-					</div>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Village/Area <span className="text-red-500">*</span>
-						<input
-							type="text"
-							name="location"
-							value={form.location}
-							onChange={handleChange}
-							required
-							placeholder="Enter village or area"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Land Type *
 					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						District <span className="text-red-500">*</span>
-						<input
-							type="text"
-							name="district"
-							value={form.district}
-							onChange={handleChange}
-							required
-							placeholder="Enter district"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						State <span className="text-red-500">*</span>
-						<input
-							type="text"
-							name="state"
-							value={form.state}
-							onChange={handleChange}
-							required
-							placeholder="Enter state"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Pincode <span className="text-red-500">*</span>
-						<input
-							type="text"
-							name="pincode"
-							value={form.pincode}
-							onChange={handleChange}
-							required
-							placeholder="Enter pincode"
-							maxLength="6"
-							pattern="[0-9]{6}"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					{/* Work Details */}
-					<div className="sm:col-span-2 mt-4">
-						<h3 className="text-lg font-semibold text-gray-700 mb-3">
-							Work Details
-						</h3>
-					</div>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Type of Work <span className="text-red-500">*</span>
-						<select
-							name="workType"
-							value={form.workType}
-							onChange={handleChange}
-							required
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						>
-							<option value="" disabled>
-								Select work type
-							</option>
-							{workTypes.map((w) => (
-								<option key={w} value={w}>
-									{w}
-								</option>
-							))}
-						</select>
-					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Land Type <span className="text-red-500">*</span>
-						<select
-							name="landType"
-							value={form.landType}
-							onChange={handleChange}
-							required
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						>
-							<option value="" disabled>
-								Select land type
-							</option>
-							{landTypes.map((l) => (
-								<option key={l} value={l}>
-									{l}
-								</option>
-							))}
-						</select>
-					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Vehicle Type <span className="text-red-500">*</span>
-						<select
-							name="vehicleType"
-							value={form.vehicleType}
-							onChange={handleChange}
-							required
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						>
-							<option value="" disabled>
-								Select tractor type
-							</option>
-							{vehicleTypes.map((v) => (
-								<option key={v} value={v}>
-									{v}
-								</option>
-							))}
-						</select>
-					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Land Size (Acres) <span className="text-red-500">*</span>
-						<input
-							type="number"
-							min="1"
-							name="landSize"
-							value={form.landSize}
-							onChange={handleChange}
-							required
-							placeholder="e.g., 10"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					{/* Scheduling */}
-					<div className="sm:col-span-2 mt-4">
-						<h3 className="text-lg font-semibold text-gray-700 mb-3">
-							Schedule
-						</h3>
-					</div>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Date <span className="text-red-500">*</span>
-						<input
-							type="date"
-							name="date"
-							value={form.date}
-							onChange={handleChange}
-							required
-							min={new Date().toISOString().split("T")[0]}
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					<label className="flex flex-col text-gray-700 font-medium">
-						Start Time <span className="text-red-500">*</span>
-						<input
-							type="time"
-							name="time"
-							value={form.time}
-							onChange={handleChange}
-							required
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					<label className="flex flex-col sm:col-span-2 text-gray-700 font-medium">
-						Work Duration (Hours) <span className="text-red-500">*</span>
-						<input
-							type="number"
-							min="1"
-							max="24"
-							name="duration"
-							value={form.duration}
-							onChange={handleChange}
-							required
-							placeholder="e.g., 4"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					{/* Additional Info */}
-					<label className="flex flex-col sm:col-span-2 text-gray-700 font-medium">
-						Additional Information
-						<textarea
-							name="additionalInfo"
-							value={form.additionalInfo}
-							onChange={handleChange}
-							placeholder="Any special requirements or notes"
-							rows="3"
-							className="mt-1 px-4 py-2 border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-400 transition duration-150"
-						/>
-					</label>
-
-					{/* Search Tractors Button */}
-					<button
-						type="button"
-						onClick={handleSearchTractors}
-						className="sm:col-span-2 py-3 rounded-xl font-semibold text-green-700 border-2 border-green-700 hover:bg-green-50 transition duration-300"
+					<select
+						name="landType"
+						value={formData.landType}
+						onChange={onChange}
+						required
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
 					>
-						🔍 Search Available Tractors
-					</button>
-
-					{/* Available Tractors List */}
-					{availableTractors.length > 0 && (
-						<div className="sm:col-span-2 mt-4">
-							<h3 className="text-lg font-semibold text-gray-700 mb-3">
-								Available Tractors
-							</h3>
-							<div className="space-y-3 max-h-60 overflow-y-auto">
-								{availableTractors.map((tractor) => (
-									<div
-										key={tractor._id}
-										onClick={() => setSelectedTractor(tractor)}
-										className={`p-4 border-2 rounded-lg cursor-pointer transition ${
-											selectedTractor?._id === tractor._id
-												? "border-green-600 bg-green-50"
-												: "border-gray-300 hover:border-green-400"
-										}`}
-									>
-										<div className="flex justify-between items-start">
-											<div>
-												<h4 className="font-semibold text-gray-800">
-													{tractor.model} - {tractor.brand}
-												</h4>
-												<p className="text-sm text-gray-600">
-													{tractor.typeOfPlowing} | {tractor.landType}
-												</p>
-												<p className="text-sm text-gray-600">
-													Vehicle: {tractor.vehicleNumber}
-												</p>
-											</div>
-											<div className="text-right">
-												<p className="text-lg font-bold text-green-700">
-													₹{tractor.chargePerAcre}/acre
-												</p>
-												{selectedTractor?._id === tractor._id && (
-													<span className="text-xs text-green-600 font-semibold">
-														✓ Selected
-													</span>
-												)}
-											</div>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-					)}
-
-					{/* Submit Button */}
-					<button
-						type="submit"
-						disabled={isSubmitting || !selectedTractor}
-						className={`sm:col-span-2 mt-6 py-3 rounded-xl font-semibold text-white transition duration-300 shadow-lg ${
-							isSubmitting || !selectedTractor
-								? "bg-green-400 cursor-not-allowed"
-								: "bg-green-700 hover:bg-green-800 active:bg-green-900"
-						}`}
-					>
-						{isSubmitting ? (
-							<span className="flex items-center justify-center">
-								<svg
-									className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-								>
-									<circle
-										className="opacity-25"
-										cx="12"
-										cy="12"
-										r="10"
-										stroke="currentColor"
-										strokeWidth="4"
-									></circle>
-									<path
-										className="opacity-75"
-										fill="currentColor"
-										d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-									></path>
-								</svg>
-								Processing Booking...
-							</span>
-						) : (
-							"Confirm Booking"
-						)}
-					</button>
-				</form>
-
-				<button
-					onClick={() => navigate("/")}
-					className="mt-4 w-full border border-gray-300 rounded-xl py-3 text-gray-700 hover:bg-gray-100 transition shadow-sm"
-				>
-					← Back to Home
-				</button>
+						<option value="Plain">Plain</option>
+						<option value="Dry">Dry</option>
+						<option value="Wet">Wet</option>
+						<option value="Hilly">Hilly</option>
+					</select>
+				</div>
 			</div>
 
-			{/* Status Notification Modal */}
-			<StatusNotification
-				status={submitStatus}
-				onClose={() => setSubmitStatus(null)}
-			/>
+			<div className="grid md:grid-cols-2 gap-4">
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Land Size (acres) *
+					</label>
+					<input
+						type="number"
+						name="landSize"
+						value={formData.landSize}
+						onChange={onChange}
+						required
+						min="0.1"
+						step="0.1"
+						placeholder="5"
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Expected Date *
+					</label>
+					<input
+						type="date"
+						name="expectedDate"
+						value={formData.expectedDate}
+						onChange={onChange}
+						required
+						min={new Date().toISOString().split("T")[0]}
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+			</div>
+
+			<div className="grid md:grid-cols-2 gap-4">
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Duration *
+					</label>
+					<input
+						type="text"
+						name="duration"
+						value={formData.duration}
+						onChange={onChange}
+						required
+						placeholder="e.g., 2 days, 5 hours"
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Max Budget (₹) *
+					</label>
+					<input
+						type="number"
+						name="maxBudget"
+						value={formData.maxBudget}
+						onChange={onChange}
+						required
+						min="0"
+						placeholder="5000"
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+			</div>
+
+			{/* Location */}
+			<div className="grid md:grid-cols-3 gap-4">
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Village
+					</label>
+					<input
+						type="text"
+						name="village"
+						value={formData.village}
+						onChange={onChange}
+						placeholder="Village name"
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						District *
+					</label>
+					<input
+						type="text"
+						name="district"
+						value={formData.district}
+						onChange={onChange}
+						required
+						placeholder="District"
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						State *
+					</label>
+					<input
+						type="text"
+						name="state"
+						value={formData.state}
+						onChange={onChange}
+						required
+						placeholder="State"
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+			</div>
+
+			{/* Urgency */}
+			<div>
+				<label className="block text-sm font-medium text-gray-700 mb-2">
+					Urgency *
+				</label>
+				<select
+					name="urgency"
+					value={formData.urgency}
+					onChange={onChange}
+					required
+					className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+				>
+					<option value="normal">Normal</option>
+					<option value="urgent">Urgent</option>
+					<option value="very_urgent">Very Urgent</option>
+				</select>
+			</div>
+
+			{/* Notes */}
+			<div>
+				<label className="block text-sm font-medium text-gray-700 mb-2">
+					Additional Notes
+				</label>
+				<textarea
+					name="notes"
+					value={formData.notes}
+					onChange={onChange}
+					rows="3"
+					placeholder="Any specific requirements..."
+					className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+				/>
+			</div>
+
+			<button
+				type="submit"
+				disabled={loading}
+				className="w-full bg-green-600 text-white py-4 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400 flex items-center justify-center"
+			>
+				{loading ? (
+					<>
+						<svg
+							className="animate-spin h-5 w-5 text-white mr-2"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								className="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								strokeWidth="4"
+							></circle>
+							<path
+								className="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
+						</svg>
+						Posting Requirement...
+					</>
+				) : (
+					"Post Requirement"
+				)}
+			</button>
+		</form>
+	</div>
+);
+
+// Booking Modal Component
+const BookingModal = ({
+	tractor,
+	bookingData,
+	setBookingData,
+	onSubmit,
+	onClose,
+	loading,
+}) => (
+	<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+		<div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
+			<h2 className="text-2xl font-bold text-gray-900 mb-6">
+				Book: {tractor.brand} {tractor.model}
+			</h2>
+
+			<form onSubmit={onSubmit} className="space-y-4">
+				<div className="grid md:grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-gray-700 mb-2">
+							Booking Date *
+						</label>
+						<input
+							type="date"
+							required
+							value={bookingData.bookingDate}
+							onChange={(e) =>
+								setBookingData({
+									...bookingData,
+									bookingDate: e.target.value,
+								})
+							}
+							min={new Date().toISOString().split("T")[0]}
+							className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-gray-700 mb-2">
+							Duration (hours) *
+						</label>
+						<input
+							type="number"
+							required
+							min="1"
+							value={bookingData.duration}
+							onChange={(e) =>
+								setBookingData({
+									...bookingData,
+									duration: e.target.value,
+								})
+							}
+							className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+						/>
+					</div>
+				</div>
+
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Work Location *
+					</label>
+					<input
+						type="text"
+						required
+						placeholder="Full address where work will be done"
+						value={bookingData.location}
+						onChange={(e) =>
+							setBookingData({
+								...bookingData,
+								location: e.target.value,
+							})
+						}
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+					/>
+				</div>
+
+				<div className="grid md:grid-cols-2 gap-4">
+					<div>
+						<label className="block text-sm font-medium text-gray-700 mb-2">
+							Work Type *
+						</label>
+						<select
+							required
+							value={bookingData.workType}
+							onChange={(e) =>
+								setBookingData({
+									...bookingData,
+									workType: e.target.value,
+								})
+							}
+							className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+						>
+							<option value="Plowing">Plowing</option>
+							<option value="Harvesting">Harvesting</option>
+							<option value="Spraying">Spraying</option>
+							<option value="Hauling">Hauling</option>
+							<option value="Land Preparation">Land Preparation</option>
+						</select>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-gray-700 mb-2">
+							Land Size (acres)
+						</label>
+						<input
+							type="number"
+							step="0.1"
+							value={bookingData.landSize}
+							onChange={(e) =>
+								setBookingData({
+									...bookingData,
+									landSize: e.target.value,
+								})
+							}
+							className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+						/>
+					</div>
+				</div>
+
+				<div>
+					<label className="block text-sm font-medium text-gray-700 mb-2">
+						Additional Notes
+					</label>
+					<textarea
+						rows="3"
+						value={bookingData.notes}
+						onChange={(e) =>
+							setBookingData({
+								...bookingData,
+								notes: e.target.value,
+							})
+						}
+						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
+						placeholder="Any special requirements..."
+					/>
+				</div>
+
+				<div className="bg-gray-50 p-4 rounded-lg">
+					<h3 className="font-semibold mb-2">Cost Estimate:</h3>
+					<p className="text-2xl font-bold text-green-600">
+						₹{tractor.chargePerAcre * (bookingData.landSize || 1)}
+					</p>
+					<p className="text-sm text-gray-500">
+						({bookingData.landSize || 1} acres × ₹{tractor.chargePerAcre}/acre)
+					</p>
+				</div>
+
+				<div className="flex space-x-4 pt-4">
+					<button
+						type="button"
+						onClick={onClose}
+						className="flex-1 px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition"
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						disabled={loading}
+						className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition disabled:bg-gray-400"
+					>
+						{loading ? "Booking..." : "Confirm Booking"}
+					</button>
+				</div>
+			</form>
 		</div>
-	);
-}
+	</div>
+);
+
+export default TractorBooking;

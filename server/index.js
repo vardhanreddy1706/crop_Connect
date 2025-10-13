@@ -5,6 +5,8 @@ const helmet = require("helmet");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
+const http = require("http");
+const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const errorHandler = require("./middlewares/errorHandler");
 
@@ -16,6 +18,56 @@ connectDB();
 
 // Initialize Express app
 const app = express();
+
+// Create HTTP server for Socket.IO
+const server = http.createServer(app);
+
+// Initialize Socket.IO
+const io = new Server(server, {
+	cors: {
+		origin: [
+			"http://localhost:5174",
+			"http://localhost:5173",
+			"http://localhost:3000",
+			"http://127.0.0.1:5174",
+			"http://127.0.0.1:5173",
+			process.env.CLIENT_URL,
+		].filter(Boolean),
+		methods: ["GET", "POST", "PUT", "DELETE"],
+		credentials: true,
+	},
+});
+
+// 🆕 SAFER: Try to load nodemailer, but don't crash if it's not available
+let emailTransporter = null;
+try {
+	const nodemailer = require("nodemailer");
+
+	if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+		emailTransporter = nodemailer.createTransporter({
+			service: "gmail",
+			auth: {
+				user: process.env.EMAIL_USER,
+				pass: process.env.EMAIL_PASS,
+			},
+		});
+		console.log("✅ Email service configured");
+	} else {
+		console.log(
+			"⚠️  Email credentials not found in .env - email notifications disabled"
+		);
+	}
+} catch (error) {
+	console.log("⚠️  nodemailer not installed - email notifications disabled");
+	console.log("   Run: npm install nodemailer");
+}
+
+// Make io and emailTransporter available in req object
+app.use((req, res, next) => {
+	req.io = io;
+	req.emailTransporter = emailTransporter;
+	next();
+});
 
 // ========================
 // SECURITY MIDDLEWARES
@@ -84,6 +136,20 @@ if (process.env.NODE_ENV === "development") {
 	});
 }
 
+// Socket.IO Connection Handler
+io.on("connection", (socket) => {
+	console.log(`🔌 User connected: ${socket.id}`);
+
+	socket.on("join", (userId) => {
+		socket.join(userId);
+		console.log(`👤 User ${userId} joined their notification room`);
+	});
+
+	socket.on("disconnect", () => {
+		console.log(`🔌 User disconnected: ${socket.id}`);
+	});
+});
+
 // ========================
 // IMPORT ROUTES
 // ========================
@@ -94,6 +160,10 @@ const tractorRoutes = require("./routes/tractorRoutes");
 const workerRoutes = require("./routes/workerRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const contactRoutes = require("./routes/contactRoutes");
+const workerRequirementRoutes = require("./routes/workerRequirementRoutes");
+const tractorRequirementRoutes = require("./routes/tractorRequirementRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const transactionRoutes = require("./routes/transactionRoutes");
 
 // ========================
 // API ROUTES
@@ -105,6 +175,10 @@ app.use("/api/tractors", tractorRoutes);
 app.use("/api/workers", workerRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/worker-requirements", workerRequirementRoutes);
+app.use("/api/tractor-requirements", tractorRequirementRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/transactions", transactionRoutes);
 
 // ========================
 // WELCOME ROUTE
@@ -123,6 +197,10 @@ app.get("/", (req, res) => {
 			workerServices: "/api/workers",
 			bookings: "/api/bookings",
 			contact: "/api/contact",
+			workerRequirements: "/api/worker-requirements",
+			tractorRequirements: "/api/tractor-requirements",
+			notifications: "/api/notifications",
+			transactions: "/api/transactions",
 		},
 	});
 });
@@ -136,6 +214,8 @@ app.get("/api/health", (req, res) => {
 		message: "Server is running",
 		uptime: process.uptime(),
 		timestamp: Date.now(),
+		socketIO: "Connected",
+		emailService: emailTransporter ? "Configured" : "Not configured",
 	});
 });
 
@@ -159,7 +239,7 @@ app.use(errorHandler);
 // ========================
 const PORT = process.env.PORT || 8000;
 
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
 	console.log("\n🚀 ========================================");
 	console.log(
 		`✅ Server running in ${process.env.NODE_ENV || "development"} mode`
@@ -168,6 +248,12 @@ const server = app.listen(PORT, () => {
 	console.log(`📡 API Base: http://localhost:${PORT}/api`);
 	console.log(`🔒 JWT Authentication: Enabled`);
 	console.log(`🌍 CORS: Enabled for http://localhost:5174`);
+	console.log(`🔌 Socket.IO: Enabled for real-time notifications`);
+	console.log(
+		`📧 Email Service: ${
+			emailTransporter ? "Configured ✅" : "Not configured ⚠️"
+		}`
+	);
 	console.log("🚀 ========================================\n");
 });
 
@@ -177,4 +263,13 @@ process.on("unhandledRejection", (err) => {
 	server.close(() => process.exit(1));
 });
 
-module.exports = app;
+// Graceful shutdown
+process.on("SIGINT", () => {
+	console.log("\n🛑 Shutting down server gracefully...");
+	server.close(() => {
+		console.log("✅ Server closed");
+		process.exit(0);
+	});
+});
+
+module.exports = { app, io, emailTransporter };

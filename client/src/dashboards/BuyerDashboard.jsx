@@ -103,6 +103,11 @@ function BuyerDashboard() {
 		navigate("/landing", { replace: true }); // 'replace' prevents back button from returning
 	};
 
+	// Navigation handler for Buy Crop button
+	const handleBuyCrop = () => {
+		navigate("/crops");
+	};
+
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
 			<header className="bg-white shadow-md p-4 md:p-6 sticky top-0 z-10">
@@ -272,6 +277,12 @@ function BuyerDashboard() {
 								</div>
 								<button className="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
 									Add to Cart
+								</button>
+								<button
+									onClick={handleBuyCrop}
+									className="px-8 py-3 sm:px-8 sm:py-4 bg-yellow-400 rounded-md text-white text-sm sm:text-base font-semibold uppercase hover:bg-yellow-500 hover:shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
+								>
+									BUY HERE
 								</button>
 							</div>
 						))}

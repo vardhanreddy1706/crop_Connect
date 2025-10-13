@@ -36,6 +36,10 @@ export const AuthProvider = ({ children }) => {
 						const parsedUser = JSON.parse(storedUser);
 						setToken(storedToken);
 						setUser(parsedUser);
+						// Set in API headers immediately
+						api.defaults.headers.common[
+							"Authorization"
+						] = `Bearer ${storedToken}`;
 					} catch (err) {
 						// Invalid JSON, clear storage
 						console.error("Failed to parse user from storage:", err);
@@ -53,27 +57,6 @@ export const AuthProvider = ({ children }) => {
 		initializeAuth();
 	}, []);
 
-	// Verify token is still valid with backend on mount
-	useEffect(() => {
-		if (token && user) {
-			const verifyToken = async () => {
-				try {
-					// Add token to headers for verification
-					api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-
-					// Call a verify endpoint or just trust the token
-					// If your backend has a /verify endpoint, call it here
-					// Otherwise, the token will be validated on first API call
-				} catch (error) {
-					// Token invalid, clear auth
-					console.error("Token verification failed:", error);
-					logout();
-				}
-			};
-			verifyToken();
-		}
-	}, []); // Only on mount
-
 	// Listen for storage changes from other tabs
 	useEffect(() => {
 		const handleStorageChange = (e) => {
@@ -82,14 +65,16 @@ export const AuthProvider = ({ children }) => {
 					// User logged out in another tab
 					setToken(null);
 					setUser(null);
+					delete api.defaults.headers.common["Authorization"];
 				} else if (e.key === "token" && e.newValue) {
 					// Token updated in another tab
 					setToken(e.newValue);
+					api.defaults.headers.common["Authorization"] = `Bearer ${e.newValue}`;
 				} else if (e.key === "user" && e.newValue) {
 					try {
 						setUser(JSON.parse(e.newValue));
 					} catch (err) {
-						console.error(err||"Failed to parse user from storage event");
+						console.error("Failed to parse user from storage event:", err);
 					}
 				}
 			}

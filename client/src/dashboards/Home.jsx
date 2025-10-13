@@ -4,6 +4,7 @@ import { AuthContext } from "../context/AuthContext.jsx";
 import "../App.css";
 import Footer from "../pages/Footer.jsx";
 import FarmerCarousel from "../caurosel/Caurosel.jsx";
+import CropPriceSearch from "../pages/CropPriceSearch.jsx";
 
 export default function FarmerDashboard() {
 	const { user, logout } = useContext(AuthContext);
@@ -24,10 +25,7 @@ export default function FarmerDashboard() {
 		nav("/sell-crop");
 	};
 
-	// Navigation handler for Buy Crop button
-	const handleBuyCrop = () => {
-		nav("/crops");
-	};
+	
 
 	return (
 		<>
@@ -127,7 +125,7 @@ export default function FarmerDashboard() {
 									{/* Dropdown Items */}
 									<div className="py-2">
 										<Link
-											to="/booking"
+											to="/worker-bookings"
 											className="group/item flex items-start gap-4 px-6 py-4 hover:bg-green-50 transition-colors"
 										>
 											<div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center group-hover/item:bg-green-200 transition-colors">
@@ -160,7 +158,7 @@ export default function FarmerDashboard() {
 										<div className="border-t border-gray-100"></div>
 
 										<Link
-											to="/book-tractor"
+											to="/tractor-booking"
 											className="group/item flex items-start gap-4 px-6 py-4 hover:bg-emerald-50 transition-colors"
 										>
 											<div className="flex-shrink-0 w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center group-hover/item:bg-emerald-200 transition-colors">
@@ -192,36 +190,6 @@ export default function FarmerDashboard() {
 
 										<div className="border-t border-gray-100"></div>
 
-										<Link
-											to="/my-bookings"
-											className="group/item flex items-start gap-4 px-6 py-4 hover:bg-blue-50 transition-colors"
-										>
-											<div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center group-hover/item:bg-blue-200 transition-colors">
-												<span className="text-2xl">📋</span>
-											</div>
-											<div className="flex-1">
-												<h4 className="font-semibold text-gray-800 group-hover/item:text-blue-700 transition-colors">
-													My Bookings
-												</h4>
-												<p className="text-xs text-gray-500 mt-0.5">
-													View all your bookings
-												</p>
-											</div>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												className="h-5 w-5 text-gray-400 group-hover/item:text-blue-600 transform group-hover/item:translate-x-1 transition-all"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke="currentColor"
-											>
-												<path
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth={2}
-													d="M9 5l7 7-7 7"
-												/>
-											</svg>
-										</Link>
 
 										<div className="border-t border-gray-100"></div>
 
@@ -512,18 +480,13 @@ export default function FarmerDashboard() {
 								>
 									SELL HERE
 								</button>
-								<button
-									onClick={handleBuyCrop}
-									className="px-8 py-3 sm:px-8 sm:py-4 bg-yellow-400 rounded-md text-white text-sm sm:text-base font-semibold uppercase hover:bg-yellow-500 hover:shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
-								>
-									BUY HERE
-								</button>
 							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 			<FarmerCarousel />
+			<CropPriceSearch/>
 			<Footer />
 		</>
 	);

@@ -7,6 +7,7 @@ const {
 	updateTractorService,
 	deleteTractorService,
 	getMyTractorServices,
+	cancelTractorService,
 } = require("../controllers/tractorController");
 const { protect, authorize } = require("../middlewares/authMiddleware");
 
@@ -14,14 +15,18 @@ router
 	.route("/")
 	.get(getAllTractorServices)
 	.post(protect, authorize("tractor_owner"), createTractorService);
-
 router.get(
 	"/my-services",
 	protect,
 	authorize("tractor_owner"),
 	getMyTractorServices
 );
-
+router.post(
+	"/:id/cancel",
+	protect,
+	authorize("tractor_owner"),
+	cancelTractorService
+);
 router
 	.route("/:id")
 	.get(getTractorServiceById)

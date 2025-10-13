@@ -21,7 +21,10 @@ import SellCropPage from "./pages/SellCropPage";
 import Products from "./pages/Products";
 import ProductDetails from "./pages/ProductDetails";
 import TractorBooking from "./pages/TractorBooking";
-import Bookings from "./pages/Bookings";
+import WorkerBookings from "./pages/Bookings";
+import FarmerBookings from "./pages/BookingsHistory";
+import TransactionHistory from "./pages/TransactionHistory";
+import { NotificationProvider } from "./context/NotificationContext";
 
 // Dashboards
 import BuyerDashboard from "./dashboards/BuyerDashboard";
@@ -218,13 +221,23 @@ function AppRoutes() {
 				}
 			/>
 			<Route
-				path="/my-bookings"
+				path="/worker-bookings"
 				element={
 					<ProtectedRoute>
-						<Bookings />
+						<WorkerBookings />
 					</ProtectedRoute>
 				}
 			/>
+			<Route
+				path="/transaction-history"
+				element={
+					<ProtectedRoute>
+						<TransactionHistory />
+					</ProtectedRoute>
+				}
+			/>
+
+			<Route path="booking-history" element ={<ProtectedRoute><FarmerBookings/></ProtectedRoute>}/>
 
 			{/* Role-Based Dashboards - Protected */}
 			<Route
@@ -292,11 +305,13 @@ function AppRoutes() {
 
 function App() {
 	return (
-		<Router>
-			<AuthProvider>
-				<AppRoutes />
-			</AuthProvider>
-		</Router>
+		<NotificationProvider>
+			<Router>
+				<AuthProvider>
+					<AppRoutes />
+				</AuthProvider>
+			</Router>
+		</NotificationProvider>
 	);
 }
 
