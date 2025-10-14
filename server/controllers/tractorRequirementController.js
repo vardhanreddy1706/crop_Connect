@@ -1,5 +1,5 @@
 const TractorRequirement = require("../models/TractorRequirement");
-const TractorService = require("../models/tractorService");
+const TractorService = require("../models/TractorService");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const Booking = require("../models/Booking");
@@ -74,9 +74,9 @@ exports.createTractorRequirement = async (req, res) => {
 	}
 };
 
-// @desc    Get all tractor requirements (for tractor owners to see)
-// @route   GET /api/tractor-requirements
-// @access  Private (Tractor Owner)
+// @desc Get all tractor requirements (for tractor owners to see)
+// @route GET /api/tractor-requirements
+// @access Private (Tractor Owner)
 exports.getAllTractorRequirements = async (req, res) => {
 	try {
 		const { workType, landType, district, state, urgency, status } = req.query;
@@ -89,20 +89,21 @@ exports.getAllTractorRequirements = async (req, res) => {
 		if (state) query["location.state"] = new RegExp(state, "i");
 		if (urgency) query.urgency = urgency;
 		if (status) query.status = status;
-		else query.status = { $in: ["open", "in_progress"] }; // 🆕 Show both open and in_progress
+		else query.status = "open"; // Default show only open requirements
 
 		const tractorRequirements = await TractorRequirement.find(query)
 			.populate("farmer", "name phone email address")
-			.populate("responses.tractorOwner", "name phone rating")
-			.populate("acceptedResponse.tractorOwner", "name phone") // 🆕 NEW: Populate accepted response
-			.sort({ urgency: -1, expectedDate: 1, createdAt: -1 });
+			.populate("acceptedBy", "name phone email") // ✅ FIXED - removed acceptedResponse
+			.populate("responses.tractorOwner", "name phone email") // ✅ Correct nested path
+			.sort({ createdAt: -1 })
+			.lean();
 
 		res.status(200).json({
 			success: true,
-			count: tractorRequirements.length,
-			tractorRequirements, // Changed from 'requirements' to match frontend
+			tractorRequirements,
 		});
 	} catch (error) {
+		console.error("Get requirements error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,
@@ -110,15 +111,15 @@ exports.getAllTractorRequirements = async (req, res) => {
 	}
 };
 
-// @desc    Get single tractor requirement
-// @route   GET /api/tractor-requirements/:id
-// @access  Private
+// @desc Get tractor requirement by ID
+// @route GET /api/tractor-requirements/:id
+// @access Private
 exports.getTractorRequirementById = async (req, res) => {
 	try {
 		const tractorRequirement = await TractorRequirement.findById(req.params.id)
 			.populate("farmer", "name phone email address")
-			.populate("responses.tractorOwner", "name phone email rating")
-			.populate("acceptedResponse.tractorOwner", "name phone address"); // 🆕 NEW
+			.populate("acceptedBy", "name phone email") // ✅ FIXED
+			.populate("responses.tractorOwner", "name phone email"); // ✅ FIXED
 
 		if (!tractorRequirement) {
 			return res.status(404).json({
@@ -129,9 +130,10 @@ exports.getTractorRequirementById = async (req, res) => {
 
 		res.status(200).json({
 			success: true,
-			tractorRequirement, // Changed from 'requirement'
+			tractorRequirement,
 		});
 	} catch (error) {
+		console.error("Get requirement by ID error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,
@@ -139,24 +141,25 @@ exports.getTractorRequirementById = async (req, res) => {
 	}
 };
 
-// @desc    Get my tractor requirements (Farmer)
-// @route   GET /api/tractor-requirements/my-requirements
-// @access  Private (Farmer)
+// @desc Get my tractor requirements (for farmers)
+// @route GET /api/tractor-requirements/my-requirements
+// @access Private (Farmer)
 exports.getMyTractorRequirements = async (req, res) => {
 	try {
 		const tractorRequirements = await TractorRequirement.find({
 			farmer: req.user._id,
 		})
-			.populate("responses.tractorOwner", "name phone email rating")
-			.populate("acceptedResponse.tractorOwner", "name phone address") // 🆕 NEW
-			.sort({ createdAt: -1 });
+			.populate("acceptedBy", "name phone email") // ✅ FIXED
+			.populate("responses.tractorOwner", "name phone email") // ✅ FIXED
+			.sort({ createdAt: -1 })
+			.lean();
 
 		res.status(200).json({
 			success: true,
-			count: tractorRequirements.length,
-			tractorRequirements, // Changed from 'requirements'
+			tractorRequirements,
 		});
 	} catch (error) {
+		console.error("Get my requirements error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,
@@ -346,142 +349,128 @@ exports.respondToRequirement = async (req, res) => {
 	}
 };
 
-// ==================== NEW FUNCTIONS ====================
-
-// @desc    Accept farmer's tractor requirement (Tractor Owner accepts bid)
-// @route   POST /api/tractor-requirements/:id/accept
-// @access  Private (Tractor Owner)
+// @desc Accept tractor requirement (Tractor Owner)
+// @route POST /api/tractor-requirements/:id/accept
+// @access Private (Tractor Owner)
 exports.acceptRequirement = async (req, res) => {
-	try {
-		const requirement = await TractorRequirement.findById(
-			req.params.id
-		).populate("farmer", "name phone email address");
+  try {
+    const requirement = await TractorRequirement.findById(req.params.id)
+      .populate("farmer", "name phone email");
 
-		if (!requirement) {
-			return res.status(404).json({
-				success: false,
-				message: "Tractor requirement not found",
-			});
-		}
+    if (!requirement) {
+      return res.status(404).json({
+        success: false,
+        message: "Tractor requirement not found",
+      });
+    }
 
-		if (requirement.status !== "open") {
-			return res.status(400).json({
-				success: false,
-				message: "This requirement is no longer open",
-			});
-		}
+    console.log("Requirement status:", requirement.status);
+    console.log("Accepted by:", requirement.acceptedBy);
 
-		// Find the response from current tractor owner
-		const response = requirement.responses.find(
-			(r) => r.tractorOwner.toString() === req.user._id.toString()
-		);
+    // ✅ FIXED - Only check if already accepted by someone
+    if (requirement.acceptedBy) {
+      const acceptedUser = await User.findById(requirement.acceptedBy);
+      return res.status(400).json({
+        success: false,
+        message: `This requirement has already been accepted by ${acceptedUser?.name || 'another tractor owner'}`,
+      });
+    }
 
-		if (!response) {
-			return res.status(400).json({
-				success: false,
-				message: "You haven't placed a bid for this requirement",
-			});
-		}
+    // Get tractor service
+    const tractorService = await TractorService.findOne({
+      owner: req.user._id,
+    });
 
-		// Update requirement status to in_progress and store accepted response
-		requirement.status = "in_progress";
-		requirement.acceptedResponse = {
-			tractorOwner: req.user._id,
-			quotedPrice: response.quotedPrice,
-			acceptedAt: Date.now(),
-		};
-		await requirement.save();
+    if (!tractorService) {
+      return res.status(400).json({
+        success: false,
+        message: "Please create a tractor service first",
+      });
+    }
 
-		// Create booking
-		const booking = await Booking.create({
-			farmer: requirement.farmer._id,
-			serviceType: "tractor",
-			serviceId: req.user._id,
-			serviceModel: "TractorService",
-			bookingDate: requirement.expectedDate,
-			duration: requirement.duration || response.estimatedDuration || "1 day",
-			totalCost: response.quotedPrice * requirement.landSize,
-			location: requirement.location,
-			workType: requirement.workType,
-			landSize: requirement.landSize,
-			status: "confirmed",
-			paymentStatus: "pending",
-		});
+    // Parse duration
+    let durationHours = 8;
+    if (requirement.duration) {
+      const match = requirement.duration.match(/(\d+)/);
+      if (match) {
+        durationHours = parseInt(match[1]);
+      }
+    }
 
-		// Get tractor owner details
-		const tractorOwner = await User.findById(req.user._id).select(
-			"name phone address"
-		);
-		const tractorService = await TractorService.findOne({
-			owner: req.user._id,
-		}).select("brand model vehicleNumber");
+    // Calculate cost
+    const costPerAcre = tractorService.chargePerAcre || (requirement.maxBudget / requirement.landSize);
+    const totalCost = Math.round(costPerAcre * requirement.landSize);
 
-		// Notify farmer about acceptance with tractor owner details
-		await Notification.create({
-			recipientId: requirement.farmer._id,
-			type: "bid_accepted",
-			title: "🎉 Your Request Accepted!",
-			message: `${tractorOwner.name} has accepted your tractor requirement for ${requirement.workType}`,
-			relatedUserId: req.user._id,
-			relatedRequirementId: requirement._id,
-			relatedBookingId: booking._id,
-			data: {
-				tractorOwner: {
-					name: tractorOwner.name,
-					phone: tractorOwner.phone,
-					address: tractorOwner.address,
-				},
-				tractorService,
-				quotedPrice: response.quotedPrice,
-				totalCost: response.quotedPrice * requirement.landSize,
-				workDate: requirement.expectedDate,
-				location: requirement.location,
-				bookingId: booking._id,
-			},
-		});
+    // Create booking
+    const booking = await Booking.create({
+      farmer: requirement.farmer._id,
+      tractorOwnerId: req.user._id,
+      serviceType: "tractor",
+      serviceId: tractorService._id,
+      serviceModel: "TractorService",
+      bookingDate: requirement.expectedDate,
+      duration: durationHours,
+      totalCost: totalCost,
+      location: requirement.location,
+      workType: requirement.workType,
+      landSize: requirement.landSize,
+      status: "confirmed",
+      paymentStatus: "pending",
+      notes: `Booking created from requirement. Work: ${requirement.workType}, Land: ${requirement.landSize} acres`,
+    });
 
-		// Real-time notification to farmer
-		if (req.io) {
-			req.io.to(requirement.farmer._id.toString()).emit("notification", {
-				type: "bid_accepted",
-				title: "🎉 Your Request Accepted!",
-				message: `${tractorOwner.name} has accepted your requirement`,
-				data: {
-					tractorOwner: {
-						name: tractorOwner.name,
-						phone: tractorOwner.phone,
-						address: tractorOwner.address,
-					},
-					tractorService,
-					booking,
-				},
-				timestamp: new Date(),
-			});
-		}
+    // Update requirement
+    requirement.status = "in_progress";
+    requirement.acceptedBy = req.user._id;
+    requirement.acceptedAt = new Date();
+    await requirement.save();
 
-		res.status(200).json({
-			success: true,
-			message:
-				"Requirement accepted successfully. Farmer has been notified with your details.",
-			booking,
-			requirement,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
+    // Populate farmer details for response
+    await requirement.populate("farmer", "name phone email");
+
+    // Create notification
+    try {
+      await Notification.create({
+        recipientId: requirement.farmer._id,
+        type: "requirement_accepted",
+        title: "🎉 Requirement Accepted!",
+        message: `${req.user.name} has accepted your ${requirement.workType} request`,
+        relatedUserId: req.user._id,
+        relatedRequirementId: requirement._id,
+        data: {
+          bookingId: booking._id,
+          tractorOwner: req.user.name,
+          workType: requirement.workType,
+          totalCost,
+        },
+      });
+    } catch (notifError) {
+      console.error("Notification creation error:", notifError);
+      // Don't fail the accept if notification fails
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Requirement accepted successfully",
+      booking,
+      requirement,
+    });
+  } catch (error) {
+    console.error("Accept requirement error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to accept requirement",
+    });
+  }
 };
 
-// @desc    Mark work as completed (Tractor Owner)
-// @route   POST /api/tractor-requirements/:id/complete
-// @access  Private (Tractor Owner)
+
+// @desc Complete work (Tractor Owner marks work as done)
+// @route POST /api/tractor-requirements/:id/complete
+// @access Private (Tractor Owner)
 exports.completeWork = async (req, res) => {
 	try {
-		const requirement = await TractorRequirement.findById(
-			req.params.id
-		).populate("farmer", "name phone");
+		const requirement = await TractorRequirement.findById(req.params.id);
 
 		if (!requirement) {
 			return res.status(404).json({
@@ -490,72 +479,46 @@ exports.completeWork = async (req, res) => {
 			});
 		}
 
-		// Find the associated booking
-		const booking = await Booking.findOne({
-			farmer: requirement.farmer._id,
-			serviceId: req.user._id,
-		});
-
-		if (!booking) {
-			return res.status(404).json({
+		if (requirement.status !== "in_progress") {
+			return res.status(400).json({
 				success: false,
-				message: "Booking not found",
+				message: "This requirement is not in progress",
 			});
 		}
 
-		// Update statuses
+		// Update requirement
 		requirement.status = "completed";
-		booking.status = "completed";
-
+		requirement.completedAt = new Date();
 		await requirement.save();
-		await booking.save();
 
-		// Notify farmer about work completion and payment options
-		await Notification.create({
-			recipientId: requirement.farmer._id,
-			type: "work_completed",
-			title: "✅ Work Completed!",
-			message: `Your ${requirement.workType} work has been completed. Please proceed with payment.`,
-			relatedRequirementId: requirement._id,
-			relatedBookingId: booking._id,
-			data: {
-				workType: requirement.workType,
-				totalCost: booking.totalCost,
-				completedAt: Date.now(),
-				bookingId: booking._id,
-				paymentOptions: [
-					{
-						method: "cash",
-						title: "Pay After Work Completion",
-						description: "Pay cash after work is done",
-					},
-					{
-						method: "razorpay",
-						title: "Pay Online via Razorpay",
-						description: "Secure online payment",
-					},
-				],
-			},
+		// Update booking
+		const booking = await Booking.findOne({
+			serviceId: requirement.acceptedBy,
+			farmer: requirement.farmer,
+			workType: requirement.workType,
 		});
 
-		// Real-time notification to farmer
-		if (req.io) {
-			req.io.to(requirement.farmer._id.toString()).emit("notification", {
-				type: "work_completed",
-				title: "✅ Work Completed!",
-				message: `Your ${requirement.workType} work has been completed`,
-				data: { booking, requirement },
-				timestamp: new Date(),
-			});
+		if (booking) {
+			booking.status = "completed";
+			await booking.save();
 		}
+
+		// Notify farmer
+		await Notification.create({
+			recipientId: requirement.farmer,
+			type: "work_completed",
+			title: "Work Completed!",
+			message: `${requirement.workType} work has been completed. Please make payment.`,
+			relatedRequirementId: requirement._id,
+		});
 
 		res.status(200).json({
 			success: true,
-			message: "Work marked as completed. Farmer can now make payment.",
+			message: "Work marked as completed",
 			requirement,
-			booking,
 		});
 	} catch (error) {
+		console.error("Complete work error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect, useCallback } from "react";
 import {
 	Tractor,
@@ -21,47 +22,47 @@ import {
 	LogOut,
 	X,
 	ChevronRight,
-	TrendingDown,
 	Package,
 	Activity,
+	Briefcase,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useNotificationContext } from "../context/NotificationContext";
 import api from "../config/api";
 
-// =============================================
-// 🚜 COMPLETE TRACTOR OWNER DASHBOARD
-// With all integrations: Payments, Notifications, Accept/Reject, Real-time
-// Green/White/Red theme for farmer-friendly UI
-// =============================================
-
 const TractorDashboard = () => {
 	const { user, logout } = useAuth();
-	const { notifications, unreadCount} = useNotificationContext();
+	const { notifications, unreadCount } = useNotificationContext();
 
-	// ========================
-	// STATE MANAGEMENT
-	// ========================
+	useEffect(() => {
+		toast.dismiss();
+	}, []);
+
+	// ==================== STATE MANAGEMENT ====================
 	const [activeTab, setActiveTab] = useState("overview");
+	const [myWorkSubTab, setMyWorkSubTab] = useState("accepted"); // NEW: subtab for My Work
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 
 	// Data states
 	const [myServices, setMyServices] = useState([]);
 	const [requirements, setRequirements] = useState([]);
+	const [myBids, setMyBids] = useState([]); // NEW: My placed bids
+	const [myWork, setMyWork] = useState([]); // NEW: Accepted work bookings
 	const [dashboardData, setDashboardData] = useState(null);
 	const [stats, setStats] = useState({
 		totalServices: 0,
 		activeRequests: 0,
 		totalEarnings: 0,
 		pendingPayments: 0,
+		acceptedWork: 0,
+		completedWork: 0,
 	});
 
 	// Form states
 	const [showServiceForm, setShowServiceForm] = useState(false);
 	const [showBidModal, setShowBidModal] = useState(null);
-
 
 	// Filter states
 	const [searchTerm, setSearchTerm] = useState("");
@@ -80,56 +81,70 @@ const TractorDashboard = () => {
 		typeOfPlowing: "",
 		landType: "",
 		chargePerAcre: "",
-		location: {
-			district: "",
-			state: "",
-			village: "",
-			pincode: "",
-		},
+		location: { district: "", state: "", village: "", pincode: "" },
 		contactNumber: user?.phone || "",
 		availability: true,
 	});
 
 	// Bid form
 	const [bidForm, setBidForm] = useState({
-		quotedPrice: "",
-		notes: "",
-		estimatedDuration: "1",
+		proposedAmount: "",
+		proposedDuration: "1",
+		message: "",
 	});
 
-	// ========================
-	// DATA FETCHING
-	// ========================
-
+	// ==================== DATA FETCHING ====================
 	const fetchAllData = useCallback(async () => {
 		try {
 			setRefreshing(true);
-
-			const [servicesRes, requirementsRes, dashboardRes] = await Promise.all([
+			const results = await Promise.allSettled([
 				api.get("/tractors/my-services"),
 				api.get("/tractor-requirements"),
 				api.get("/transactions/dashboard"),
+				api.get("/bids/tractor-owner"), // NEW: Fetch my bids
+				api.get("/bookings/tractor-owner"), // NEW: Fetch my work/bookings
 			]);
 
-			setMyServices(servicesRes.data.tractorServices || []);
-			setRequirements(requirementsRes.data.tractorRequirements || []);
-			setDashboardData(dashboardRes.data);
+			// Handle services
+			if (results[0].status === "fulfilled") {
+				setMyServices(results[0].value.data.tractorServices || []);
+			}
 
-			// Calculate stats
-			setStats({
-				totalServices: servicesRes.data.tractorServices?.length || 0,
-				activeRequests:
-					requirementsRes.data.tractorRequirements?.filter(
-						(r) => r.status === "open"
-					).length || 0,
-				totalEarnings: dashboardRes.data.stats?.totalAmount || 0,
-				pendingPayments: dashboardRes.data.stats?.pendingAmount || 0,
-			});
+			// Handle requirements
+			if (results[1].status === "fulfilled") {
+				setRequirements(results[1].value.data.tractorRequirements || []);
+			}
 
-			toast.success("Dashboard refreshed!");
+			// Handle dashboard
+			if (results[2].status === "fulfilled") {
+				setDashboardData(results[2].value.data);
+			}
+
+			// NEW: Handle bids
+			if (results[3].status === "fulfilled") {
+				setMyBids(results[3].value.data.bids || []);
+			}
+
+			// NEW: Handle my work (bookings)
+			if (results[4].status === "fulfilled") {
+				const bookings = results[4].value.data.bookings || [];
+				setMyWork(bookings);
+				setStats((prev) => ({
+					...prev,
+					totalServices: results[0].value?.data.tractorServices?.length || 0,
+					activeRequests:
+						results[1].value?.data.tractorRequirements?.filter(
+							(r) => r.status === "open"
+						).length || 0,
+					totalEarnings: results[2].value?.data.stats?.totalAmount || 0,
+					pendingPayments: results[2].value?.data.stats?.pendingAmount || 0,
+					acceptedWork: bookings.filter((b) => b.status === "confirmed").length,
+					completedWork: bookings.filter((b) => b.status === "completed")
+						.length,
+				}));
+			}
 		} catch (error) {
-			console.error("Error fetching data:", error);
-			toast.error(error.message || "Failed to load dashboard data");
+			console.error("Fetch error:", error);
 		} finally {
 			setLoading(false);
 			setRefreshing(false);
@@ -140,18 +155,17 @@ const TractorDashboard = () => {
 		fetchAllData();
 	}, [fetchAllData]);
 
-	// ========================
-	// SERVICE POSTING
-	// ========================
-
+	// ==================== SERVICE POSTING ====================
 	const handleCreateService = async (e) => {
 		e.preventDefault();
 		try {
 			const response = await api.post("/tractors", newService);
 			toast.success(
-				`Service posted! ${
-					response.data.notifiedFarmers || 0
-				} nearby farmers notified 🚜`
+				`✅ Service posted!${
+					response.data.notifiedFarmers > 0
+						? ` ${response.data.notifiedFarmers} farmers notified`
+						: ""
+				}`
 			);
 			setShowServiceForm(false);
 			setNewService({
@@ -171,133 +185,47 @@ const TractorDashboard = () => {
 		}
 	};
 
-	const handleCancelService = async (serviceId) => {
-		if (!window.confirm("Are you sure you want to cancel this service?"))
-			return;
-
-		try {
-			await api.post(`/tractors/${serviceId}/cancel`);
-			toast.success("Service cancelled successfully");
-			fetchAllData();
-		} catch (error) {
-			toast.error(error.message || "Failed to cancel service");
-		}
-	};
-
-	// ========================
-	// REQUIREMENT HANDLING
-	// ========================
-
+	// ==================== NEW BID SYSTEM ====================
 	const handlePlaceBid = async (requirementId) => {
 		try {
-			await api.post(`/tractor-requirements/${requirementId}/respond`, {
-				quotedPrice: parseFloat(bidForm.quotedPrice),
-				notes: bidForm.notes,
-				estimatedDuration: `${bidForm.estimatedDuration} day(s)`,
+			const requirement = requirements.find((r) => r._id === requirementId);
+
+			await api.post("/bids", {
+				requirementId,
+				proposedAmount: parseFloat(bidForm.proposedAmount),
+				proposedDuration: `${bidForm.proposedDuration} days`,
+				proposedDate: requirement?.expectedDate,
+				message: bidForm.message,
 			});
 
-			toast.success("Bid placed successfully! Farmer will be notified 📋");
+			toast.success("🎉 Bid placed successfully! Farmer will be notified");
 			setShowBidModal(null);
-			setBidForm({ quotedPrice: "", notes: "", estimatedDuration: "1" });
+			setBidForm({ proposedAmount: "", proposedDuration: "1", message: "" });
 			fetchAllData();
 		} catch (error) {
-			toast.error(error.message || "Failed to place bid");
+			toast.error(error.response?.data?.message || "Failed to place bid");
 		}
 	};
 
-	const handleAcceptRequirement = async (requirementId) => {
-		// Show loading toast
-		const loadingToast = toast.loading("Accepting requirement...");
+	// ==================== WORK COMPLETION ====================
+	const handleMarkWorkComplete = async (bookingId) => {
+		if (!window.confirm("Mark this work as completed?")) return;
 
 		try {
-			const { data } = await api.post(
-				`/tractor-requirements/${requirementId}/accept`
-			);
-
-			const { booking, requirement } = data;
-
-			// Dismiss loading toast
-			toast.dismiss(loadingToast);
-
-			// Show success with booking details
-			toast.success(
-				(t) => (
-					<div>
-						<div className="font-bold">🎉 Booking Confirmed!</div>
-						<div className="text-sm mt-1">
-							<div>
-								Date: {new Date(booking.bookingDate).toLocaleDateString()}
-							</div>
-							<div>Amount: ₹{booking.totalCost}</div>
-							<div>Farmer: {requirement.farmer?.name}</div>
-						</div>
-						<button
-							onClick={() => {
-								toast.dismiss(t.id);
-								setActiveTab("payments"); // Navigate to payments tab
-							}}
-							className="mt-2 text-xs bg-green-100 hover:bg-green-200 px-2 py-1 rounded"
-						>
-							View in Payments →
-						</button>
-					</div>
-				),
-				{ duration: 8000 }
-			);
-
-			// Update stats optimistically
-			setStats((prev) => ({
-				...prev,
-				activeRequests: prev.activeRequests + 1,
-			}));
-
-			// Refresh data in background
-			await fetchAllData();
-		} catch (error) {
-			// Dismiss loading toast
-			toast.dismiss(loadingToast);
-
-			// Show error
-			const errorMsg =
-				error.response?.data?.message ||
-				error.message ||
-				"Failed to accept requirement";
-			toast.error(errorMsg, { duration: 4000 });
-
-			console.error("Accept error:", error);
-		}
-	};
-
-
-	const handleCompleteWork = async (requirementId) => {
-		if (
-			!window.confirm(
-				"Mark this work as completed? Farmer will be able to make payment."
-			)
-		)
-			return;
-
-		try {
-			await api.post(`/tractor-requirements/${requirementId}/complete`);
-			toast.success("Work marked as completed! Farmer can now pay ✅");
+			await api.post(`/bookings/${bookingId}/complete`);
+			toast.success("✅ Work marked as completed!");
 			fetchAllData();
 		} catch (error) {
-			toast.error(error.message || "Failed to complete work");
+			toast.error(error.response?.data?.message || "Failed to complete work");
 		}
 	};
 
-	// ========================
-	// FILTERING
-	// ========================
-
+	// ==================== FILTERING ====================
 	const filteredRequirements = requirements.filter((req) => {
 		const matchesSearch =
-			searchTerm === "" ||
+			!searchTerm ||
 			req.workType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-			req.location?.district
-				?.toLowerCase()
-				.includes(searchTerm.toLowerCase()) ||
-			req.farmer?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+			req.location?.district?.toLowerCase().includes(searchTerm.toLowerCase());
 
 		const matchesWorkType =
 			!filters.workType || req.workType === filters.workType;
@@ -318,10 +246,7 @@ const TractorDashboard = () => {
 		);
 	});
 
-	// ========================
-	// RENDER COMPONENTS
-	// ========================
-
+	// ==================== RENDER ====================
 	if (loading) {
 		return (
 			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -337,7 +262,7 @@ const TractorDashboard = () => {
 		<div className="min-h-screen bg-gray-50">
 			<Toaster position="top-right" />
 
-			{/* ===== HEADER ===== */}
+			{/* HEADER */}
 			<header className="bg-white shadow-sm border-b sticky top-0 z-40">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 					<div className="flex justify-between items-center py-4">
@@ -372,7 +297,7 @@ const TractorDashboard = () => {
 
 							<button
 								onClick={() => setShowServiceForm(true)}
-								className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md transition-all transform hover:scale-105"
+								className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md transition-all"
 							>
 								<Plus className="h-5 w-5" />
 								<span className="hidden sm:inline">Post Service</span>
@@ -399,7 +324,7 @@ const TractorDashboard = () => {
 				</div>
 			</header>
 
-			{/* ===== NAVIGATION TABS ===== */}
+			{/* NAVIGATION TABS */}
 			<nav className="bg-white border-b sticky top-[73px] z-30">
 				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 					<div className="flex space-x-8 overflow-x-auto">
@@ -410,6 +335,12 @@ const TractorDashboard = () => {
 								label: "Available Work",
 								icon: Search,
 								badge: stats.activeRequests,
+							},
+							{
+								id: "mywork",
+								label: "My Work",
+								icon: Briefcase,
+								badge: stats.acceptedWork,
 							},
 							{
 								id: "services",
@@ -441,7 +372,7 @@ const TractorDashboard = () => {
 				</div>
 			</nav>
 
-			{/* ===== MAIN CONTENT ===== */}
+			{/* MAIN CONTENT */}
 			<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 				{activeTab === "overview" && (
 					<OverviewTab
@@ -451,6 +382,7 @@ const TractorDashboard = () => {
 						setActiveTab={setActiveTab}
 					/>
 				)}
+
 				{activeTab === "requirements" && (
 					<RequirementsTab
 						requirements={filteredRequirements}
@@ -459,24 +391,33 @@ const TractorDashboard = () => {
 						filters={filters}
 						setFilters={setFilters}
 						onPlaceBid={(req) => setShowBidModal(req)}
-						onAccept={handleAcceptRequirement}
-						onComplete={handleCompleteWork}
-						userId={user?._id}
+						myBids={myBids}
 					/>
 				)}
+
+				{activeTab === "mywork" && (
+					<MyWorkTab
+						myWork={myWork}
+						activeSubTab={myWorkSubTab}
+						setActiveSubTab={setMyWorkSubTab}
+						onMarkComplete={handleMarkWorkComplete}
+					/>
+				)}
+
 				{activeTab === "services" && (
 					<ServicesTab
 						services={myServices}
-						onCancel={handleCancelService}
+						onCancel={() => {}}
 						onPostNew={() => setShowServiceForm(true)}
 					/>
 				)}
+
 				{activeTab === "payments" && (
 					<PaymentsTab dashboardData={dashboardData} />
 				)}
 			</main>
 
-			{/* ===== MODALS ===== */}
+			{/* MODALS */}
 			{showServiceForm && (
 				<ServiceFormModal
 					newService={newService}
@@ -499,870 +440,998 @@ const TractorDashboard = () => {
 	);
 };
 
-// =============================================
-// TAB COMPONENTS
-// =============================================
+// Continue with Part 2...
+// ==================== MY WORK TAB (NEW) ====================
+const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) => {
+    const filteredWork = myWork.filter((work) => {
+        if (activeSubTab === "accepted") return work.status === "confirmed";
+        if (activeSubTab === "completed") return work.status === "completed";
+        if (activeSubTab === "cancelled") return work.status === "cancelled";
+        return false;
+    });
 
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-gray-900">My Work</h2>
+            </div>
+
+            {/* Sub Tabs */}
+            <div className="flex gap-4 border-b">
+                {[
+                    { id: "accepted", label: "Accepted Work", icon: CheckCircle },
+                    { id: "completed", label: "Completed", icon: Package },
+                    { id: "cancelled", label: "Cancelled", icon: XCircle },
+                ].map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveSubTab(tab.id)}
+                        className={`pb-3 px-4 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
+                            activeSubTab === tab.id
+                                ? "border-green-500 text-green-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                        <tab.icon className="h-4 w-4" />
+                        <span>{tab.label}</span>
+                        <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs">
+                            {
+                                myWork.filter((w) => {
+                                    if (tab.id === "accepted") return w.status === "confirmed";
+                                    if (tab.id === "completed") return w.status === "completed";
+                                    if (tab.id === "cancelled") return w.status === "cancelled";
+                                    return false;
+                                }).length
+                            }
+                        </span>
+                    </button>
+                ))}
+            </div>
+
+            {/* Work List */}
+            {filteredWork.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                    <Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        No {activeSubTab} work
+                    </h3>
+                    <p className="text-gray-600">
+                        Your {activeSubTab} work will appear here
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {filteredWork.map((work) => (
+                        <div
+                            key={work._id}
+                            className="bg-white rounded-xl shadow-sm border-2 border-gray-200 hover:border-green-500 transition-all p-6"
+                        >
+                            {/* Status Badge */}
+                            <div className="flex justify-between items-start mb-4">
+                                <span
+                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                                        work.status === "confirmed"
+                                            ? "bg-blue-100 text-blue-800"
+                                            : work.status === "completed"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-red-100 text-red-800"
+                                    }`}
+                                >
+                                    {work.status === "confirmed" && <Clock className="h-3 w-3 mr-1" />}
+                                    {work.status === "completed" && <CheckCircle className="h-3 w-3 mr-1" />}
+                                    {work.status === "cancelled" && <XCircle className="h-3 w-3 mr-1" />}
+                                    {work.status.toUpperCase()}
+                                </span>
+                                <span className="text-2xl font-bold text-green-600">
+                                    ₹{work.totalCost}
+                                </span>
+                            </div>
+
+                            {/* Work Details */}
+                            <div className="space-y-3 mb-4">
+                                <div className="flex items-center text-gray-700">
+                                    <Tractor className="h-4 w-4 mr-2 text-green-600" />
+                                    <span className="font-semibold">{work.workType}</span>
+                                </div>
+                                <div className="flex items-center text-gray-600 text-sm">
+                                    <Calendar className="h-4 w-4 mr-2" />
+                                    {new Date(work.bookingDate).toLocaleDateString("en-IN", {
+                                        weekday: "short",
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                    })}
+                                </div>
+                                <div className="flex items-center text-gray-600 text-sm">
+                                    <MapPin className="h-4 w-4 mr-2" />
+                                    {work.location?.district}, {work.location?.state}
+                                </div>
+                                <div className="flex items-center text-gray-600 text-sm">
+                                    <User className="h-4 w-4 mr-2" />
+                                    <span className="font-medium">{work.farmer?.name}</span>
+                                </div>
+                                <div className="flex items-center text-gray-600 text-sm">
+                                    <Package className="h-4 w-4 mr-2" />
+                                    Land Size: {work.landSize} acres
+                                </div>
+                            </div>
+
+                            {/* Payment Status */}
+                            <div className="mb-4">
+                                <span
+                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                        work.paymentStatus === "paid"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-orange-100 text-orange-800"
+                                    }`}
+                                >
+                                    Payment: {work.paymentStatus}
+                                </span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2">
+                                {work.status === "confirmed" && (
+                                    <>
+                                        <a
+                                            href={`tel:${work.farmer?.phone}`}
+                                            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
+                                        >
+                                            <Phone className="h-4 w-4" />
+                                            <span>Call Farmer</span>
+                                        </a>
+                                        {new Date(work.bookingDate) <= new Date() && (
+                                            <button
+                                                onClick={() => onMarkComplete(work._id)}
+                                                className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
+                                            >
+                                                <CheckCircle className="h-4 w-4" />
+                                                <span>Mark Complete</span>
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                {work.status === "completed" && work.paymentStatus === "pending" && (
+                                    <div className="flex-1 bg-orange-50 border-2 border-orange-200 text-orange-800 px-4 py-2 rounded-lg text-center text-sm font-medium">
+                                        ⏳ Awaiting Payment
+                                    </div>
+                                )}
+                                {work.status === "completed" && work.paymentStatus === "paid" && (
+                                    <div className="flex-1 bg-green-50 border-2 border-green-200 text-green-800 px-4 py-2 rounded-lg text-center text-sm font-medium">
+                                        ✅ Payment Received
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Booking ID */}
+                            <div className="mt-3 pt-3 border-t text-xs text-gray-500">
+                                Booking ID: {work._id.slice(-8).toUpperCase()}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ==================== REQUIREMENTS TAB (UPDATED) ====================
+const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, setFilters, onPlaceBid, myBids }) => {
+    const hasBidOnRequirement = (reqId) => {
+        return myBids.some((bid) => bid.requirementId?._id === reqId);
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Available Work</h2>
+                    <p className="text-gray-600 text-sm">
+                        {requirements.length} requirements available
+                    </p>
+                </div>
+            </div>
+
+            {/* Search and Filters */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="md:col-span-2">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search by work type or district..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            />
+                        </div>
+                    </div>
+                    <select
+                        value={filters.workType}
+                        onChange={(e) => setFilters({ ...filters, workType: e.target.value })}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                        <option value="">All Work Types</option>
+                        <option value="Plowing">Plowing</option>
+                        <option value="Harvesting">Harvesting</option>
+                        <option value="Spraying">Spraying</option>
+                        <option value="Hauling">Hauling</option>
+                        <option value="Land Preparation">Land Preparation</option>
+                    </select>
+                    <select
+                        value={filters.urgency}
+                        onChange={(e) => setFilters({ ...filters, urgency: e.target.value })}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                        <option value="">All Urgency</option>
+                        <option value="normal">Normal</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="very_urgent">Very Urgent</option>
+                    </select>
+                    <button
+                        onClick={() => {
+                            setSearchTerm("");
+                            setFilters({ workType: "", district: "", urgency: "", status: "" });
+                        }}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+
+            {/* Requirements List */}
+            {requirements.length === 0 ? (
+                <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                    <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No requirements found</h3>
+                    <p className="text-gray-600">Check back later for new work opportunities</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {requirements.map((req) => {
+                        const bidPlaced = hasBidOnRequirement(req._id);
+                        const bid = myBids.find((b) => b.requirementId?._id === req._id);
+
+                        return (
+                            <div
+                                key={req._id}
+                                className="bg-white rounded-xl shadow-md border-2 border-gray-200 hover:border-green-500 transition-all p-6"
+                            >
+                                {/* Header */}
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 mb-1">
+                                            {req.workType}
+                                        </h3>
+                                        <div className="flex items-center space-x-2">
+                                            <span
+                                                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${
+                                                    req.urgency === "very_urgent"
+                                                        ? "bg-red-100 text-red-800"
+                                                        : req.urgency === "urgent"
+                                                        ? "bg-orange-100 text-orange-800"
+                                                        : "bg-blue-100 text-blue-800"
+                                                }`}
+                                            >
+                                                {req.urgency === "very_urgent" && <Zap className="h-3 w-3 mr-1" />}
+                                                {req.urgency.replace("_", " ").toUpperCase()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm text-gray-500">Budget</p>
+                                        <p className="text-2xl font-bold text-green-600">
+                                            ₹{req.maxBudget}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Details */}
+                                <div className="space-y-3 mb-4">
+                                    <div className="flex items-center text-gray-700">
+                                        <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                                        <span className="text-sm">
+                                            {req.location?.village ? `${req.location.village}, ` : ""}
+                                            {req.location?.district}, {req.location?.state}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center text-gray-700">
+                                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                                        <span className="text-sm">
+                                            Expected:{" "}
+                                            {new Date(req.expectedDate).toLocaleDateString("en-IN")}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center text-gray-700">
+                                        <Package className="h-4 w-4 mr-2 text-gray-400" />
+                                        <span className="text-sm">
+                                            {req.landSize} acres • {req.landType} land
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center text-gray-700">
+                                        <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                                        <span className="text-sm">Duration: {req.duration}</span>
+                                    </div>
+                                    {req.additionalNotes && (
+                                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                            <p className="text-sm text-gray-700">{req.additionalNotes}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Farmer Info */}
+                                <div className="bg-blue-50 rounded-lg p-3 mb-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center">
+                                            <User className="h-4 w-4 mr-2 text-blue-600" />
+                                            <span className="text-sm font-medium text-gray-900">
+                                                {req.farmer?.name}
+                                            </span>
+                                        </div>
+                                        <a
+                                            href={`tel:${req.farmer?.phone}`}
+                                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                        >
+                                            {req.farmer?.phone}
+                                        </a>
+                                    </div>
+                                </div>
+
+                                {/* Action Button */}
+                                {bidPlaced ? (
+                                    <div
+                                        className={`w-full px-4 py-3 rounded-lg text-center font-medium text-sm ${
+                                            bid?.status === "accepted"
+                                                ? "bg-green-100 text-green-800 border-2 border-green-300"
+                                                : bid?.status === "rejected"
+                                                ? "bg-red-100 text-red-800 border-2 border-red-300"
+                                                : "bg-yellow-100 text-yellow-800 border-2 border-yellow-300"
+                                        }`}
+                                    >
+                                        {bid?.status === "accepted" && "✅ Bid Accepted"}
+                                        {bid?.status === "rejected" && "❌ Bid Rejected"}
+                                        {bid?.status === "pending" && "⏳ Bid Placed - Pending"}
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => onPlaceBid(req)}
+                                        className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-medium flex items-center justify-center space-x-2 shadow-lg transition-all"
+                                    >
+                                        <DollarSign className="h-5 w-5" />
+                                        <span>Place Bid</span>
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ==================== OTHER TABS (Keep your existing ones) ====================
 const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => (
-	<div className="space-y-6">
-		{/* Stats Grid */}
-		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-			<StatCard
-				icon={Tractor}
-				label="Active Services"
-				value={stats.totalServices}
-				color="green"
-			/>
-			<StatCard
-				icon={Package}
-				label="Available Work"
-				value={stats.activeRequests}
-				color="blue"
-			/>
-			<StatCard
-				icon={DollarSign}
-				label="Total Earnings"
-				value={`₹${stats.totalEarnings.toLocaleString()}`}
-				color="green"
-			/>
-			<StatCard
-				icon={AlertCircle}
-				label="Pending Payments"
-				value={`₹${stats.pendingPayments.toLocaleString()}`}
-				color="orange"
-			/>
-		</div>
+    <div className="space-y-6">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <StatCard
+                title="Total Services"
+                value={stats.totalServices}
+                icon={Tractor}
+                color="blue"
+                onClick={() => setActiveTab("services")}
+            />
+            <StatCard
+                title="Active Requests"
+                value={stats.activeRequests}
+                icon={TrendingUp}
+                color="green"
+                onClick={() => setActiveTab("requirements")}
+            />
+            <StatCard
+                title="Total Earnings"
+                value={`₹${stats.totalEarnings.toLocaleString()}`}
+                icon={DollarSign}
+                color="green"
+                onClick={() => setActiveTab("payments")}
+            />
+            <StatCard
+                title="Accepted Work"
+                value={stats.acceptedWork}
+                icon={CheckCircle}
+                color="purple"
+                onClick={() => setActiveTab("mywork")}
+            />
+        </div>
 
-		{/* Recent Activity Grid */}
-		<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			{/* Recent Notifications */}
-			<div className="bg-white rounded-xl shadow-md overflow-hidden">
-				<div className="px-6 py-4 border-b bg-gradient-to-r from-green-50 to-white">
-					<h3 className="text-lg font-semibold text-gray-900 flex items-center">
-						<Bell className="h-5 w-5 text-green-600 mr-2" />
-						Recent Notifications
-					</h3>
-				</div>
-				<div className="divide-y max-h-96 overflow-y-auto">
-					{notifications.slice(0, 5).map((notif, idx) => (
-						<div
-							key={idx}
-							className="px-6 py-4 hover:bg-gray-50 transition-colors"
-						>
-							<div className="flex items-start">
-								<div
-									className={`w-2 h-2 rounded-full mt-2 mr-3 ${
-										notif.read ? "bg-gray-300" : "bg-green-500 animate-pulse"
-									}`}
-								></div>
-								<div className="flex-1">
-									<p className="text-sm font-medium text-gray-900">
-										{notif.title}
-									</p>
-									<p className="text-sm text-gray-600 mt-1">{notif.message}</p>
-									<p className="text-xs text-gray-400 mt-2">
-										{new Date(notif.createdAt).toLocaleString()}
-									</p>
-								</div>
-							</div>
-						</div>
-					))}
-				</div>
-			</div>
+        {/* Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <Bell className="h-5 w-5 mr-2 text-green-600" />
+                    Recent Notifications
+                </h3>
+                <div className="space-y-3">
+                    {notifications.slice(0, 5).map((notif) => (
+                        <div key={notif._id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                            <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-900">{notif.title}</p>
+                                <p className="text-xs text-gray-600 mt-1">{notif.message}</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {new Date(notif.createdAt).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
 
-			{/* Quick Actions */}
-			<div className="bg-white rounded-xl shadow-md overflow-hidden">
-				<div className="px-6 py-4 border-b bg-gradient-to-r from-blue-50 to-white">
-					<h3 className="text-lg font-semibold text-gray-900 flex items-center">
-						<Zap className="h-5 w-5 text-blue-600 mr-2" />
-						Quick Actions
-					</h3>
-				</div>
-				<div className="p-6 space-y-3">
-					<QuickActionButton
-						icon={Search}
-						label="Browse Work Requests"
-						onClick={() => setActiveTab("requirements")}
-						color="blue"
-					/>
-					<QuickActionButton
-						icon={Plus}
-						label="Post New Service"
-						onClick={() => {}}
-						color="green"
-					/>
-					<QuickActionButton
-						icon={DollarSign}
-						label="View Payment History"
-						onClick={() => setActiveTab("payments")}
-						color="purple"
-					/>
-				</div>
-			</div>
-		</div>
-
-		{/* Recent Transactions */}
-		{dashboardData?.transactions?.length > 0 && (
-			<div className="bg-white rounded-xl shadow-md overflow-hidden">
-				<div className="px-6 py-4 border-b">
-					<h3 className="text-lg font-semibold text-gray-900">
-						Recent Transactions
-					</h3>
-				</div>
-				<div className="overflow-x-auto">
-					<table className="min-w-full divide-y divide-gray-200">
-						<thead className="bg-gray-50">
-							<tr>
-								<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-									Date
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-									Farmer
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-									Work Type
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-									Amount
-								</th>
-								<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-									Status
-								</th>
-							</tr>
-						</thead>
-						<tbody className="bg-white divide-y divide-gray-200">
-							{dashboardData.transactions.slice(0, 5).map((txn) => (
-								<tr key={txn._id} className="hover:bg-gray-50">
-									<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-										{new Date(txn.createdAt).toLocaleDateString()}
-									</td>
-									<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-										{txn.farmerId?.name}
-									</td>
-									<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-										{txn.bookingId?.workType}
-									</td>
-									<td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-										₹{txn.amount.toLocaleString()}
-									</td>
-									<td className="px-6 py-4 whitespace-nowrap">
-										<StatusBadge status={txn.status} />
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
-			</div>
-		)}
-	</div>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div className="space-y-3">
+                    <button
+                        onClick={() => setActiveTab("requirements")}
+                        className="w-full bg-green-50 hover:bg-green-100 text-green-700 px-4 py-3 rounded-lg text-left flex items-center space-x-3 transition-colors"
+                    >
+                        <Search className="h-5 w-5" />
+                        <span className="font-medium">Browse Available Work</span>
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("mywork")}
+                        className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-3 rounded-lg text-left flex items-center space-x-3 transition-colors"
+                    >
+                        <Briefcase className="h-5 w-5" />
+                        <span className="font-medium">View My Work</span>
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("payments")}
+                        className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 px-4 py-3 rounded-lg text-left flex items-center space-x-3 transition-colors"
+                    >
+                        <DollarSign className="h-5 w-5" />
+                        <span className="font-medium">Check Earnings</span>
+                        <ChevronRight className="h-4 w-4 ml-auto" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 );
 
-const RequirementsTab = ({
-	requirements,
-	searchTerm,
-	setSearchTerm,
-	filters,
-	setFilters,
-	onPlaceBid,
-	onAccept,
-	onComplete,
-	userId,
-}) => (
-	<div className="space-y-6">
-		{/* Search and Filters */}
-		<div className="bg-white rounded-xl shadow-md p-6">
-			<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-				<div className="relative">
-					<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-					<input
-						type="text"
-						placeholder="Search requirements..."
-						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-						className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-					/>
-				</div>
-				<select
-					value={filters.workType}
-					onChange={(e) => setFilters({ ...filters, workType: e.target.value })}
-					className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-				>
-					<option value="">All Work Types</option>
-					<option value="Plowing">Plowing</option>
-					<option value="Harvesting">Harvesting</option>
-					<option value="Spraying">Spraying</option>
-					<option value="Hauling">Hauling</option>
-				</select>
-				<input
-					type="text"
-					placeholder="Filter by district"
-					value={filters.district}
-					onChange={(e) => setFilters({ ...filters, district: e.target.value })}
-					className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-				/>
-				<select
-					value={filters.urgency}
-					onChange={(e) => setFilters({ ...filters, urgency: e.target.value })}
-					className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-				>
-					<option value="">All Urgency</option>
-					<option value="urgent">Urgent</option>
-					<option value="normal">Normal</option>
-					<option value="flexible">Flexible</option>
-				</select>
-			</div>
-		</div>
+const StatCard = ({ title, value, icon: Icon, color, onClick }) => {
+    const colorClasses = {
+        blue: "from-blue-500 to-blue-600",
+        green: "from-green-500 to-green-600",
+        purple: "from-purple-500 to-purple-600",
+        orange: "from-orange-500 to-orange-600",
+    };
 
-		{/* Requirements Grid */}
-		<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-			{requirements.map((req) => (
-				<RequirementCard
-					key={req._id}
-					requirement={req}
-					onPlaceBid={onPlaceBid}
-					onAccept={onAccept}
-					onComplete={onComplete}
-					userId={userId}
-				/>
-			))}
-		</div>
+    return (
+        <div
+            onClick={onClick}
+            className="bg-white rounded-xl shadow-sm p-6 cursor-pointer hover:shadow-lg transition-all border-2 border-transparent hover:border-green-500"
+        >
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-sm text-gray-600 mb-1">{title}</p>
+                    <p className="text-3xl font-bold text-gray-900">{value}</p>
+                </div>
+                <div
+                    className={`bg-gradient-to-br ${colorClasses[color]} p-3 rounded-xl shadow-lg`}
+                >
+                    <Icon className="h-8 w-8 text-white" />
+                </div>
+            </div>
+        </div>
+    );
+};
 
-		{requirements.length === 0 && (
-			<div className="bg-white rounded-xl shadow-md p-12 text-center">
-				<Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-				<h3 className="text-xl font-semibold text-gray-900 mb-2">
-					No Requirements Found
-				</h3>
-				<p className="text-gray-500">
-					{searchTerm || Object.values(filters).some((f) => f)
-						? "Try adjusting your search or filters"
-						: "No farmer requests available at the moment"}
-				</p>
-			</div>
-		)}
-	</div>
-);
+// Keep your existing ServicesTab and PaymentsTab components...
 
+// Continue with Part 3 for Modals and Backend...
+// ==================== BID MODAL ====================
+const BidModal = ({ requirement, bidForm, setBidForm, onSubmit, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900">Place Your Bid</h2>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        <X className="h-6 w-6" />
+                    </button>
+                </div>
+
+                <div className="p-6">
+                    {/* Requirement Details */}
+                    <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-xl p-6 mb-6 border-2 border-green-200">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                            <Tractor className="h-5 w-5 mr-2 text-green-600" />
+                            Requirement Details
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="text-sm text-gray-600">Work Type</p>
+                                <p className="font-semibold text-gray-900">{requirement.workType}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-600">Farmer Budget</p>
+                                <p className="font-semibold text-green-600 text-lg">
+                                    ₹{requirement.maxBudget}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-600">Land Size</p>
+                                <p className="font-semibold text-gray-900">
+                                    {requirement.landSize} acres
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-600">Expected Date</p>
+                                <p className="font-semibold text-gray-900">
+                                    {new Date(requirement.expectedDate).toLocaleDateString("en-IN")}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-600">Duration</p>
+                                <p className="font-semibold text-gray-900">{requirement.duration}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-600">Location</p>
+                                <p className="font-semibold text-gray-900">
+                                    {requirement.location?.district}, {requirement.location?.state}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bid Form */}
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            onSubmit();
+                        }}
+                        className="space-y-6"
+                    >
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Your Bid Amount (₹) *
+                            </label>
+                            <div className="relative">
+                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    step="0.01"
+                                    value={bidForm.proposedAmount}
+                                    onChange={(e) =>
+                                        setBidForm({ ...bidForm, proposedAmount: e.target.value })
+                                    }
+                                    placeholder={`Farmer's budget: ₹${requirement.maxBudget}`}
+                                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-lg font-semibold"
+                                />
+                            </div>
+                            <p className="mt-2 text-sm text-gray-600">
+                                💡 Tip: Bid competitively. Farmer's max budget is ₹
+                                {requirement.maxBudget}
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Estimated Duration (days) *
+                            </label>
+                            <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                                <input
+                                    type="number"
+                                    required
+                                    min="1"
+                                    max="30"
+                                    value={bidForm.proposedDuration}
+                                    onChange={(e) =>
+                                        setBidForm({ ...bidForm, proposedDuration: e.target.value })
+                                    }
+                                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Message to Farmer (Optional)
+                            </label>
+                            <textarea
+                                value={bidForm.message}
+                                onChange={(e) => setBidForm({ ...bidForm, message: e.target.value })}
+                                placeholder="Introduce yourself and explain why you're the best fit for this work..."
+                                rows={4}
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 resize-none"
+                            />
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-4 pt-4">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-all flex items-center justify-center space-x-2"
+                            >
+                                <DollarSign className="h-5 w-5" />
+                                <span>Submit Bid</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==================== SERVICE FORM MODAL ====================
+const ServiceFormModal = ({ newService, setNewService, onSubmit, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900">Post New Tractor Service</h2>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                        <X className="h-6 w-6" />
+                    </button>
+                </div>
+
+                <form onSubmit={onSubmit} className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Brand */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Tractor Brand *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={newService.brand}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, brand: e.target.value })
+                                }
+                                placeholder="e.g., Mahindra, John Deere"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Model */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Model *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={newService.model}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, model: e.target.value })
+                                }
+                                placeholder="e.g., 575 DI, 5050 E"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Vehicle Number */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Vehicle Number *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={newService.vehicleNumber}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, vehicleNumber: e.target.value })
+                                }
+                                placeholder="e.g., AP 01 AB 1234"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Type of Plowing */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Type of Service *
+                            </label>
+                            <select
+                                required
+                                value={newService.typeOfPlowing}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, typeOfPlowing: e.target.value })
+                                }
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            >
+                                <option value="">Select Service Type</option>
+                                <option value="Plowing">Plowing</option>
+                                <option value="Harvesting">Harvesting</option>
+                                <option value="Spraying">Spraying</option>
+                                <option value="Hauling">Hauling</option>
+                                <option value="Land Preparation">Land Preparation</option>
+                            </select>
+                        </div>
+
+                        {/* Land Type */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Suitable for Land Type *
+                            </label>
+                            <select
+                                required
+                                value={newService.landType}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, landType: e.target.value })
+                                }
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            >
+                                <option value="">Select Land Type</option>
+                                <option value="Dry">Dry</option>
+                                <option value="Wet">Wet</option>
+                                <option value="Hilly">Hilly</option>
+                                <option value="Plain">Plain</option>
+                            </select>
+                        </div>
+
+                        {/* Charge per Acre */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Charge per Acre (₹) *
+                            </label>
+                            <input
+                                type="number"
+                                required
+                                min="1"
+                                value={newService.chargePerAcre}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, chargePerAcre: e.target.value })
+                                }
+                                placeholder="e.g., 1500"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* District */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                District *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={newService.location.district}
+                                onChange={(e) =>
+                                    setNewService({
+                                        ...newService,
+                                        location: { ...newService.location, district: e.target.value },
+                                    })
+                                }
+                                placeholder="e.g., Guntur"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* State */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                State *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={newService.location.state}
+                                onChange={(e) =>
+                                    setNewService({
+                                        ...newService,
+                                        location: { ...newService.location, state: e.target.value },
+                                    })
+                                }
+                                placeholder="e.g., Andhra Pradesh"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Village */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Village (Optional)
+                            </label>
+                            <input
+                                type="text"
+                                value={newService.location.village}
+                                onChange={(e) =>
+                                    setNewService({
+                                        ...newService,
+                                        location: { ...newService.location, village: e.target.value },
+                                    })
+                                }
+                                placeholder="e.g., Pedanandipadu"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Pincode */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Pincode *
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                pattern="[0-9]{6}"
+                                value={newService.location.pincode}
+                                onChange={(e) =>
+                                    setNewService({
+                                        ...newService,
+                                        location: { ...newService.location, pincode: e.target.value },
+                                    })
+                                }
+                                placeholder="e.g., 522001"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Contact Number */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Contact Number *
+                            </label>
+                            <input
+                                type="tel"
+                                required
+                                pattern="[0-9]{10}"
+                                value={newService.contactNumber}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, contactNumber: e.target.value })
+                                }
+                                placeholder="e.g., 9876543210"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <div className="flex gap-4 mt-8 pt-6 border-t">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-200 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-all flex items-center justify-center space-x-2"
+                        >
+                            <Plus className="h-5 w-5" />
+                            <span>Post Service</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// ==================== SERVICES TAB (Keep your existing or use this) ====================
 const ServicesTab = ({ services, onCancel, onPostNew }) => (
-	<div className="space-y-6">
-		<div className="bg-white rounded-xl shadow-md overflow-hidden">
-			<div className="px-6 py-4 border-b bg-gradient-to-r from-green-50 to-white flex justify-between items-center">
-				<h3 className="text-lg font-semibold text-gray-900">My Services</h3>
-				<button
-					onClick={onPostNew}
-					className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md transition-all"
-				>
-					<Plus className="h-4 w-4" />
-					<span>Add Service</span>
-				</button>
-			</div>
-			<div className="divide-y">
-				{services.map((service) => (
-					<ServiceCard
-						key={service._id}
-						service={service}
-						onCancel={onCancel}
-					/>
-				))}
-			</div>
-		</div>
-	</div>
+    <div className="space-y-6">
+        <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900">My Services</h2>
+            <button
+                onClick={onPostNew}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+            >
+                <Plus className="h-5 w-5" />
+                <span>Add New Service</span>
+            </button>
+        </div>
+
+        {services.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+                <Tractor className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">No services posted yet</h3>
+                <p className="text-gray-600 mb-6">Post your first tractor service to get started</p>
+                <button
+                    onClick={onPostNew}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg inline-flex items-center space-x-2"
+                >
+                    <Plus className="h-5 w-5" />
+                    <span>Post Service</span>
+                </button>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {services.map((service) => (
+                    <div
+                        key={service._id}
+                        className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6"
+                    >
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">
+                                    {service.brand} {service.model}
+                                </h3>
+                                <p className="text-gray-600">{service.vehicleNumber}</p>
+                            </div>
+                            <span
+                                className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                    service.availability
+                                        ? "bg-green-100 text-green-800"
+                                        : "bg-red-100 text-red-800"
+                                }`}
+                            >
+                                {service.availability ? "Available" : "Unavailable"}
+                            </span>
+                        </div>
+
+                        <div className="space-y-2 text-sm text-gray-700">
+                            <p>
+                                <strong>Service:</strong> {service.typeOfPlowing}
+                            </p>
+                            <p>
+                                <strong>Land Type:</strong> {service.landType}
+                            </p>
+                            <p>
+                                <strong>Charge:</strong> ₹{service.chargePerAcre}/acre
+                            </p>
+                            <p>
+                                <strong>Location:</strong> {service.location.district},{" "}
+                                {service.location.state}
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        )}
+    </div>
 );
 
+// ==================== PAYMENTS TAB (Keep your existing) ====================
 const PaymentsTab = ({ dashboardData }) => (
-	<div className="space-y-6">
-		<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-			<div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
-				<div className="flex items-center justify-between">
-					<div>
-						<p className="text-green-100 text-sm mb-1">Total Earnings</p>
-						<p className="text-3xl font-bold">
-							₹{dashboardData?.stats?.totalAmount?.toLocaleString() || 0}
-						</p>
-					</div>
-					<DollarSign className="h-12 w-12 text-green-200" />
-				</div>
-			</div>
-			<div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl shadow-lg p-6 text-white">
-				<div className="flex items-center justify-between">
-					<div>
-						<p className="text-orange-100 text-sm mb-1">Pending</p>
-						<p className="text-3xl font-bold">
-							₹{dashboardData?.stats?.pendingAmount?.toLocaleString() || 0}
-						</p>
-					</div>
-					<Clock className="h-12 w-12 text-orange-200" />
-				</div>
-			</div>
-			<div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-				<div className="flex items-center justify-between">
-					<div>
-						<p className="text-blue-100 text-sm mb-1">Completed</p>
-						<p className="text-3xl font-bold">
-							{dashboardData?.stats?.completedTransactions || 0}
-						</p>
-					</div>
-					<CheckCircle className="h-12 w-12 text-blue-200" />
-				</div>
-			</div>
-		</div>
-
-		<div className="bg-white rounded-xl shadow-md overflow-hidden">
-			<div className="px-6 py-4 border-b">
-				<h3 className="text-lg font-semibold text-gray-900">Payment History</h3>
-			</div>
-			<div className="divide-y">
-				{dashboardData?.transactions?.map((txn) => (
-					<div key={txn._id} className="px-6 py-4 hover:bg-gray-50">
-						<div className="flex items-center justify-between">
-							<div className="flex-1">
-								<div className="flex items-center space-x-3">
-									<div
-										className={`w-10 h-10 rounded-full flex items-center justify-center ${
-											txn.status === "completed"
-												? "bg-green-100"
-												: txn.status === "pending"
-												? "bg-yellow-100"
-												: "bg-red-100"
-										}`}
-									>
-										<DollarSign
-											className={`h-5 w-5 ${
-												txn.status === "completed"
-													? "text-green-600"
-													: txn.status === "pending"
-													? "text-yellow-600"
-													: "text-red-600"
-											}`}
-										/>
-									</div>
-									<div>
-										<h4 className="text-sm font-semibold text-gray-900">
-											₹{txn.amount.toLocaleString()}
-										</h4>
-										<p className="text-sm text-gray-500">
-											{txn.method} • {txn.farmerId?.name}
-										</p>
-									</div>
-								</div>
-							</div>
-							<div className="text-right">
-								<StatusBadge status={txn.status} />
-								<p className="text-xs text-gray-400 mt-1">
-									{new Date(txn.createdAt).toLocaleDateString()}
-								</p>
-							</div>
-						</div>
-					</div>
-				))}
-			</div>
-		</div>
-	</div>
-);
-
-// =============================================
-// CARD COMPONENTS
-// =============================================
-
-const StatCard = ({  label, value, color }) => {
-	const colors = {
-		green: "from-green-500 to-green-600 text-green-200",
-		blue: "from-blue-500 to-blue-600 text-blue-200",
-		orange: "from-orange-500 to-orange-600 text-orange-200",
-		purple: "from-purple-500 to-purple-600 text-purple-200",
-	};
-
-	return (
-		<div
-			className={`bg-gradient-to-br ${colors[color]} rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition-transform`}
-		>
-			<div className="flex items-center justify-between">
-				<div>
-					<p className="text-sm opacity-90 mb-1">{label}</p>
-					<p className="text-3xl font-bold">{value}</p>
-				</div>
-				
-			</div>
-		</div>
-	);
-};
-
-const RequirementCard = ({
-	requirement,
-	onPlaceBid,
-	onAccept,
-	onComplete,
-	userId,
-}) => {
-	const myResponse = requirement.responses?.find(
-		(r) => r.tractorOwner?._id === userId || r.tractorOwner === userId
-	);
-	const canAccept = myResponse && requirement.status === "open";
-	const canComplete =
-		requirement.status === "in_progress" &&
-		requirement.acceptedResponse?.tractorOwner === userId;
-
-	return (
-		<div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow p-6">
-			<div className="flex justify-between items-start mb-4">
-				<div className="flex items-center space-x-3">
-					<div className="bg-blue-100 p-3 rounded-lg">
-						<User className="h-6 w-6 text-blue-600" />
-					</div>
-					<div>
-						<h4 className="text-lg font-semibold text-gray-900">
-							{requirement.workType}
-						</h4>
-						<p className="text-sm text-gray-500">{requirement.farmer?.name}</p>
-					</div>
-				</div>
-				<UrgencyBadge urgency={requirement.urgency} />
-			</div>
-
-			<div className="space-y-2 mb-4">
-				<div className="flex items-center text-sm text-gray-600">
-					<MapPin className="h-4 w-4 mr-2 text-gray-400" />
-					<span>
-						{requirement.location?.district}, {requirement.location?.state}
-					</span>
-				</div>
-				<div className="flex items-center text-sm text-gray-600">
-					<Calendar className="h-4 w-4 mr-2 text-gray-400" />
-					<span>
-						Expected: {new Date(requirement.expectedDate).toLocaleDateString()}
-					</span>
-				</div>
-				<div className="flex items-center text-sm text-gray-600">
-					<DollarSign className="h-4 w-4 mr-2 text-gray-400" />
-					<span>Budget: Up to ₹{requirement.maxBudget}/acre</span>
-				</div>
-				<div className="flex items-center text-sm text-gray-600">
-					<Package className="h-4 w-4 mr-2 text-gray-400" />
-					<span>
-						{requirement.landSize} acres • {requirement.landType}
-					</span>
-				</div>
-			</div>
-
-			{requirement.additionalNotes && (
-				<div className="mb-4 p-3 bg-gray-50 rounded-lg">
-					<p className="text-sm text-gray-700">{requirement.additionalNotes}</p>
-				</div>
-			)}
-
-			{myResponse && (
-				<div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-					<p className="text-sm font-medium text-blue-900">Your Bid:</p>
-					<p className="text-sm text-blue-700">
-						₹{myResponse.quotedPrice}/acre • {myResponse.notes}
-					</p>
-				</div>
-			)}
-
-			<div className="flex space-x-2">
-				{requirement.status === "open" && !myResponse && (
-					<button
-						onClick={() => onPlaceBid(requirement)}
-						className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-					>
-						Place Bid
-					</button>
-				)}
-				{canAccept && (
-					<button
-						onClick={() => onAccept(requirement._id)}
-						className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-					>
-						Accept Work
-					</button>
-				)}
-				{canComplete && (
-					<button
-						onClick={() => onComplete(requirement._id)}
-						className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors"
-					>
-						Mark Completed
-					</button>
-				)}
-				{requirement.farmer?.phone && (
-					<button className="bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors">
-						<Phone className="h-4 w-4" />
-					</button>
-				)}
-			</div>
-		</div>
-	);
-};
-
-const ServiceCard = ({ service, onCancel }) => (
-	<div className="px-6 py-6 hover:bg-gray-50 transition-colors">
-		<div className="flex items-center justify-between">
-			<div className="flex-1">
-				<div className="flex items-center space-x-3">
-					<div className="bg-green-100 p-3 rounded-lg">
-						<Tractor className="h-6 w-6 text-green-600" />
-					</div>
-					<div>
-						<h4 className="text-lg font-semibold text-gray-900">
-							{service.brand} {service.model}
-						</h4>
-						<p className="text-sm text-gray-500">
-							{service.vehicleNumber} • {service.typeOfPlowing}
-						</p>
-					</div>
-				</div>
-				<div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-					<div>
-						<span className="font-medium text-gray-500">Rate:</span>
-						<span className="ml-2 text-gray-900 font-semibold">
-							₹{service.chargePerAcre}/acre
-						</span>
-					</div>
-					<div>
-						<span className="font-medium text-gray-500">Land Type:</span>
-						<span className="ml-2 text-gray-900">{service.landType}</span>
-					</div>
-					<div>
-						<span className="font-medium text-gray-500">Location:</span>
-						<span className="ml-2 text-gray-900">
-							{service.location?.district}
-						</span>
-					</div>
-				</div>
-			</div>
-			<div className="flex items-center space-x-2">
-				<span
-					className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-						service.availability && service.status !== "cancelled"
-							? "bg-green-100 text-green-800"
-							: "bg-red-100 text-red-800"
-					}`}
-				>
-					{service.availability && service.status !== "cancelled"
-						? "Available"
-						: "Cancelled"}
-				</span>
-				{service.availability && service.status !== "cancelled" && (
-					<button
-						onClick={() => onCancel(service._id)}
-						className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-colors"
-					>
-						<XCircle className="h-5 w-5" />
-					</button>
-				)}
-			</div>
-		</div>
-	</div>
-);
-
-// =============================================
-// MODAL COMPONENTS
-// =============================================
-
-const ServiceFormModal = ({ newService, setNewService, onSubmit, onClose }) => (
-	<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-		<div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-			<div className="sticky top-0 bg-white px-6 py-4 border-b flex justify-between items-center rounded-t-2xl">
-				<h3 className="text-xl font-bold text-gray-900">Post New Service</h3>
-				<button
-					onClick={onClose}
-					className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-				>
-					<X className="h-6 w-6" />
-				</button>
-			</div>
-			<form onSubmit={onSubmit} className="p-6 space-y-6">
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<FormInput
-						label="Brand *"
-						value={newService.brand}
-						onChange={(e) =>
-							setNewService({ ...newService, brand: e.target.value })
-						}
-						required
-					/>
-					<FormInput
-						label="Model *"
-						value={newService.model}
-						onChange={(e) =>
-							setNewService({ ...newService, model: e.target.value })
-						}
-						required
-					/>
-					<FormInput
-						label="Vehicle Number *"
-						value={newService.vehicleNumber}
-						onChange={(e) =>
-							setNewService({ ...newService, vehicleNumber: e.target.value })
-						}
-						required
-					/>
-					<FormSelect
-						label="Service Type *"
-						value={newService.typeOfPlowing}
-						onChange={(e) =>
-							setNewService({ ...newService, typeOfPlowing: e.target.value })
-						}
-						options={[
-							"Plowing",
-							"Harvesting",
-							"Spraying",
-							"Hauling",
-							"Land Preparation",
-						]}
-						required
-					/>
-					<FormSelect
-						label="Land Type *"
-						value={newService.landType}
-						onChange={(e) =>
-							setNewService({ ...newService, landType: e.target.value })
-						}
-						options={["Dry", "Wet", "Hilly", "Plain"]}
-						required
-					/>
-					<FormInput
-						label="Charge per Acre (₹) *"
-						type="number"
-						value={newService.chargePerAcre}
-						onChange={(e) =>
-							setNewService({ ...newService, chargePerAcre: e.target.value })
-						}
-						required
-						min="0"
-					/>
-				</div>
-
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-					<FormInput
-						label="District *"
-						value={newService.location.district}
-						onChange={(e) =>
-							setNewService({
-								...newService,
-								location: { ...newService.location, district: e.target.value },
-							})
-						}
-						required
-					/>
-					<FormInput
-						label="State *"
-						value={newService.location.state}
-						onChange={(e) =>
-							setNewService({
-								...newService,
-								location: { ...newService.location, state: e.target.value },
-							})
-						}
-						required
-					/>
-				</div>
-
-				<FormInput
-					label="Contact Number *"
-					type="tel"
-					value={newService.contactNumber}
-					onChange={(e) =>
-						setNewService({ ...newService, contactNumber: e.target.value })
-					}
-					required
-				/>
-
-				<div className="flex justify-end space-x-4 pt-4">
-					<button
-						type="button"
-						onClick={onClose}
-						className="px-6 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						className="px-6 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 rounded-lg shadow-md transition-all"
-					>
-						Post Service
-					</button>
-				</div>
-			</form>
-		</div>
-	</div>
-);
-
-const BidModal = ({ requirement, bidForm, setBidForm, onSubmit, onClose }) => (
-	<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-		<div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full">
-			<div className="px-6 py-4 border-b flex justify-between items-center">
-				<h3 className="text-xl font-bold text-gray-900">Place Your Bid</h3>
-				<button
-					onClick={onClose}
-					className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-lg"
-				>
-					<X className="h-6 w-6" />
-				</button>
-			</div>
-			<div className="p-6 space-y-6">
-				<div className="bg-blue-50 rounded-lg p-4">
-					<h4 className="font-semibold text-blue-900 mb-2">
-						{requirement.workType}
-					</h4>
-					<div className="space-y-1 text-sm text-blue-700">
-						<p>Land Size: {requirement.landSize} acres</p>
-						<p>Budget: Up to ₹{requirement.maxBudget}/acre</p>
-						<p>
-							Location: {requirement.location?.district},{" "}
-							{requirement.location?.state}
-						</p>
-					</div>
-				</div>
-
-				<FormInput
-					label="Your Quote (₹ per acre) *"
-					type="number"
-					value={bidForm.quotedPrice}
-					onChange={(e) =>
-						setBidForm({ ...bidForm, quotedPrice: e.target.value })
-					}
-					placeholder={`Max budget: ₹${requirement.maxBudget}`}
-					required
-					min="0"
-					max={requirement.maxBudget}
-				/>
-
-				<FormInput
-					label="Estimated Duration (days)"
-					type="number"
-					value={bidForm.estimatedDuration}
-					onChange={(e) =>
-						setBidForm({ ...bidForm, estimatedDuration: e.target.value })
-					}
-					required
-					min="1"
-				/>
-
-				<div>
-					<label className="block text-sm font-medium text-gray-700 mb-2">
-						Additional Notes
-					</label>
-					<textarea
-						rows={3}
-						value={bidForm.notes}
-						onChange={(e) => setBidForm({ ...bidForm, notes: e.target.value })}
-						className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-						placeholder="Any additional information for the farmer..."
-					/>
-				</div>
-
-				<div className="flex space-x-3 pt-4">
-					<button
-						type="button"
-						onClick={onClose}
-						className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-lg font-medium transition-colors"
-					>
-						Cancel
-					</button>
-					<button
-						onClick={onSubmit}
-						className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white py-3 rounded-lg font-medium shadow-md transition-all"
-					>
-						Submit Bid
-					</button>
-				</div>
-			</div>
-		</div>
-	</div>
-);
-
-// =============================================
-// UTILITY COMPONENTS
-// =============================================
-
-const StatusBadge = ({ status }) => {
-	const colors = {
-		completed: "bg-green-100 text-green-800",
-		pending: "bg-yellow-100 text-yellow-800",
-		failed: "bg-red-100 text-red-800",
-	};
-
-	return (
-		<span
-			className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-				colors[status] || "bg-gray-100 text-gray-800"
-			}`}
-		>
-			{status}
-		</span>
-	);
-};
-
-const UrgencyBadge = ({ urgency }) => {
-	const colors = {
-		urgent: "bg-red-100 text-red-800 animate-pulse",
-		normal: "bg-yellow-100 text-yellow-800",
-		flexible: "bg-green-100 text-green-800",
-	};
-
-	return (
-		<span
-			className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase ${
-				colors[urgency] || "bg-gray-100 text-gray-800"
-			}`}
-		>
-			{urgency}
-		</span>
-	);
-};
-
-const QuickActionButton = ({  label, onClick, color }) => {
-	const colors = {
-		blue: "from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700",
-		green:
-			"from-green-500 to-green-600 hover:from-green-600 hover:to-green-700",
-		purple:
-			"from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700",
-	};
-
-	return (
-		<button
-			onClick={onClick}
-			className={`w-full bg-gradient-to-r ${colors[color]} text-white py-3 px-4 rounded-lg flex items-center justify-center space-x-3 shadow-md transition-all transform hover:scale-105`}
-		>
-			
-			<span className="font-medium">{label}</span>
-			<ChevronRight className="h-5 w-5" />
-		</button>
-	);
-};
-
-const FormInput = ({ label, ...props }) => (
-	<div>
-		<label className="block text-sm font-medium text-gray-700 mb-2">
-			{label}
-		</label>
-		<input
-			className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-			{...props}
-		/>
-	</div>
-);
-
-const FormSelect = ({ label, options, ...props }) => (
-	<div>
-		<label className="block text-sm font-medium text-gray-700 mb-2">
-			{label}
-		</label>
-		<select
-			className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-			{...props}
-		>
-			<option value="">Select {label.replace(" *", "")}</option>
-			{options.map((opt) => (
-				<option key={opt} value={opt}>
-					{opt}
-				</option>
-			))}
-		</select>
-	</div>
+    <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-gray-900">Payments & Earnings</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <p className="text-gray-600 text-sm mb-2">Total Earnings</p>
+                <p className="text-3xl font-bold text-green-600">
+                    ₹{dashboardData?.stats?.totalAmount?.toLocaleString() || 0}
+                </p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <p className="text-gray-600 text-sm mb-2">Pending Payments</p>
+                <p className="text-3xl font-bold text-orange-600">
+                    ₹{dashboardData?.stats?.pendingAmount?.toLocaleString() || 0}
+                </p>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6">
+                <p className="text-gray-600 text-sm mb-2">Completed Payments</p>
+                <p className="text-3xl font-bold text-gray-900">
+                    {dashboardData?.transactions?.filter((t) => t.status === "success").length || 0}
+                </p>
+            </div>
+        </div>
+    </div>
 );
 
 export default TractorDashboard;

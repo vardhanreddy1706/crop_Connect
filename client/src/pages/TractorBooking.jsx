@@ -140,27 +140,16 @@ const TractorBooking = () => {
 	const handleBookingSubmit = async (e) => {
 		e.preventDefault();
 		setBookingLoading(true);
-		setMessage(null);
 
 		try {
-			const token = localStorage.getItem("token");
-
-			const bookingPayload = {
-				serviceType: "tractor",
-				serviceId: selectedTractor._id,
-				bookingDate: new Date(bookingData.bookingDate).toISOString(),
-				duration: parseInt(bookingData.duration),
+			const response = await api.post("/bookings/create", {
+				tractorServiceId: selectedTractor._id,
+				bookingDate: bookingData.bookingDate,
+				duration: bookingData.duration,
 				location: bookingData.location,
 				workType: bookingData.workType,
 				landSize: bookingData.landSize,
 				notes: bookingData.notes,
-			};
-
-			const response = await api.post("/bookings/create", bookingPayload, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-					"Content-Type": "application/json",
-				},
 			});
 
 			if (response.data.success) {
@@ -194,6 +183,7 @@ const TractorBooking = () => {
 			setBookingLoading(false);
 		}
 	};
+
 
 	// TRACTOR REQUIREMENT HANDLERS
 	const handleRequirementChange = (e) => {

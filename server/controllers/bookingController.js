@@ -1,249 +1,131 @@
 const Booking = require("../models/Booking");
-const TractorService = require("../models/tractorService");
-const WorkerService = require("../models/WorkerService");
+const Transaction = require("../models/Transaction");
+const Notification = require("../models/Notification");
+const TractorRequirement = require("../models/TractorRequirement");
 
-// @desc    Create booking
-// @route   POST /api/bookings/create
-// @access  Private (Farmer)
-exports.createBooking = async (req, res) => {
-	try {
-		const {
-			serviceType,
-			serviceId,
-			bookingDate,
-			duration,
-			workType,
-			landSize,
-			location,
-			notes,
-		} = req.body;
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
-		let service;
-		let serviceModel;
-		let totalCost = 0;
+// Initialize Razorpay (put this at the top of the file, after imports)
+const razorpay = new Razorpay({
+	key_id: process.env.RAZORPAY_KEY_ID,
+	key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
-		if (serviceType === "tractor") {
-			service = await TractorService.findById(serviceId);
-			serviceModel = "TractorService";
-			if (service && landSize) {
-				totalCost = service.chargePerAcre * landSize;
-			}
-		} else if (serviceType === "worker") {
-			service = await WorkerService.findById(serviceId);
-			serviceModel = "WorkerService";
-			if (service && duration) {
-				totalCost = service.chargePerDay * duration;
-			}
-		}
+// Create direct booking (when farmer books a tractor directly)
+const createBooking = async (req, res) => {
+    try {
+        const {
+            tractorServiceId,
+            bookingDate,
+            duration,
+            location,
+            workType,
+            landSize,
+            notes,
+        } = req.body;
 
-		if (!service) {
-			return res.status(404).json({
-				success: false,
-				message: "Service not found",
-			});
-		}
+        // Get tractor service
+        const TractorService = require("../models/TractorService");
+        const tractorService = await TractorService.findById(tractorServiceId);
 
-		if (!service.availability) {
-			return res.status(400).json({
-				success: false,
-				message: "Service is not available",
-			});
-		}
+        if (!tractorService) {
+            return res.status(404).json({
+                success: false,
+                message: "Tractor service not found",
+            });
+        }
 
-		const booking = await Booking.create({
-			farmer: req.user._id,
-			serviceType,
-			serviceId,
-			serviceModel,
-			bookingDate,
-			duration,
-			totalCost,
-			workType,
-			landSize,
-			location,
-			notes,
-		});
+        if (!tractorService.availability) {
+            return res.status(400).json({
+                success: false,
+                message: "This tractor is not available",
+            });
+        }
 
-		res.status(201).json({
-			success: true,
-			message: "Booking created successfully",
-			booking,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
+        // Calculate cost
+        const totalCost = Math.round(tractorService.chargePerAcre * (landSize || 1));
+
+        // Create booking
+        const booking = await Booking.create({
+            farmer: req.user._id,
+            tractorOwnerId: tractorService.owner,
+            serviceType: "tractor",
+            serviceId: tractorServiceId,
+            serviceModel: "TractorService",
+            bookingDate,
+            duration: duration || 8,
+            totalCost,
+            location,
+            workType: workType || tractorService.typeOfPlowing,
+            landSize,
+            status: "confirmed",
+            paymentStatus: "pending",
+            notes,
+        });
+
+        // Populate tractor owner details
+        await booking.populate("tractorOwnerId", "name phone email");
+
+        // Create notification for tractor owner
+        // await Notification.create({
+        //     recipientId: tractorService.owner,
+        //     type: "booking_received",
+        //     title: "🎉 New Booking Received!",
+        //     message: `${req.user.name} has booked your tractor for ${workType}`,
+        //     relatedUserId: req.user._id,
+        //     data: {
+        //         bookingId: booking._id,
+        //         workType,
+        //         landSize,
+        //         totalCost,
+        //         bookingDate,
+        //     },
+        // });
+
+        // Socket notification
+        if (req.io) {
+            req.io.to(tractorService.owner.toString()).emit("notification", {
+                type: "booking_received",
+                title: "🎉 New Booking!",
+                message: `New booking for ${workType}`,
+                bookingId: booking._id,
+            });
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Booking created successfully",
+            booking,
+        });
+    } catch (error) {
+        console.error("Create booking error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to create booking",
+        });
+    }
 };
 
-// @desc    Get all bookings for farmer
-// @route   GET /api/bookings/my-bookings
-// @access  Private (Farmer)
-exports.getMyBookings = async (req, res) => {
-	try {
-		const bookings = await Booking.find({ farmer: req.user._id })
-			.populate("serviceId")
-			.sort({ createdAt: -1 });
 
-		res.status(200).json({
-			success: true,
-			count: bookings.length,
-			bookings,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
-};
-
-// @desc    Get bookings for service provider
-// @route   GET /api/bookings/service-bookings
-// @access  Private (Tractor Owner/Worker)
-exports.getServiceBookings = async (req, res) => {
-	try {
-		let services;
-
-		if (req.user.role === "tractor_owner") {
-			services = await TractorService.find({ owner: req.user._id });
-		} else if (req.user.role === "worker") {
-			services = await WorkerService.find({ worker: req.user._id });
-		}
-
-		const serviceIds = services.map((s) => s._id);
-		const bookings = await Booking.find({ serviceId: { $in: serviceIds } })
-			.populate("farmer", "name phone email")
-			.populate("serviceId")
-			.sort({ createdAt: -1 });
-
-		res.status(200).json({
-			success: true,
-			count: bookings.length,
-			bookings,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
-};
-
-// @desc    Update booking status
-// @route   PUT /api/bookings/:id/status
-// @access  Private
-exports.updateBookingStatus = async (req, res) => {
-	try {
-		const { status } = req.body;
-		const booking = await Booking.findById(req.params.id);
-
-		if (!booking) {
-			return res.status(404).json({
-				success: false,
-				message: "Booking not found",
-			});
-		}
-
-		booking.status = status;
-		await booking.save();
-
-		res.status(200).json({
-			success: true,
-			message: "Booking status updated",
-			booking,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
-};
-
-// @desc    Cancel booking
-// @route   DELETE /api/bookings/:id
-// @access  Private
-exports.cancelBooking = async (req, res) => {
-	try {
-		const booking = await Booking.findById(req.params.id);
-
-		if (!booking) {
-			return res.status(404).json({
-				success: false,
-				message: "Booking not found",
-			});
-		}
-
-		if (booking.farmer.toString() !== req.user._id.toString()) {
-			return res.status(403).json({
-				success: false,
-				message: "Not authorized",
-			});
-		}
-
-		booking.status = "cancelled";
-		await booking.save();
-
-		res.status(200).json({
-			success: true,
-			message: "Booking cancelled successfully",
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
-};
-
-// ✅ NEW FUNCTIONS - Add these at the end
-
-// @desc    Get farmer's tractor bookings
-// @route   GET /api/bookings/farmer/tractors
-// @access  Private (Farmer)
-exports.getFarmerTractorBookings = async (req, res) => {
+// Get farmer's tractor bookings
+const getFarmerTractorBookings = async (req, res) => {
 	try {
 		const bookings = await Booking.find({
 			farmer: req.user._id,
 			serviceType: "tractor",
 		})
-			.populate({
-				path: "serviceId",
-				populate: {
-					path: "owner",
-					select: "name phone email",
-				},
-			})
-			.sort({ createdAt: -1 });
-
-		// Format response
-		const formattedBookings = bookings.map((booking) => ({
-			_id: booking._id,
-			bookingDate: booking.bookingDate,
-			duration: booking.duration,
-			location: booking.location || "",
-			totalCost: booking.totalCost,
-			status: booking.status,
-			notes: booking.notes,
-			workType: booking.workType,
-			landSize: booking.landSize,
-			createdAt: booking.createdAt,
-			serviceProvider: {
-				name: booking.serviceId?.owner?.name || "N/A",
-				phone: booking.serviceId?.owner?.phone || "",
-				email: booking.serviceId?.owner?.email || "",
-			},
-		}));
+			.populate("tractorOwnerId", "name phone email")
+			.populate("serviceId")
+			.sort({ createdAt: -1 })
+			.lean();
 
 		res.status(200).json({
 			success: true,
-			count: formattedBookings.length,
-			bookings: formattedBookings,
+			bookings,
 		});
 	} catch (error) {
-		console.error("Error fetching tractor bookings:", error);
+		console.error("Get farmer tractor bookings error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,
@@ -251,49 +133,14 @@ exports.getFarmerTractorBookings = async (req, res) => {
 	}
 };
 
-// @desc    Get farmer's worker bookings
-// @route   GET /api/bookings/farmer/workers
-// @access  Private (Farmer)
-exports.getFarmerWorkerBookings = async (req, res) => {
+// Get farmer's worker bookings
+const getFarmerWorkerBookings = async (req, res) => {
 	try {
-		const bookings = await Booking.find({
-			farmer: req.user._id,
-			serviceType: "worker",
-		})
-			.populate({
-				path: "serviceId",
-				populate: {
-					path: "worker",
-					select: "name phone email",
-				},
-			})
-			.sort({ createdAt: -1 });
-
-		// Format response
-		const formattedBookings = bookings.map((booking) => ({
-			_id: booking._id,
-			bookingDate: booking.bookingDate,
-			duration: booking.duration,
-			location: booking.location || "",
-			totalCost: booking.totalCost,
-			status: booking.status,
-			notes: booking.notes,
-			workType: booking.workType,
-			createdAt: booking.createdAt,
-			serviceProvider: {
-				name: booking.serviceId?.worker?.name || "N/A",
-				phone: booking.serviceId?.worker?.phone || "",
-				email: booking.serviceId?.worker?.email || "",
-			},
-		}));
-
 		res.status(200).json({
 			success: true,
-			count: formattedBookings.length,
-			bookings: formattedBookings,
+			bookings: [],
 		});
 	} catch (error) {
-		console.error("Error fetching worker bookings:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message,
@@ -301,42 +148,275 @@ exports.getFarmerWorkerBookings = async (req, res) => {
 	}
 };
 
+// Get farmer's tractor requirements
+const getFarmerTractorRequirements = async (req, res) => {
+	try {
+		const requirements = await TractorRequirement.find({
+			farmer: req.user._id,
+		})
+			.populate("acceptedBy", "name phone email")
+			.sort({ createdAt: -1 })
+			.lean();
 
-// @desc    Get farmer's tractor requirements (posted jobs)
-// @route   GET /api/bookings/farmer/tractor-requirements
-// @access  Private (Farmer)
-exports.getFarmerTractorRequirements = async (req, res) => {
+		res.status(200).json({
+			success: true,
+			requirements,
+		});
+	} catch (error) {
+		console.error("Get farmer tractor requirements error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// Get farmer's worker requirements
+const getFarmerWorkerRequirements = async (req, res) => {
+	try {
+		res.status(200).json({
+			success: true,
+			requirements: [],
+		});
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// Get all farmer bookings
+const getAllFarmerBookings = async (req, res) => {
+	try {
+		const bookings = await Booking.find({ farmer: req.user._id })
+			.populate("tractorOwnerId", "name phone email")
+			.populate("serviceId")
+			.sort({ createdAt: -1 })
+			.lean();
+
+		res.status(200).json({
+			success: true,
+			bookings,
+		});
+	} catch (error) {
+		console.error("Get all farmer bookings error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// Get tractor owner's bookings
+const getTractorOwnerBookings = async (req, res) => {
+	try {
+		const bookings = await Booking.find({ tractorOwnerId: req.user._id })
+			.populate("farmer", "name phone email")
+			.populate("serviceId")
+			.sort({ createdAt: -1 })
+			.lean();
+
+		res.status(200).json({
+			success: true,
+			bookings,
+		});
+	} catch (error) {
+		console.error("Get tractor owner bookings error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// Create Razorpay Order
+
+
+// Create Razorpay Order
+// Create Razorpay Order
+const createRazorpayOrder = async (req, res) => {
     try {
-        const TractorRequirement = require("../models/TractorRequirement");
-        
-        const requirements = await TractorRequirement.find({
-            farmer: req.user._id,
-        }).sort({ createdAt: -1 });
+        const booking = await Booking.findById(req.params.id);
 
-        const formattedRequirements = requirements.map((req) => ({
-            _id: req._id,
-            workType: req.workType,
-            landType: req.landType,
-            landSize: req.landSize,
-            expectedDate: req.expectedDate,
-            duration: req.duration,
-            location: req.location,
-            maxBudget: req.maxBudget,
-            urgency: req.urgency,
-            status: req.status,
-            notes: req.additionalNotes,
-            responses: req.responses?.length || 0,
-            createdAt: req.createdAt,
-            type: "tractor-requirement",
-        }));
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found",
+            });
+        }
+
+        // Check authorization
+        if (!req.user || booking.farmer.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "Not authorized",
+            });
+        }
+
+        if (booking.paymentStatus === "paid") {
+            return res.status(400).json({
+                success: false,
+                message: "Booking already paid",
+            });
+        }
+
+        // Check if tractorOwnerId exists
+        if (!booking.tractorOwnerId) {
+            return res.status(400).json({
+                success: false,
+                message: "Tractor owner information missing. Please contact support.",
+            });
+        }
+
+        // Check if Razorpay is configured
+        if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+            console.warn("⚠️  Razorpay credentials not configured");
+            // Return mock order for development
+            const mockOrder = {
+                id: `order_mock_${Date.now()}`,
+                amount: booking.totalCost * 100,
+                currency: "INR",
+            };
+
+            booking.razorpayOrderId = mockOrder.id;
+            booking.paymentMethod = "pay_now";
+            await booking.save();
+
+            return res.status(200).json({
+                success: true,
+                order: mockOrder,
+                bookingId: booking._id,
+                amount: booking.totalCost,
+                key: "rzp_test_mock",
+                isMock: true,
+            });
+        }
+
+        // Create real Razorpay order
+        const options = {
+            amount: booking.totalCost * 100,
+            currency: "INR",
+            receipt: `booking_${booking._id}`,
+            notes: {
+                bookingId: booking._id.toString(),
+                farmerId: booking.farmer.toString(),
+                tractorOwnerId: booking.tractorOwnerId.toString(),
+            },
+        };
+
+        const order = await razorpay.orders.create(options);
+
+        booking.razorpayOrderId = order.id;
+        booking.paymentMethod = "pay_now";
+        await booking.save();
 
         res.status(200).json({
             success: true,
-            count: formattedRequirements.length,
-            requirements: formattedRequirements,
+            order,
+            bookingId: booking._id,
+            amount: booking.totalCost,
+            key: process.env.RAZORPAY_KEY_ID,
+            isMock: false,
         });
     } catch (error) {
-        console.error("Error fetching tractor requirements:", error);
+        console.error("Create Razorpay order error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to create order",
+        });
+    }
+};
+
+
+// Verify Payment
+
+
+// Verify Payment
+const verifyPayment = async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+        const booking = await Booking.findById(req.params.id)
+            .populate("tractorOwnerId", "name phone email");
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found",
+            });
+        }
+
+        // Verify signature (only if not mock)
+        if (process.env.RAZORPAY_KEY_SECRET && !razorpay_order_id.includes("mock")) {
+            const body = razorpay_order_id + "|" + razorpay_payment_id;
+            const expectedSignature = crypto
+                .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+                .update(body.toString())
+                .digest("hex");
+
+            const isAuthentic = expectedSignature === razorpay_signature;
+
+            if (!isAuthentic) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Payment verification failed - Invalid signature",
+                });
+            }
+        }
+
+        // Update booking
+        booking.paymentStatus = "paid";
+        booking.razorpayPaymentId = razorpay_payment_id;
+        booking.razorpaySignature = razorpay_signature;
+        booking.paidAt = new Date();
+        await booking.save();
+
+        // Create transaction
+        const transaction = await Transaction.create({
+					bookingId: booking._id,
+					farmerId: booking.farmer,
+					tractorOwnerId: booking.tractorOwnerId._id,
+					amount: booking.totalCost,
+					method: "razorpay",
+					paymentId: razorpay_payment_id,
+					razorpayOrderId: razorpay_order_id,
+					razorpaySignature: razorpay_signature,
+					status: "completed",
+					paidAt: new Date(),
+				});
+
+        // Notify tractor owner
+        if (req.io) {
+            req.io.to(booking.tractorOwnerId._id.toString()).emit("notification", {
+                type: "payment_received",
+                title: "💰 Payment Received!",
+                message: `Payment of ₹${booking.totalCost} received`,
+                amount: booking.totalCost,
+            });
+        }
+
+        await Notification.create({
+            recipientId: booking.tractorOwnerId._id,
+            type: "payment_received",
+            title: "💰 Payment Received!",
+            message: `Payment of ₹${booking.totalCost} received for ${booking.workType}`,
+            relatedUserId: booking.farmer,
+            data: {
+                bookingId: booking._id,
+                transactionId: transaction._id,
+                amount: booking.totalCost,
+            },
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Payment successful",
+            booking,
+            transaction,
+        });
+    } catch (error) {
+        console.error("Verify payment error:", error);
         res.status(500).json({
             success: false,
             message: error.message,
@@ -344,43 +424,86 @@ exports.getFarmerTractorRequirements = async (req, res) => {
     }
 };
 
-// @desc    Get farmer's worker requirements (posted jobs)
-// @route   GET /api/bookings/farmer/worker-requirements
-// @access  Private (Farmer)
-exports.getFarmerWorkerRequirements = async (req, res) => {
-    try {
-        const WorkerRequirement = require("../models/WorkerRequirement");
-        
-        const requirements = await WorkerRequirement.find({
-            farmer: req.user._id,
-        }).sort({ createdAt: -1 });
 
-        const formattedRequirements = requirements.map((req) => ({
-            _id: req._id,
-            workType: req.workType,
-            requiredAge: req.requiredAge,
-            preferredGender: req.preferredGender,
-            minExperience: req.minExperience,
-            wagesOffered: req.wagesOffered,
-            location: req.location,
-            workDuration: req.workDuration,
-            foodProvided: req.foodProvided,
-            transportationProvided: req.transportationProvided,
-            startDate: req.startDate,
-            status: req.status,
-            notes: req.notes,
-            applicants: req.applicants?.length || 0,
-            createdAt: req.createdAt,
-            type: "worker-requirement",
-        }));
+// Choose Pay After Work
+const choosePayAfterWork = async (req, res) => {
+	try {
+		const booking = await Booking.findById(req.params.id);
+
+		if (!booking) {
+			return res.status(404).json({
+				success: false,
+				message: "Booking not found",
+			});
+		}
+
+		booking.paymentMethod = "pay_after_work";
+		booking.paymentStatus = "pending";
+		await booking.save();
+
+		res.status(200).json({
+			success: true,
+			message: "Payment method set to pay after work",
+			booking,
+		});
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// Complete work
+const completeWork = async (req, res) => {
+	try {
+		const booking = await Booking.findById(req.params.id);
+
+		if (!booking) {
+			return res.status(404).json({
+				success: false,
+				message: "Booking not found",
+			});
+		}
+
+		booking.status = "completed";
+		booking.workCompletedAt = new Date();
+		await booking.save();
+
+		res.status(200).json({
+			success: true,
+			message: "Work marked as completed",
+			booking,
+		});
+	} catch (error) {
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// Cancel booking
+const cancelBooking = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id);
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found",
+            });
+        }
+
+        booking.status = "cancelled";
+        await booking.save();
 
         res.status(200).json({
             success: true,
-            count: formattedRequirements.length,
-            requirements: formattedRequirements,
+            message: "Booking cancelled",
+            booking,
         });
     } catch (error) {
-        console.error("Error fetching worker requirements:", error);
         res.status(500).json({
             success: false,
             message: error.message,
@@ -388,3 +511,75 @@ exports.getFarmerWorkerRequirements = async (req, res) => {
     }
 };
 
+// ✅ ADD THIS FUNCTION - Complete Booking (Tractor Owner marks work done)
+const completeBooking = async (req, res) => {
+    try {
+        const booking = await Booking.findById(req.params.id);
+
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: "Booking not found",
+            });
+        }
+
+        if (booking.tractorOwnerId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: "Not authorized to complete this booking",
+            });
+        }
+
+        if (booking.status === "completed") {
+            return res.status(400).json({
+                success: false,
+                message: "Booking already marked as completed",
+            });
+        }
+
+        booking.status = "completed";
+        booking.workCompletedAt = new Date();
+        await booking.save();
+
+        // Notify farmer
+        await Notification.create({
+            recipientId: booking.farmer,
+            type: "work_completed",
+            title: "🎊 Work Completed!",
+            message: `${req.user.name} has marked the work as completed. Please proceed with payment.`,
+            data: {
+                bookingId: booking._id,
+                totalCost: booking.totalCost,
+            },
+        });
+
+        res.status(200).json({
+            success: true,
+            message: "Work marked as completed successfully",
+            booking,
+        });
+    } catch (error) {
+        console.error("Complete booking error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to complete booking",
+        });
+    }
+};
+
+// ✅ NOW YOUR module.exports WILL WORK
+module.exports = {
+    getFarmerTractorBookings,
+    getFarmerWorkerBookings,
+    getFarmerTractorRequirements,
+    getFarmerWorkerRequirements,
+    getAllFarmerBookings,
+    getTractorOwnerBookings,
+    createRazorpayOrder,
+    verifyPayment,
+    choosePayAfterWork,
+    completeWork,
+    cancelBooking,
+    createBooking,
+    completeBooking, 
+};

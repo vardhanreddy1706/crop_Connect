@@ -7,14 +7,12 @@ const isDevelopment = import.meta.env.MODE === "development";
 
 const api = axios.create({
 	baseURL: API_BASE_URL,
-	timeout: 15000, // Reduced from 30s to 15s
+	timeout: 10000, // 10 seconds - reasonable timeout
 	headers: { "Content-Type": "application/json" },
 	withCredentials: true,
 });
 
-let retryCount = 0;
-const MAX_RETRIES = 2; // Reduced retries
-const RETRY_DELAY = 800;
+let retryQueue = new Map();
 
 // REQUEST INTERCEPTOR
 api.interceptors.request.use(
@@ -26,75 +24,83 @@ api.interceptors.request.use(
 		config.metadata = { startTime: new Date() };
 
 		if (isDevelopment) {
-			console.log(`🔵 ${config.method.toUpperCase()} ${config.url}`);
+			console.log(`🔵 ${config.method?.toUpperCase()} ${config.url}`);
 		}
 		return config;
 	},
-	(error) => {
-		console.error("Request Error:", error);
-		return Promise.reject(error);
-	}
+	(error) => Promise.reject(error)
 );
 
-// RESPONSE INTERCEPTOR - Fixed!
+// RESPONSE INTERCEPTOR - FIXED!
 api.interceptors.response.use(
 	(response) => {
 		const duration = new Date() - response.config.metadata.startTime;
 		if (isDevelopment) {
 			console.log(
-				`✅ ${response.config.method.toUpperCase()} ${
+				`✅ ${response.config.method?.toUpperCase()} ${
 					response.config.url
 				} (${duration}ms)`
 			);
 		}
-		retryCount = 0;
+
+		// Clear any retry for this request
+		const requestKey = `${response.config.method}-${response.config.url}`;
+		retryQueue.delete(requestKey);
+
 		return response;
 	},
 	async (error) => {
 		const originalRequest = error.config;
+		const requestKey = `${originalRequest?.method}-${originalRequest?.url}`;
 
-		// NETWORK ERROR - Fixed retry logic
+		// NETWORK ERROR HANDLING - IMPROVED
 		if (
 			error.code === "ECONNABORTED" ||
 			error.message === "Network Error" ||
 			!error.response
 		) {
-			if (retryCount < MAX_RETRIES && !originalRequest._retry) {
-				retryCount++;
-				originalRequest._retry = true;
+			// Only retry if not already retried
+			if (!retryQueue.has(requestKey)) {
+				retryQueue.set(requestKey, 1);
 
-				console.log(`🔄 Retry ${retryCount}/${MAX_RETRIES}...`);
-				await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+				console.log(`🔄 Retrying ${originalRequest.url}...`);
+				await new Promise((resolve) => setTimeout(resolve, 500));
 
-				return api(originalRequest);
+				try {
+					return await api(originalRequest);
+				} catch (retryError) {
+					retryQueue.delete(requestKey);
+					// Only show error if it's an important request
+					if (
+						!originalRequest.url.includes("/notifications") &&
+						!originalRequest.url.includes("/health")
+					) {
+						toast.error("Request failed. Please try again.", {
+							duration: 2000,
+							id: "network-error",
+						});
+					}
+					return Promise.reject(retryError);
+				}
 			}
 
-			// After retries failed - show user-friendly message
-			const errorMsg =
-				"Connection error. Please check your internet and try again.";
-			toast.error(errorMsg, { id: "network-error", duration: 4000 }); // Auto-dismiss after 4s
-
-			return Promise.reject({
-				message: errorMsg,
-				type: "NETWORK_ERROR",
-				originalError: error,
-			});
+			retryQueue.delete(requestKey);
+			return Promise.reject(error);
 		}
 
 		const status = error.response?.status;
 		const errorMessage = error.response?.data?.message || error.message;
 
-		// Log detailed error in development
 		if (isDevelopment) {
 			console.error(`❌ ${status}: ${errorMessage}`);
 		}
 
-		// Handle different status codes
+		// Handle errors - 2 second toasts
 		switch (status) {
 			case 400:
 				toast.error(errorMessage || "Invalid request", {
+					duration: 2000,
 					id: "bad-request",
-					duration: 3000,
 				});
 				break;
 
@@ -104,57 +110,39 @@ api.interceptors.response.use(
 
 				if (!["/login", "/", "/register"].includes(window.location.pathname)) {
 					toast.error("Session expired. Please login again.", {
+						duration: 3000,
 						id: "auth-error",
-						duration: 4000,
 					});
-					setTimeout(() => (window.location.href = "/login"), 1500);
+					setTimeout(() => (window.location.href = "/login"), 1000);
 				}
 				break;
 
 			case 403:
-				toast.error("Access denied. You don't have permission.", {
-					id: "forbidden",
-					duration: 3000,
-				});
+				toast.error("Access denied", { duration: 2000, id: "forbidden" });
 				break;
 
 			case 404:
-				toast.error("Resource not found", { id: "not-found", duration: 3000 });
-				break;
-
-			case 409:
-				toast.error(errorMessage || "Conflict: Resource already exists", {
-					id: "conflict",
-					duration: 3000,
-				});
-				break;
-
-			case 422:
-				toast.error(errorMessage || "Validation error", {
-					id: "validation",
-					duration: 3000,
-				});
-				break;
-
-			case 429:
-				toast.error("Too many requests. Please wait a moment.", {
-					id: "rate-limit",
-					duration: 4000,
-				});
+				// Don't show toast for 404 on optional requests
+				if (!originalRequest.url.includes("/notifications")) {
+					toast.error("Resource not found", {
+						duration: 2000,
+						id: "not-found",
+					});
+				}
 				break;
 
 			case 500:
 			case 502:
 			case 503:
-				toast.error("Server error. Please try again later.", {
+				toast.error("Server error. Try again later.", {
+					duration: 1000,
 					id: "server-error",
-					duration: 4000,
 				});
 				break;
 
 			default:
-				if (errorMessage) {
-					toast.error(errorMessage, { id: `error-${status}`, duration: 3000 });
+				if (errorMessage && !originalRequest.url.includes("/notifications")) {
+					toast.error(errorMessage, { duration: 2000, id: `error-${status}` });
 				}
 		}
 
@@ -167,7 +155,6 @@ api.interceptors.response.use(
 	}
 );
 
-// Helper functions
 export const checkBackendHealth = async () => {
 	try {
 		const response = await axios.get(
@@ -196,15 +183,14 @@ export const logout = () => {
 	window.location.href = "/login";
 };
 
-// Network status monitoring
+// Network status - 2 second toasts
 if (typeof window !== "undefined") {
 	window.addEventListener("online", () => {
-		toast.success("Connection restored", { id: "online", duration: 2000 });
-		retryCount = 0;
+		toast.success("Internet restored", { duration: 2000, id: "online" });
 	});
 
 	window.addEventListener("offline", () => {
-		toast.error("No internet connection", { id: "offline", duration: 4000 });
+		toast.error("No internet", { duration: 2000, id: "offline" });
 	});
 }
 

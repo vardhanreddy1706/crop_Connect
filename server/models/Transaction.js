@@ -1,7 +1,5 @@
 const mongoose = require("mongoose");
 
-
-
 const transactionSchema = new mongoose.Schema(
 	{
 		bookingId: {
@@ -26,25 +24,36 @@ const transactionSchema = new mongoose.Schema(
 		},
 		method: {
 			type: String,
-			enum: ["cash", "razorpay", "upi", "card"],
-			required: true,
+			enum: ["razorpay", "cash", "upi", "bank_transfer"],
+			default: "razorpay",
+		},
+		paymentId: {
+			type: String,
+		},
+		razorpayOrderId: {
+			type: String,
+		},
+		razorpaySignature: {
+			type: String,
 		},
 		status: {
 			type: String,
 			enum: ["pending", "completed", "failed", "refunded"],
-			default: "pending",
+			default: "completed",
 		},
-		razorpayOrderId: String,
-		razorpayPaymentId: String,
-		razorpaySignature: String,
-		notes: String,
+		paidAt: {
+			type: Date,
+			default: Date.now,
+		},
 	},
 	{
 		timestamps: true,
 	}
 );
 
+// Indexes
 transactionSchema.index({ farmerId: 1, status: 1 });
 transactionSchema.index({ tractorOwnerId: 1, status: 1 });
+transactionSchema.index({ bookingId: 1 });
 
 module.exports = mongoose.model("Transaction", transactionSchema);

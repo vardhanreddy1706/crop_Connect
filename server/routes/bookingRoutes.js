@@ -1,66 +1,56 @@
-const express = require("express");
-const router = express.Router();
+const router = require("express").Router();
+const { protect, authorize } = require("../middlewares/authMiddleware"); // ← ADD authorize import
 const {
-	createBooking,
-	getMyBookings,
-	getServiceBookings,
-	updateBookingStatus,
-	cancelBooking,
 	getFarmerTractorBookings,
 	getFarmerWorkerBookings,
-	getFarmerTractorRequirements, 
-	getFarmerWorkerRequirements, 
+	getFarmerTractorRequirements,
+	getFarmerWorkerRequirements,
+	getAllFarmerBookings,
+	getTractorOwnerBookings,
+	createRazorpayOrder,
+	verifyPayment,
+	choosePayAfterWork,
+	completeWork,
+	cancelBooking,
+	createBooking,
+	completeBooking, // ← REMOVE DUPLICATE getTractorOwnerBookings
 } = require("../controllers/bookingController");
 
-const { protect, authorize } = require("../middlewares/authMiddleware");
+// ==================== BOOKING CREATION ====================
+router.post("/create", protect, createBooking);
 
-
+// ==================== FARMER ROUTES ====================
+router.get("/farmer/tractors", protect, getFarmerTractorBookings);
+router.get("/farmer/workers", protect, getFarmerWorkerBookings);
 router.get(
 	"/farmer/tractor-requirements",
 	protect,
-	authorize("farmer"),
 	getFarmerTractorRequirements
 );
+router.get("/farmer/worker-requirements", protect, getFarmerWorkerRequirements);
+router.get("/farmer", protect, getAllFarmerBookings);
 
+// ==================== TRACTOR OWNER ROUTES ====================
 router.get(
-	"/farmer/worker-requirements",
+	"/tractor-owner",
 	protect,
-	authorize("farmer"),
-	getFarmerWorkerRequirements
+	authorize("tractor_owner"),
+	getTractorOwnerBookings
 );
-// Farmer-specific booking routes (NEW)
-router.get(
-	"/farmer/tractors",
+router.post(
+	"/:id/complete",
 	protect,
-	authorize("farmer"),
-	getFarmerTractorBookings
-);
-
-router.get(
-	"/farmer/workers",
-	protect,
-	authorize("farmer"),
-	getFarmerWorkerBookings
+	authorize("tractor_owner"),
+	completeBooking
 );
 
-// Create booking
-router.post("/create", protect, authorize("farmer"), createBooking);
+// ==================== PAYMENT ROUTES ====================
+router.post("/:id/create-order", protect, createRazorpayOrder);
+router.post("/:id/verify-payment", protect, verifyPayment);
+router.post("/:id/pay-after-work", protect, choosePayAfterWork);
 
-// Get my bookings (all types)
-router.get("/my-bookings", protect, authorize("farmer"), getMyBookings);
-
-// Get service bookings (for service providers)
-router.get(
-	"/service-bookings",
-	protect,
-	authorize("tractor_owner", "worker"),
-	getServiceBookings
-);
-
-// Update booking status
-router.put("/:id/status", protect, updateBookingStatus);
-
-// Cancel booking
-router.delete("/:id", protect, cancelBooking);
+// ==================== WORK MANAGEMENT ====================
+router.post("/:id/complete-work", protect, completeWork);
+router.post("/:id/cancel", protect, cancelBooking);
 
 module.exports = router;

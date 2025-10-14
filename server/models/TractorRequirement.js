@@ -37,9 +37,7 @@ const tractorRequirementSchema = new mongoose.Schema(
 			required: [true, "Please provide work duration"],
 		},
 		location: {
-			village: {
-				type: String,
-			},
+			village: String,
 			district: {
 				type: String,
 				required: [true, "Please provide district"],
@@ -63,11 +61,32 @@ const tractorRequirementSchema = new mongoose.Schema(
 			type: String,
 			maxlength: [500, "Notes cannot exceed 500 characters"],
 		},
+		// ✅ FIXED: Single status field with all valid values
 		status: {
 			type: String,
-			enum: ["open", "in_progress", "completed", "cancelled"],
+			enum: [
+				"open",
+				"pending",
+				"accepted",
+				"rejected",
+				"cancelled",
+				"in_progress",
+				"completed",
+			],
 			default: "open",
 		},
+		// ✅ Bid acceptance tracking
+		acceptedBy: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+		},
+		acceptedAt: {
+			type: Date,
+		},
+		completedAt: {
+			type: Date,
+		},
+		// ✅ Responses/Bids array
 		responses: [
 			{
 				tractorOwner: {
@@ -77,30 +96,24 @@ const tractorRequirementSchema = new mongoose.Schema(
 				message: String,
 				quotedPrice: Number,
 				contactNumber: String,
+				estimatedDuration: String,
 				respondedAt: {
 					type: Date,
 					default: Date.now,
 				},
 			},
 		],
-		// Add this inside your schema definition:
-		acceptedResponse: {
-			tractorOwner: {
-				type: require("mongoose").Schema.Types.ObjectId,
-				ref: "User",
-			},
-			quotedPrice: Number,
-			acceptedAt: Date,
-		},
 	},
 	{
 		timestamps: true,
 	}
 );
 
-// Index for faster queries
+// Indexes for performance
 tractorRequirementSchema.index({ farmer: 1, status: 1 });
 tractorRequirementSchema.index({ "location.district": 1, "location.state": 1 });
 tractorRequirementSchema.index({ expectedDate: 1 });
 
-module.exports = mongoose.model("TractorRequirement", tractorRequirementSchema);
+module.exports =
+	mongoose.models.TractorRequirement ||
+	mongoose.model("TractorRequirement", tractorRequirementSchema);

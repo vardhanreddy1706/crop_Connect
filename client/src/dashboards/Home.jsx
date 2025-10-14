@@ -5,6 +5,9 @@ import "../App.css";
 import Footer from "../pages/Footer.jsx";
 import FarmerCarousel from "../caurosel/Caurosel.jsx";
 import CropPriceSearch from "../pages/CropPriceSearch.jsx";
+import CropYieldPredictor from "../pages/CropYieldPredictor.jsx";
+
+
 
 export default function FarmerDashboard() {
 	const { user, logout } = useContext(AuthContext);
@@ -190,7 +193,6 @@ export default function FarmerDashboard() {
 
 										<div className="border-t border-gray-100"></div>
 
-
 										<div className="border-t border-gray-100"></div>
 
 										<Link
@@ -256,6 +258,36 @@ export default function FarmerDashboard() {
 												/>
 											</svg>
 										</Link>
+										<Link
+											to="/farmer/my-bookings"
+											className="group/item flex items-start gap-4 px-6 py-4 hover:bg-purple-50 transition-colors"
+										>
+											<div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover/item:bg-purple-200 transition-colors">
+												<span className="text-2xl">🕒</span>
+											</div>
+											<div className="flex-1">
+												<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
+													My Booking
+												</h4>
+												<p className="text-xs text-gray-500 mt-0.5">Bookings</p>
+											</div>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												className="h-5 w-5 text-gray-400 group-hover/item:text-purple-600 transform group-hover/item:translate-x-1 transition-all"
+												fill="none"
+												viewBox="0 0 24 24"
+												stroke="currentColor"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth={2}
+													d="M9 5l7 7-7 7"
+												/>
+											</svg>
+										</Link>
+
+										
 									</div>
 								</div>
 							</div>
@@ -486,7 +518,8 @@ export default function FarmerDashboard() {
 				</div>
 			</div>
 			<FarmerCarousel />
-			<CropPriceSearch/>
+			<CropPriceSearch />
+			<CropYieldPredictor />
 			<Footer />
 		</>
 	);

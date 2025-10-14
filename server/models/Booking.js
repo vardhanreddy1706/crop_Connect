@@ -7,6 +7,11 @@ const bookingSchema = new mongoose.Schema(
 			ref: "User",
 			required: true,
 		},
+		tractorOwnerId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
+		},
 		serviceType: {
 			type: String,
 			enum: ["tractor", "worker"],
@@ -51,22 +56,58 @@ const bookingSchema = new mongoose.Schema(
 		},
 		status: {
 			type: String,
-			enum: ["pending", "confirmed", "completed", "cancelled"],
+			enum: ["pending", "confirmed", "in_progress", "completed", "cancelled"],
+			default: "confirmed",
+		},
+		// Add to existing Booking schema
+		bidId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Bid",
+		},
+		workCompletedAt: {
+			type: Date,
+		},
+		workStatus: {
+			type: String,
+			enum: ["pending", "in_progress", "completed", "cancelled"],
 			default: "pending",
 		},
 		paymentStatus: {
 			type: String,
-			enum: ["pending", "paid", "refunded"],
+			enum: ["pending", "paid", "failed", "refunded"],
 			default: "pending",
+		},
+		paymentMethod: {
+			type: String,
+			enum: ["pay_now", "pay_after_work"],
+		},
+		razorpayOrderId: {
+			type: String,
+		},
+		razorpayPaymentId: {
+			type: String,
+		},
+		razorpaySignature: {
+			type: String,
+		},
+		paidAt: {
+			type: Date,
+		},
+		workCompletedAt: {
+			type: Date,
 		},
 		notes: {
 			type: String,
-			maxlength: 500,
 		},
 	},
 	{
 		timestamps: true,
 	}
 );
+
+// Indexes for faster queries
+bookingSchema.index({ farmer: 1, status: 1 });
+bookingSchema.index({ tractorOwnerId: 1, status: 1 });
+bookingSchema.index({ paymentStatus: 1 });
 
 module.exports = mongoose.model("Booking", bookingSchema);

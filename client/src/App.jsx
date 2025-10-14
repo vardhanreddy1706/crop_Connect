@@ -25,6 +25,7 @@ import WorkerBookings from "./pages/Bookings";
 import FarmerBookings from "./pages/BookingsHistory";
 import TransactionHistory from "./pages/TransactionHistory";
 import { NotificationProvider } from "./context/NotificationContext";
+import FarmerMyBookings from "./pages/FarmerBookings";
 
 // Dashboards
 import BuyerDashboard from "./dashboards/BuyerDashboard";
@@ -236,8 +237,23 @@ function AppRoutes() {
 					</ProtectedRoute>
 				}
 			/>
+			<Route
+				path="/farmer/my-bookings"
+				element={
+					<ProtectedRoute allowedRoles={["farmer"]}>
+						<FarmerMyBookings />
+					</ProtectedRoute>
+				}
+			/>
 
-			<Route path="booking-history" element ={<ProtectedRoute><FarmerBookings/></ProtectedRoute>}/>
+			<Route
+				path="booking-history"
+				element={
+					<ProtectedRoute>
+						<FarmerBookings />
+					</ProtectedRoute>
+				}
+			/>
 
 			{/* Role-Based Dashboards - Protected */}
 			<Route

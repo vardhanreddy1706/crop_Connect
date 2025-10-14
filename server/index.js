@@ -158,13 +158,14 @@ const cropRoutes = require("./routes/cropRoutes");
 const productRoutes = require("./routes/productRoutes");
 const tractorRoutes = require("./routes/tractorRoutes");
 const workerRoutes = require("./routes/workerRoutes");
-const bookingRoutes = require("./routes/bookingRoutes");
 const contactRoutes = require("./routes/contactRoutes");
 const workerRequirementRoutes = require("./routes/workerRequirementRoutes");
 const tractorRequirementRoutes = require("./routes/tractorRequirementRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const transactionRoutes = require("./routes/transactionRoutes");
-
+const bookingRoutes = require("./routes/bookingRoutes");
+const debugRoutes = require("./routes/debugRoutes");
+const bidRoutes = require("./routes/bidRoutes");
 // ========================
 // API ROUTES
 // ========================
@@ -179,6 +180,11 @@ app.use("/api/worker-requirements", workerRequirementRoutes);
 app.use("/api/tractor-requirements", tractorRequirementRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/transactions", transactionRoutes);
+app.use("/api/debug", debugRoutes);
+app.use("/api/bids", bidRoutes);
+
+
+
 
 // ========================
 // WELCOME ROUTE
@@ -271,5 +277,9 @@ process.on("SIGINT", () => {
 		process.exit(0);
 	});
 });
+
+
+
+
 
 module.exports = { app, io, emailTransporter };

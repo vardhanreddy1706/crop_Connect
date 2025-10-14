@@ -45,4 +45,9 @@ router
 	.put(protect, authorize("farmer"), updateTractorRequirement)
 	.delete(protect, authorize("farmer"), deleteTractorRequirement);
 
+
+	router.post("/:id/respond", protect, respondToRequirement);
+	router.post("/:id/accept", protect, acceptRequirement); 
+	router.post("/:id/complete", protect, completeWork); 
+
 module.exports = router;

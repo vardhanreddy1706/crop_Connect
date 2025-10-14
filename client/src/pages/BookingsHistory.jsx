@@ -20,12 +20,12 @@ import {
 } from "lucide-react";
 
 function FarmerBookings() {
-	const { user , authLoading} = useAuth();
+	const { user, authLoading } = useAuth();
 	const [bookings, setBookings] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
-	const [activeTab, setActiveTab] = useState("all"); // all, tractor, worker
-	const [statusFilter, setStatusFilter] = useState("all"); // all, pending, confirmed, completed, cancelled
+	const [activeTab, setActiveTab] = useState("all");
+	const [statusFilter, setStatusFilter] = useState("all");
 	const [searchQuery, setSearchQuery] = useState("");
 
 	useEffect(() => {
@@ -34,66 +34,92 @@ function FarmerBookings() {
 		}
 	}, [authLoading, user]);
 
-    
 	const fetchBookings = async () => {
 		try {
 			setLoading(true);
 			setError(null);
 
-			// Fetch BOTH bookings AND requirements
 			const [
 				tractorBookingsRes,
 				workerBookingsRes,
 				tractorRequirementsRes,
 				workerRequirementsRes,
-			] = await Promise.all([
+			] = await Promise.allSettled([
 				api.get("/bookings/farmer/tractors"),
 				api.get("/bookings/farmer/workers"),
-				api.get("/bookings/farmer/tractor-requirements"), // ✅ NEW
-				api.get("/bookings/farmer/worker-requirements"), // ✅ NEW
+				api.get("/bookings/farmer/tractor-requirements"),
+				api.get("/bookings/farmer/worker-requirements"),
 			]);
 
-			// Format bookings
+			// ✅ Format bookings with proper string conversion
 			const tractorBookings =
-				tractorBookingsRes.data.bookings?.map((booking) => ({
-					...booking,
-					type: "tractor",
-					category: "booking",
-				})) || [];
+				tractorBookingsRes.status === "fulfilled"
+					? (tractorBookingsRes.value?.data?.bookings || []).map((booking) => ({
+							...booking,
+							type: "tractor",
+							category: "booking",
+							location: formatLocation(booking.location), // ✅ Convert to string
+							notes: booking.notes || "N/A", // ✅ Ensure string
+							serviceProvider: booking.serviceProvider || {
+								name: "N/A",
+								phone: "",
+							},
+					  }))
+					: [];
 
 			const workerBookings =
-				workerBookingsRes.data.bookings?.map((booking) => ({
-					...booking,
-					type: "worker",
-					category: "booking",
-				})) || [];
+				workerBookingsRes.status === "fulfilled"
+					? (workerBookingsRes.value?.data?.bookings || []).map((booking) => ({
+							...booking,
+							type: "worker",
+							category: "booking",
+							location: formatLocation(booking.location), // ✅ Convert to string
+							notes: booking.notes || "N/A", // ✅ Ensure string
+							serviceProvider: booking.serviceProvider || {
+								name: "N/A",
+								phone: "",
+							},
+					  }))
+					: [];
 
-			// ✅ Format requirements (posted jobs)
+			// ✅ Format requirements with proper string conversion
 			const tractorRequirements =
-				tractorRequirementsRes.data.requirements?.map((req) => ({
-					...req,
-					type: "tractor",
-					category: "requirement",
-					totalCost: req.maxBudget,
-					bookingDate: req.expectedDate,
-					location: `${req.location?.village || ""}, ${
-						req.location?.district || ""
-					}`.trim(),
-					serviceProvider: { name: "Pending Responses", phone: "" },
-				})) || [];
+				tractorRequirementsRes.status === "fulfilled"
+					? (tractorRequirementsRes.value?.data?.requirements || []).map(
+							(req) => ({
+								...req,
+								type: "tractor",
+								category: "requirement",
+								totalCost: req.maxBudget || 0,
+								bookingDate: req.expectedDate,
+								location: formatLocation(req.location), // ✅ Convert to string
+								notes: req.additionalNotes || "No notes", // ✅ Ensure string
+								serviceProvider: {
+									name: req.acceptedBy?.name || "Pending Responses",
+									phone: req.acceptedBy?.phone || "",
+								},
+							})
+					  )
+					: [];
 
 			const workerRequirements =
-				workerRequirementsRes.data.requirements?.map((req) => ({
-					...req,
-					type: "worker",
-					category: "requirement",
-					totalCost: req.wagesOffered,
-					bookingDate: req.startDate,
-					location: `${req.location?.village || ""}, ${
-						req.location?.district || ""
-					}`.trim(),
-					serviceProvider: { name: "Pending Applicants", phone: "" },
-				})) || [];
+				workerRequirementsRes.status === "fulfilled"
+					? (workerRequirementsRes.value?.data?.requirements || []).map(
+							(req) => ({
+								...req,
+								type: "worker",
+								category: "requirement",
+								totalCost: req.wagesOffered || 0,
+								bookingDate: req.startDate,
+								location: formatLocation(req.location), // ✅ Convert to string
+								notes: req.additionalInfo || "No notes", // ✅ Ensure string
+								serviceProvider: {
+									name: req.acceptedBy?.name || "Pending Applicants",
+									phone: req.acceptedBy?.phone || "",
+								},
+							})
+					  )
+					: [];
 
 			// Combine all data
 			const allData = [
@@ -101,14 +127,28 @@ function FarmerBookings() {
 				...workerBookings,
 				...tractorRequirements,
 				...workerRequirements,
-			].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+			].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
 			setBookings(allData);
 		} catch (err) {
+			console.error("Fetch bookings error:", err);
 			setError(err.response?.data?.message || "Failed to load bookings");
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	// ✅ Helper function to format location object to string
+	const formatLocation = (location) => {
+		if (!location) return "Location not specified";
+
+		if (typeof location === "string") return location;
+
+		const parts = [location.village, location.district, location.state].filter(
+			Boolean
+		);
+
+		return parts.length > 0 ? parts.join(", ") : "Location not specified";
 	};
 
 	const getStatusColor = (status) => {
@@ -117,6 +157,8 @@ function FarmerBookings() {
 			confirmed: "bg-blue-100 text-blue-800 border-blue-200",
 			completed: "bg-green-100 text-green-800 border-green-200",
 			cancelled: "bg-red-100 text-red-800 border-red-200",
+			open: "bg-blue-100 text-blue-800 border-blue-200",
+			in_progress: "bg-purple-100 text-purple-800 border-purple-200",
 		};
 		return (
 			colors[status?.toLowerCase()] ||
@@ -126,211 +168,173 @@ function FarmerBookings() {
 
 	const getStatusIcon = (status) => {
 		const icons = {
-			pending: <Clock className="w-4 h-4" />,
+			pending: <AlertCircle className="w-4 h-4" />,
 			confirmed: <CheckCircle className="w-4 h-4" />,
 			completed: <CheckCircle className="w-4 h-4" />,
 			cancelled: <XCircle className="w-4 h-4" />,
+			open: <Clock className="w-4 h-4" />,
+			in_progress: <Clock className="w-4 h-4" />,
 		};
 		return icons[status?.toLowerCase()] || <AlertCircle className="w-4 h-4" />;
 	};
 
+	// Filter bookings
 	const filteredBookings = bookings.filter((booking) => {
 		const matchesTab = activeTab === "all" || booking.type === activeTab;
 		const matchesStatus =
 			statusFilter === "all" || booking.status?.toLowerCase() === statusFilter;
 		const matchesSearch =
-			searchQuery === "" ||
+			!searchQuery ||
+			booking.workType?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			booking.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
 			booking.serviceProvider?.name
 				?.toLowerCase()
-				.includes(searchQuery.toLowerCase()) ||
-			booking.location?.toLowerCase().includes(searchQuery.toLowerCase());
+				.includes(searchQuery.toLowerCase());
 
 		return matchesTab && matchesStatus && matchesSearch;
 	});
 
+	// Calculate stats
 	const stats = {
 		total: bookings.length,
 		tractor: bookings.filter((b) => b.type === "tractor").length,
 		worker: bookings.filter((b) => b.type === "worker").length,
-		pending: bookings.filter((b) => b.status?.toLowerCase() === "pending")
-			.length,
-		confirmed: bookings.filter((b) => b.status?.toLowerCase() === "confirmed")
-			.length,
-		completed: bookings.filter((b) => b.status?.toLowerCase() === "completed")
-			.length,
+		pending: bookings.filter(
+			(b) =>
+				b.status?.toLowerCase() === "pending" ||
+				b.status?.toLowerCase() === "open"
+		).length,
 	};
 
 	if (loading) {
 		return (
-			<div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center">
+			<div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
 				<div className="text-center">
-					<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto"></div>
-					<p className="mt-4 text-gray-600 font-medium">Loading bookings...</p>
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+					<p className="mt-4 text-gray-600">Loading bookings...</p>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 py-8 px-4 sm:px-6 lg:px-8">
+		<div className="min-h-screen bg-gray-50 p-6">
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
 				<div className="mb-8">
-					<h1 className="text-4xl font-bold text-gray-900 mb-2">My Bookings</h1>
+					<h1 className="text-3xl font-bold text-gray-900 mb-2">
+						My Bookings & Requests
+					</h1>
 					<p className="text-gray-600">
 						Manage all your tractor and worker bookings
 					</p>
 				</div>
 
 				{/* Stats Cards */}
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-					<div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+					<div className="bg-white p-6 rounded-lg shadow">
 						<div className="flex items-center justify-between">
 							<div>
-								<p className="text-sm text-gray-600 mb-1">Total Bookings</p>
-								<p className="text-3xl font-bold text-gray-900">
+								<p className="text-sm text-gray-600">Total Bookings</p>
+								<p className="text-2xl font-bold text-gray-900">
 									{stats.total}
 								</p>
 							</div>
-							<div className="p-3 bg-green-100 rounded-lg">
-								<Calendar className="w-6 h-6 text-green-600" />
-							</div>
+							<Calendar className="w-10 h-10 text-green-600" />
 						</div>
 					</div>
 
-					<div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+					<div className="bg-white p-6 rounded-lg shadow">
 						<div className="flex items-center justify-between">
 							<div>
-								<p className="text-sm text-gray-600 mb-1">Tractor Bookings</p>
-								<p className="text-3xl font-bold text-blue-600">
+								<p className="text-sm text-gray-600">Tractor Bookings</p>
+								<p className="text-2xl font-bold text-gray-900">
 									{stats.tractor}
 								</p>
 							</div>
-							<div className="p-3 bg-blue-100 rounded-lg">
-								<Tractor className="w-6 h-6 text-blue-600" />
-							</div>
+							<Tractor className="w-10 h-10 text-blue-600" />
 						</div>
 					</div>
 
-					<div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+					<div className="bg-white p-6 rounded-lg shadow">
 						<div className="flex items-center justify-between">
 							<div>
-								<p className="text-sm text-gray-600 mb-1">Worker Bookings</p>
-								<p className="text-3xl font-bold text-purple-600">
+								<p className="text-sm text-gray-600">Worker Bookings</p>
+								<p className="text-2xl font-bold text-gray-900">
 									{stats.worker}
 								</p>
 							</div>
-							<div className="p-3 bg-purple-100 rounded-lg">
-								<Users className="w-6 h-6 text-purple-600" />
-							</div>
+							<Users className="w-10 h-10 text-purple-600" />
 						</div>
 					</div>
 
-					<div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+					<div className="bg-white p-6 rounded-lg shadow">
 						<div className="flex items-center justify-between">
 							<div>
-								<p className="text-sm text-gray-600 mb-1">Pending</p>
-								<p className="text-3xl font-bold text-yellow-600">
+								<p className="text-sm text-gray-600">Pending</p>
+								<p className="text-2xl font-bold text-gray-900">
 									{stats.pending}
 								</p>
 							</div>
-							<div className="p-3 bg-yellow-100 rounded-lg">
-								<Clock className="w-6 h-6 text-yellow-600" />
-							</div>
+							<Clock className="w-10 h-10 text-yellow-600" />
 						</div>
 					</div>
 				</div>
 
-				{/* Filters Section */}
-				<div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-gray-100">
-					{/* Search Bar */}
-					<div className="mb-6">
-						<div className="relative">
+				{/* Filters and Search */}
+				<div className="bg-white p-4 rounded-lg shadow mb-6">
+					<div className="flex flex-col md:flex-row gap-4">
+						{/* Search */}
+						<div className="flex-1 relative">
 							<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
 							<input
 								type="text"
-								placeholder="Search by provider name or location..."
+								placeholder="Search by work type, location..."
 								value={searchQuery}
 								onChange={(e) => setSearchQuery(e.target.value)}
-								className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+								className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
 							/>
 						</div>
-					</div>
 
-					{/* Type Tabs */}
-					<div className="flex flex-wrap gap-2 mb-4">
-						<button
-							onClick={() => setActiveTab("all")}
-							className={`px-4 py-2 rounded-lg font-medium transition-all ${
-								activeTab === "all"
-									? "bg-green-600 text-white shadow-md"
-									: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-							}`}
+						{/* Tab Filter */}
+						<select
+							value={activeTab}
+							onChange={(e) => setActiveTab(e.target.value)}
+							className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
 						>
-							All ({stats.total})
-						</button>
-						<button
-							onClick={() => setActiveTab("tractor")}
-							className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-								activeTab === "tractor"
-									? "bg-blue-600 text-white shadow-md"
-									: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-							}`}
-						>
-							<Tractor className="w-4 h-4" />
-							Tractors ({stats.tractor})
-						</button>
-						<button
-							onClick={() => setActiveTab("worker")}
-							className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 ${
-								activeTab === "worker"
-									? "bg-purple-600 text-white shadow-md"
-									: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-							}`}
-						>
-							<Users className="w-4 h-4" />
-							Workers ({stats.worker})
-						</button>
-					</div>
+							<option value="all">All Types</option>
+							<option value="tractor">Tractor Only</option>
+							<option value="worker">Worker Only</option>
+						</select>
 
-					{/* Status Filter */}
-					<div className="flex flex-wrap gap-2">
-						<span className="flex items-center gap-2 text-gray-600 font-medium">
-							<Filter className="w-4 h-4" />
-							Status:
-						</span>
-						{["all", "pending", "confirmed", "completed", "cancelled"].map(
-							(status) => (
-								<button
-									key={status}
-									onClick={() => setStatusFilter(status)}
-									className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
-										statusFilter === status
-											? "bg-green-600 text-white"
-											: "bg-gray-100 text-gray-700 hover:bg-gray-200"
-									}`}
-								>
-									{status.charAt(0).toUpperCase() + status.slice(1)}
-								</button>
-							)
-						)}
+						{/* Status Filter */}
+						<select
+							value={statusFilter}
+							onChange={(e) => setStatusFilter(e.target.value)}
+							className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+						>
+							<option value="all">All Status</option>
+							<option value="pending">Pending</option>
+							<option value="open">Open</option>
+							<option value="confirmed">Confirmed</option>
+							<option value="in_progress">In Progress</option>
+							<option value="completed">Completed</option>
+							<option value="cancelled">Cancelled</option>
+						</select>
 					</div>
 				</div>
 
-				{/* Error Message */}
+				{/* Bookings List */}
 				{error && (
 					<div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
 						{error}
 					</div>
 				)}
 
-				{/* Bookings List */}
 				{filteredBookings.length === 0 ? (
-					<div className="bg-white rounded-xl shadow-md p-12 text-center border border-gray-100">
-						<div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-							<Calendar className="w-10 h-10 text-gray-400" />
-						</div>
-						<h3 className="text-xl font-semibold text-gray-900 mb-2">
+					<div className="bg-white p-12 rounded-lg shadow text-center">
+						<AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+						<h3 className="text-lg font-semibold text-gray-900 mb-2">
 							No bookings found
 						</h3>
 						<p className="text-gray-600">
@@ -344,147 +348,103 @@ function FarmerBookings() {
 						{filteredBookings.map((booking) => (
 							<div
 								key={booking._id}
-								className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow border border-gray-100 overflow-hidden"
+								className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
 							>
-								<div className="p-6">
-									<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-										{/* Left Section */}
-										<div className="flex-1">
-											<div className="flex items-start gap-4">
-												<div
-													className={`p-3 rounded-lg ${
-														booking.type === "tractor"
-															? "bg-blue-100"
-															: "bg-purple-100"
-													}`}
-												>
-													{booking.type === "tractor" ? (
-														<Tractor
-															className={`w-6 h-6 ${
-																booking.type === "tractor"
-																	? "text-blue-600"
-																	: "text-purple-600"
-															}`}
-														/>
-													) : (
-														<Users
-															className={`w-6 h-6 ${
-																booking.type === "tractor"
-																	? "text-blue-600"
-																	: "text-purple-600"
-															}`}
-														/>
-													)}
+								<div className="flex flex-col md:flex-row justify-between gap-4">
+									{/* Left Section */}
+									<div className="flex-1">
+										<div className="flex items-center gap-3 mb-3">
+											{booking.type === "tractor" ? (
+												<Tractor className="w-6 h-6 text-blue-600" />
+											) : (
+												<Users className="w-6 h-6 text-purple-600" />
+											)}
+											<div>
+												<h3 className="text-lg font-semibold text-gray-900">
+													{booking.workType || "Service"}
+												</h3>
+												<p className="text-sm text-gray-500">
+													{booking.category === "requirement"
+														? "Your Requirement"
+														: "Booked Service"}
+												</p>
+											</div>
+											<span
+												className={`ml-auto px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1 ${getStatusColor(
+													booking.status
+												)}`}
+											>
+												{getStatusIcon(booking.status)}
+												{booking.status || "Unknown"}
+											</span>
+										</div>
+
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+											<div className="flex items-start gap-2">
+												<Calendar className="w-4 h-4 text-gray-400 mt-0.5" />
+												<div>
+													<p className="text-gray-600">Date</p>
+													<p className="font-medium text-gray-900">
+														{new Date(booking.bookingDate).toLocaleDateString()}
+													</p>
 												</div>
+											</div>
 
-												<div className="flex-1">
-													<div className="flex items-center gap-2 mb-2">
-														<h3 className="text-lg font-semibold text-gray-900">
-															{booking.type === "tractor"
-																? "Tractor Service"
-																: "Worker Service"}
-														</h3>
-														<span
-															className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-1 ${getStatusColor(
-																booking.status
-															)}`}
-														>
-															{getStatusIcon(booking.status)}
-															{booking.status}
-														</span>
-													</div>
+											<div className="flex items-start gap-2">
+												<MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+												<div>
+													<p className="text-gray-600">Location</p>
+													<p className="font-medium text-gray-900">
+														{booking.location || "N/A"}
+													</p>
+												</div>
+											</div>
 
-													<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-														<div className="flex items-center gap-2 text-gray-600">
-															<User className="w-4 h-4" />
-															<span className="font-medium">
-																{booking.serviceProvider?.name || "N/A"}
-															</span>
-														</div>
+											<div className="flex items-start gap-2">
+												<User className="w-4 h-4 text-gray-400 mt-0.5" />
+												<div>
+													<p className="text-gray-600">Service Provider</p>
+													<p className="font-medium text-gray-900">
+														{booking.serviceProvider?.name || "N/A"}
+													</p>
+												</div>
+											</div>
 
-														<div className="flex items-center gap-2 text-gray-600">
-															<Calendar className="w-4 h-4" />
-															<span>
-																{new Date(
-																	booking.bookingDate
-																).toLocaleDateString("en-IN", {
-																	day: "numeric",
-																	month: "short",
-																	year: "numeric",
-																})}
-															</span>
-														</div>
-
-														<div className="flex items-center gap-2 text-gray-600">
-															<MapPin className="w-4 h-4" />
-															<span className="truncate">
-																{booking.location || "N/A"}
-															</span>
-														</div>
-
-														<div className="flex items-center gap-2 text-gray-600">
-															<IndianRupee className="w-4 h-4" />
-															<span className="font-semibold text-green-600">
-																₹{booking.totalCost || "N/A"}
-															</span>
-														</div>
-
-														{booking.duration && (
-															<div className="flex items-center gap-2 text-gray-600">
-																<Clock className="w-4 h-4" />
-																<span>{booking.duration} hours</span>
-															</div>
-														)}
-
-														{booking.serviceProvider?.phone && (
-															<div className="flex items-center gap-2 text-gray-600">
-																<Phone className="w-4 h-4" />
-																<a
-																	href={`tel:${booking.serviceProvider.phone}`}
-																	className="text-blue-600 hover:underline"
-																>
-																	{booking.serviceProvider.phone}
-																</a>
-															</div>
-														)}
-													</div>
-
-													{booking.notes && (
-														<div className="mt-3 p-3 bg-gray-50 rounded-lg">
-															<p className="text-sm text-gray-700">
-																<span className="font-medium">Notes:</span>{" "}
-																{booking.notes}
-															</p>
-														</div>
-													)}
+											<div className="flex items-start gap-2">
+												<IndianRupee className="w-4 h-4 text-gray-400 mt-0.5" />
+												<div>
+													<p className="text-gray-600">Total Cost</p>
+													<p className="font-medium text-gray-900">
+														₹{booking.totalCost || 0}
+													</p>
 												</div>
 											</div>
 										</div>
 
-										{/* Right Section - Actions */}
-										<div className="flex flex-col gap-2 lg:w-40">
-											{booking.status?.toLowerCase() === "pending" && (
-												<>
-													<button className="w-full px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors">
-														Confirm
-													</button>
-													<button className="w-full px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors">
-														Cancel
-													</button>
-												</>
+										{booking.notes &&
+											booking.notes !== "N/A" &&
+											booking.notes !== "No notes" && (
+												<div className="mt-3 p-3 bg-gray-50 rounded">
+													<p className="text-sm text-gray-600">
+														<span className="font-medium">Notes:</span>{" "}
+														{String(booking.notes)}
+													</p>
+												</div>
 											)}
-											{booking.status?.toLowerCase() === "confirmed" && (
-												<button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
-													View Details
-												</button>
-											)}
-											{booking.status?.toLowerCase() === "completed" && (
-												<button className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg font-medium hover:bg-yellow-700 transition-colors">
-													Rate Service
-												</button>
-											)}
-										</div>
 									</div>
+
+									{/* Right Section - Contact */}
+									{booking.serviceProvider?.phone && (
+										<div className="flex flex-col gap-2 md:items-end">
+											<a
+												href={`tel:${booking.serviceProvider.phone}`}
+												className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+											>
+												<Phone className="w-4 h-4" />
+												Call Provider
+											</a>
+										</div>
+									)}
 								</div>
 							</div>
 						))}
