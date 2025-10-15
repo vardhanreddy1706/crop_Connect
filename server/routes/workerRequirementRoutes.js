@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+
 const {
 	createWorkerRequirement,
 	getAllWorkerRequirements,
@@ -8,10 +9,14 @@ const {
 	updateWorkerRequirement,
 	deleteWorkerRequirement,
 } = require("../controllers/WorkerRequirementController");
+
 const { protect } = require("../middlewares/authMiddleware");
 
 // Farmer creates requirement
 router.post("/", protect, createWorkerRequirement);
+
+// ✅ ADD THIS NEW ROUTE - Get all requirements (for workers to browse)
+router.get("/available", getAllWorkerRequirements);
 
 // Get all requirements (public/workers can see)
 router.get("/", getAllWorkerRequirements);

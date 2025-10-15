@@ -15,7 +15,15 @@ exports.placeBid = async (req, res) => {
 			proposedDuration,
 			proposedDate,
 			message,
-		} = req.body;
+        } = req.body;
+        
+                await NotificationService.notifyBidPlaced(
+									farmer,
+									tractorOwner,
+									requirement,
+									bidData
+								);
+
 
 		// Check if requirement exists
 		const requirement = await TractorRequirement.findById(
@@ -169,12 +177,18 @@ exports.acceptBid = async (req, res) => {
 			.populate("tractorOwnerId", "name phone email")
 			.populate("requirementId");
 
+        
 		if (!bid) {
 			return res.status(404).json({
 				success: false,
 				message: "Bid not found",
 			});
 		}
+
+                await NotificationService.notifyBidAccepted(
+									tractorOwner,
+									booking
+								);
 
 		// Check if user is the farmer who posted the requirement
 		if (bid.requirementId.farmer.toString() !== req.user._id.toString()) {
@@ -318,3 +332,5 @@ exports.rejectBid = async (req, res) => {
 		});
 	}
 };
+
+

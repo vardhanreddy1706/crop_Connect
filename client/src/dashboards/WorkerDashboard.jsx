@@ -1,445 +1,1990 @@
-// src/pages/dashboards/WorkerDashboard.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../config/api";
-
-import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
-	User,
-	DollarSign,
+	TrendingUp,
+	Users,
+	Briefcase,
+	CheckCircle,
+	XCircle,
 	Clock,
-	Hammer,
+	IndianRupee,
+	MapPin,
 	Calendar,
-	Star,
 	Phone,
-	Gauge,
-	X,
+	Mail,
+	Edit,
+	Trash2,
 	Plus,
-	ArrowLeft,
+	Search,
+	Filter,
+	Star,
+	Loader,
+	AlertCircle,
+	X,
+	LogOut,
 } from "lucide-react";
 
-// Mock Data
-const mockBookings = [
-	{
-		id: 1,
-		farmer: "Green Acres Farm",
-		date: "Oct 25, 2025",
-		status: "Confirmed",
-		type: "Harvesting",
-	},
-	{
-		id: 2,
-		farmer: "Riverbend Orchards",
-		date: "Oct 28, 2025",
-		status: "Pending",
-		type: "Pruning",
-	},
-];
-
-const mockRatings = [
-	{
-		id: 1,
-		farmer: "Sun Valley Crops",
-		rating: 5,
-		comment: "Excellent work ethic, very fast and efficient.",
-	},
-	{
-		id: 2,
-		farmer: "Hillside Dairy",
-		rating: 4,
-		comment: "Arrived on time. Minor delay in finishing the task.",
-	},
-];
-
-const StatCard = ({  title, value, unit, color }) => (
-	<div
-		className={`p-4 bg-white border-l-4 ${color} shadow-lg rounded-lg transition hover:shadow-xl`}
-	>
-		<div className="flex items-center justify-between">
-			<div className="text-sm font-medium text-gray-500">{title}</div>
-			
-		</div>
-		<p className="mt-1 text-3xl font-bold text-gray-900">
-			{value}
-			{unit && (
-				<span className="ml-1 text-base font-normal text-gray-500">{unit}</span>
-			)}
-		</p>
-	</div>
-);
-
-const WorkerForm = ({ formData, handleChange, handleSubmit, handleClose }) => (
-	<div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
-		<div className="bg-white p-6 md:p-8 rounded-xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-300">
-			<div className="flex justify-between items-center mb-6 border-b pb-3">
-				<h3 className="text-2xl font-semibold text-indigo-700">
-					Post Your Availability
-				</h3>
-				<button
-					onClick={handleClose}
-					className="text-gray-400 hover:text-gray-700 transition"
-				>
-					<X className="w-6 h-6" />
-				</button>
-			</div>
-
-			<form onSubmit={handleSubmit} className="space-y-4">
-				<div className="flex space-x-4">
-					<input
-						name="name"
-						placeholder="Name"
-						value={formData.name}
-						onChange={handleChange}
-						className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						required
-					/>
-					<input
-						name="age"
-						type="number"
-						placeholder="Age"
-						value={formData.age}
-						onChange={handleChange}
-						className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						min="16"
-						required
-					/>
-				</div>
-
-				<div className="flex space-x-4">
-					<select
-						name="gender"
-						value={formData.gender}
-						onChange={handleChange}
-						className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						required
-					>
-						<option value="">Select Gender</option>
-						<option value="male">Male</option>
-						<option value="female">Female</option>
-						<option value="other">Other</option>
-					</select>
-					<input
-						name="phone"
-						placeholder="Phone Number"
-						value={formData.phone}
-						onChange={handleChange}
-						className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						type="tel"
-						required
-					/>
-				</div>
-
-				<div className="flex space-x-4">
-					<input
-						name="workerType"
-						placeholder="Job Title (e.g., Tractor Operator)"
-						value={formData.workerType}
-						onChange={handleChange}
-						className="w-2/3 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						required
-					/>
-					<input
-						name="experience"
-						type="number"
-						placeholder="Exp (years)"
-						value={formData.experience}
-						onChange={handleChange}
-						className="w-1/3 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						min="0"
-					/>
-				</div>
-
-				<div className="flex space-x-4">
-					<input
-						name="hours"
-						type="number"
-						placeholder="Hours/Day"
-						value={formData.hours}
-						onChange={handleChange}
-						className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						min="1"
-					/>
-					<input
-						name="chargePerDay"
-						type="number"
-						placeholder="Charge Per Day (₹)"
-						value={formData.chargePerDay}
-						onChange={handleChange}
-						className="w-1/2 p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
-						min="10"
-					/>
-				</div>
-
-				<button
-					type="submit"
-					className="w-full bg-indigo-600 text-white p-3 rounded-xl font-semibold hover:bg-indigo-700 transition shadow-md hover:shadow-lg mt-6"
-				>
-					Submit Work Post
-				</button>
-			</form>
-		</div>
-	</div>
-);
-
 function WorkerDashboard() {
-	const navigate = useNavigate();
-	const [showForm, setShowForm] = useState(false);
 	const { user, logout } = useAuth();
-	const [formData, setFormData] = useState({
-		name: "John Doe",
-		age: "35",
-		gender: "male",
-		phone: "555-1234",
-		experience: "10",
-		workerType: "General Farm Hand",
-		hours: "8",
-		chargePerDay: "120",
-	});
-	const [posts, setPosts] = useState([]);
 
-	// Logout logic: sessionStorage, redirect, block back
-	const handleLogout = () => {
-		logout();
-		navigate("/", { replace: true });
+	// State management
+	const [workOrders, setWorkOrders] = useState([]);
+	const [myServices, setMyServices] = useState([]);
+	const [hireRequests, setHireRequests] = useState([]); // Requests from farmers
+	const [availableJobs, setAvailableJobs] = useState([]); // Jobs posted by farmers
+	const [appliedJobs, setAppliedJobs] = useState([]); // Jobs I applied for
+	const [setTransactions] = useState([]);
+
+
+	const [loading, setLoading] = useState(true);
+	const [actionLoading, setActionLoading] = useState(null);
+	const [activeTab, setActiveTab] = useState("overview");
+	const [activeWorkSubTab, setActiveWorkSubTab] = useState("accepted");
+
+	// Service Modal State
+	const [showServiceModal, setShowServiceModal] = useState(false);
+	const [editingService, setEditingService] = useState(null);
+	const [serviceFormData, setServiceFormData] = useState({
+		workerType: "",
+		chargePerDay: "",
+		experience: "",
+		workingHours: "8",
+		location: {
+			district: "",
+			state: "",
+			pincode: "",
+		},
+		skills: "",
+		description: "",
+		contactNumber: "",
+	});
+
+	// Job search filters
+	const [jobSearch, setJobSearch] = useState({
+		district: "",
+		workType: "",
+		maxBudget: "",
+	});
+
+	// ✅ Fetch all data on mount
+	useEffect(() => {
+		if (user) {
+			fetchAllData();
+		}
+	}, [user]);
+
+	// ✅ Fetch data when tab changes
+	useEffect(() => {
+		if (user && activeTab === "available") {
+			fetchAvailableJobs();
+		}
+	}, [activeTab]);
+
+	// ✅ Fetch all data at once
+	const fetchAllData = async () => {
+		setLoading(true);
+		await Promise.all([
+			fetchWorkOrders(),
+			fetchHireRequests(),
+			fetchMyServices(),
+		
+			fetchWorkerApplications(),
+		]);
+		setLoading(false);
 	};
 
-	const handleChange = (e) =>
-		setFormData({ ...formData, [e.target.name]: e.target.value });
-
-	const handleSubmit = async (e) => {
-		e.preventDefault();
-
+	const fetchWorkerApplications = async () => {
 		try {
-			const token = localStorage.getItem("token");
-			const response = await api.post(
-				"/workers/post-availability",
-				{
-					workerType: formData.workerType,
-					experience: formData.experience,
-					chargePerDay: formData.chargePerDay,
-					workingHours: formData.hours,
-					contactNumber: formData.phone,
-					availability: true,
-				},
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			);
-
-			if (response.data.success) {
-				alert("Availability posted successfully!");
-				setPosts([response.data.workerService, ...posts]);
-				setShowForm(false);
-			}
+			const { data } = await api.get("/worker-hires/worker-applications");
+			setAppliedJobs(data.applications || []);
+			console.log("✅ Applications loaded:", data.applications?.length || 0);
 		} catch (error) {
-			console.error("Error posting availability:", error);
-			alert(error.response?.data?.message || "Failed to post availability");
+			console.error("Fetch applications error:", error);
+			// Silent fail - endpoint might not exist yet
 		}
 	};
 
+	// ✅ Fetch work orders (bookings where worker is hired)
+	const fetchWorkOrders = async () => {
+		try {
+			const { data } = await api.get("/bookings/worker");
+			setWorkOrders(data.bookings || []);
+			console.log("✅ Work orders loaded:", data.bookings?.length || 0);
+		} catch (error) {
+			console.error("Fetch work orders error:", error);
+		}
+	};
+
+	// ✅ FIXED: Fetch hire requests (farmers hiring me)
+	const fetchHireRequests = async () => {
+		try {
+			const { data } = await api.get("/worker-hires/worker-requests");
+
+			// ✅ FIXED: Backend returns 'requests', not 'hireRequests'
+			const allRequests = data.requests || data.hireRequests || [];
+
+			// Filter only farmer-to-worker requests (not applications)
+			const farmerRequests = allRequests.filter(
+				(r) => r.requestType === "farmer_to_worker" || !r.requestType
+			);
+
+			setHireRequests(farmerRequests);
+			console.log("✅ Hire requests loaded:", farmerRequests.length);
+		} catch (error) {
+			console.error("Fetch hire requests error:", error);
+		}
+	};
+
+	// ✅ FIXED: Fetch worker applications separately
+	// const fetchWorkerApplications = async () => {
+	// 	try {
+	// 		const { data } = await api.get("/worker-hires/worker-applications");
+	// 		setAppliedJobs(data.applications || []);
+	// 		console.log("✅ Applications loaded:", data.applications?.length || 0);
+	// 	} catch (error) {
+	// 		console.error("Fetch applications error:", error);
+	// 	}
+	// };
+
+	// ✅ FIXED: Fetch my posted services
+	const fetchMyServices = async () => {
+		try {
+			const { data } = await api.get("/workers/my-posts");
+
+			// ✅ FIXED: Backend may return 'services' or 'workerPosts'
+			const services = data.services || data.workerPosts || [];
+			setMyServices(services);
+			console.log("✅ Services loaded:", services.length);
+		} catch (error) {
+			console.error("Fetch my services error:", error);
+		}
+	};
+
+	// ✅ Fetch available jobs (farmer requirements)
+	const fetchAvailableJobs = async () => {
+		try {
+			setLoading(true);
+			const params = {};
+
+			if (jobSearch.district) params.location = jobSearch.district;
+			if (jobSearch.workType) params.workType = jobSearch.workType;
+			if (jobSearch.maxBudget) params.minWage = jobSearch.maxBudget;
+
+			const { data } = await api.get("/worker-requirements", { params });
+			setAvailableJobs(data.workerRequirements || data.requirements || []);
+		} catch (error) {
+			console.error("Fetch available jobs error:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	// ✅ Fetch transactions
+	const fetchTransactions = async () => {
+		try {
+			const { data } = await api.get("/transactions/worker");
+			setTransactions(data.transactions || []);
+		} catch (error) {
+			console.error("Fetch transactions error:", error);
+			// Silent fail - endpoint might not exist
+		}
+	};
+
+	// ✅ Handle search button click
+	const handleSearchJobs = () => {
+		fetchAvailableJobs();
+	};
+
+	// ✅ Reset job filters
+	const handleResetFilters = () => {
+		setJobSearch({
+			district: "",
+			workType: "",
+			maxBudget: "",
+		});
+		fetchAvailableJobs();
+	};
+	
+
+	// ✅ Accept hire request from farmer
+	const handleAcceptHireRequest = async (requestId) => {
+		if (!window.confirm("Accept this hire request and create booking?")) return;
+
+		try {
+			setActionLoading(requestId);
+			await api.post(`/worker-hires/${requestId}/worker-accept`);
+			toast.success("🎉 Hire request accepted! Booking created.");
+			await fetchAllData(); // Refresh all data
+			setActiveTab("work"); // Switch to My Work tab
+		} catch (error) {
+			console.error("Accept hire request error:", error);
+			toast.error(error.response?.data?.message || "Failed to accept request");
+		} finally {
+			setActionLoading(null);
+		}
+	};
+
+	// ✅ Reject hire request from farmer
+	const handleRejectHireRequest = async (requestId) => {
+		const reason = prompt("Reason for rejection (optional):");
+
+		try {
+			setActionLoading(requestId);
+			await api.post(`/worker-hires/${requestId}/worker-reject`, { reason });
+			toast.success("Hire request rejected");
+			fetchHireRequests();
+		} catch (error) {
+			console.error("Reject hire request error:", error);
+			toast.error(error.response?.data?.message || "Failed to reject request");
+		} finally {
+			setActionLoading(null);
+		}
+	};
+	const handleApplyForJob = async (requirement) => {
+		// ✅ FIXED: Check if already applied using _id
+		const alreadyApplied = appliedJobs.find(
+			(job) => job.workerRequirement?._id === requirement._id
+		);
+
+		if (alreadyApplied) {
+			toast.info("You have already applied for this job");
+			return;
+		}
+
+		if (
+			!window.confirm(
+				`Apply for ${requirement.workType} job at ₹${requirement.wagesOffered}/day?`
+			)
+		) {
+			return;
+		}
+
+		try {
+			setActionLoading(requirement._id); // ✅ Fixed
+			await api.post(`/worker-requirements/${requirement._id}/apply`); // ✅ Fixed
+			toast.success(
+				"✅ Application sent successfully! Farmer will be notified."
+			);
+
+			fetchAvailableJobs();
+			fetchWorkerApplications(); // ✅ Refresh applications too
+		} catch (error) {
+			console.error("Apply for job error:", error);
+			toast.error(error.response?.data?.message || "Failed to apply for job");
+		} finally {
+			setActionLoading(null);
+		}
+	};
+
+	// ✅ Handle opening service modal for new service
+	const handleOpenServiceModal = () => {
+		setEditingService(null);
+		setServiceFormData({
+			workerType: "",
+			chargePerDay: "",
+			experience: "",
+			workingHours: "8",
+			location: {
+				district: "",
+				state: "",
+				pincode: "",
+			},
+			skills: "",
+			description: "",
+			contactNumber: user?.phone || "",
+		});
+		setShowServiceModal(true);
+	};
+
+	// ✅ Handle opening service modal for editing
+	const handleEditService = (service) => {
+		setEditingService(service);
+		setServiceFormData({
+			workerType: service.workerType,
+			chargePerDay: service.chargePerDay.toString(),
+			experience: service.experience.toString(),
+			workingHours: service.workingHours.toString(),
+			location: {
+				district: service.location?.district || "",
+				state: service.location?.state || "",
+				pincode: service.location?.pincode || "",
+			},
+			skills: service.skills?.join(", ") || "",
+			description: service.description || "",
+			contactNumber: service.contactNumber || user?.phone || "",
+		});
+		setShowServiceModal(true);
+	};
+
+	// ✅ Handle closing service modal
+	const handleCloseServiceModal = () => {
+		setShowServiceModal(false);
+		setEditingService(null);
+	};
+
+	// ✅ Handle form input changes
+	const handleServiceFormChange = (e) => {
+		const { name, value } = e.target;
+
+		if (name.startsWith("location.")) {
+			const locationField = name.split(".")[1];
+			setServiceFormData({
+				...serviceFormData,
+				location: {
+					...serviceFormData.location,
+					[locationField]: value,
+				},
+			});
+		} else {
+			setServiceFormData({
+				...serviceFormData,
+				[name]: value,
+			});
+		}
+	};
+
+	// ✅ The function IS defined in your code:
+	const handleCompleteWork = async (bookingId) => {
+		if (!window.confirm("Mark this work as completed?")) return;
+
+		try {
+			setActionLoading(bookingId);
+			await api.post(`/bookings/${bookingId}/complete`);
+			toast.success("Work marked as completed!");
+			fetchWorkOrders();
+			fetchMyServices(); // Update service status
+		} catch (error) {
+			toast.error(error.response?.data?.message || "Failed to complete work");
+		} finally {
+			setActionLoading(null);
+		}
+	};
+
+	// ✅ Handle posting/updating service
+	const handlePostService = async (e) => {
+		e.preventDefault();
+
+		// Validation
+		if (
+			!serviceFormData.workerType ||
+			!serviceFormData.chargePerDay ||
+			!serviceFormData.experience ||
+			!serviceFormData.contactNumber
+		) {
+			toast.error("Please fill in all required fields");
+			return;
+		}
+
+		try {
+			setActionLoading("posting");
+
+			const postData = {
+				...serviceFormData,
+				chargePerDay: parseInt(serviceFormData.chargePerDay),
+				experience: parseInt(serviceFormData.experience),
+				workingHours: parseInt(serviceFormData.workingHours),
+				skills: serviceFormData.skills
+					? serviceFormData.skills.split(",").map((s) => s.trim())
+					: [],
+			};
+
+			if (editingService) {
+				await api.put(`/workers/availability/${editingService._id}`, postData);
+				toast.success("✅ Service updated successfully!");
+			} else {
+				await api.post("/workers/post-availability", postData);
+				toast.success("🎉 Service posted successfully!");
+			}
+
+			handleCloseServiceModal();
+			fetchMyServices();
+		} catch (error) {
+			console.error("Post service error:", error);
+			toast.error(error.response?.data?.message || "Failed to post service");
+		} finally {
+			setActionLoading(null);
+		}
+	};
+
+	// ✅ Delete service
+	const handleDeleteService = async (serviceId) => {
+		if (!window.confirm("Are you sure you want to delete this service?"))
+			return;
+
+		try {
+			setActionLoading(serviceId);
+			await api.delete(`/workers/availability/${serviceId}`);
+			toast.success("Service deleted successfully");
+			fetchMyServices();
+		} catch (error) {
+			toast.error(error.response?.data?.message || "Failed to delete service");
+		} finally {
+			setActionLoading(null);
+		}
+	};
+
+	// ✅ FIXED: Calculate stats dynamically
+	const stats = {
+		totalWork: workOrders.length,
+		pending: hireRequests.filter((r) => r.status === "pending").length,
+		accepted: hireRequests.filter((r) => r.status === "accepted").length,
+		completed: workOrders.filter((w) => w.status === "completed").length,
+		rejected: hireRequests.filter((r) => r.status === "rejected").length,
+		totalEarnings: workOrders
+			.filter((w) => w.paymentStatus === "paid" || w.paymentCompleted)
+			.reduce((sum, w) => sum + (w.totalCost || 0), 0),
+		postedServices: myServices.length,
+		availableServices: myServices.filter(
+			(s) => s.bookingStatus === "available" || !s.bookingStatus
+		).length,
+	};
+
+	// Utility functions
+	const getStatusColor = (status) => {
+		const colors = {
+			pending: "bg-yellow-100 text-yellow-800 border-yellow-300",
+			confirmed: "bg-blue-100 text-blue-800 border-blue-300",
+			in_progress: "bg-purple-100 text-purple-800 border-purple-300",
+			completed: "bg-green-100 text-green-800 border-green-300",
+			cancelled: "bg-red-100 text-red-800 border-red-300",
+			accepted: "bg-green-100 text-green-800 border-green-300",
+			rejected: "bg-red-100 text-red-800 border-red-300",
+		};
+		return colors[status] || "bg-gray-100 text-gray-800 border-gray-300";
+	};
+
+	const formatDate = (date) => {
+		return new Date(date).toLocaleDateString("en-IN", {
+			day: "numeric",
+			month: "short",
+			year: "numeric",
+		});
+	};
+
+	if (loading && myServices.length === 0) {
+		return (
+			<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+				<div className="text-center">
+					<Loader
+						className="animate-spin mx-auto mb-4 text-green-600"
+						size={48}
+					/>
+					<div className="text-xl text-gray-700">Loading...</div>
+				</div>
+			</div>
+		);
+	}
+
 	return (
-		<div className="min-h-screen bg-gray-50 font-sans">
-			<header className="bg-white shadow-md p-4 md:p-6 sticky top-0 z-10">
-				<div className="max-w-7xl mx-auto flex justify-between items-center">
-					<div className="flex items-center gap-4">
-						<button
-							onClick={() => navigate(-1)}
-							className="text-gray-600 hover:text-gray-800"
-						>
-							<ArrowLeft className="w-6 h-6" />
-						</button>
-						<h1 className="text-3xl font-extrabold text-gray-900">
+		<div className="min-h-screen bg-gradient-to-br from-green-200 to-blue-50 py-8 px-4">
+			<div className="max-w-7xl mx-auto">
+				{/* Header */}
+				<div className="flex items-center justify-between bg-white rounded-2xl shadow-lg p-6 mb-6">
+					<div className="  mb-6">
+						<h1 className="text-3xl font-bold text-gray-900 mb-2">
 							Worker Dashboard
 						</h1>
-					</div>
-					{user && (
-						<button
-							onClick={handleLogout}
-							className="px-4 py-2 rounded-md text-white font-medium bg-red-600 hover:bg-red-700 transition-colors"
-						>
-							Logout
-						</button>
-					)}
-					<button
-						onClick={() => setShowForm(true)}
-						className="flex items-center space-x-2 bg-green-500 text-white px-4 py-2 rounded-xl font-medium hover:bg-green-600 transition shadow-md active:scale-95"
-					>
-						<Plus className="w-5 h-5" />
-						<span>Post New Work</span>
-					</button>
-				</div>
-			</header>
-
-			<main className="max-w-7xl mx-auto p-4 md:p-8 space-y-10">
-				<div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-					<StatCard
-						icon={Calendar}
-						title="Confirmed Bookings"
-						value={mockBookings.filter((b) => b.status === "Confirmed").length}
-						color="border-indigo-500"
-					/>
-					<StatCard
-						icon={Gauge}
-						title="Overall Rating"
-						value={4.5}
-						unit="/ 5.0"
-						color="border-yellow-500"
-					/>
-					<StatCard
-						icon={DollarSign}
-						title="Daily Rate"
-						value={formData.chargePerDay || "120"}
-						unit="₹"
-						color="border-green-500"
-					/>
-					<StatCard
-						icon={Clock}
-						title="Experience"
-						value={formData.experience}
-						unit="Years"
-						color="border-blue-500"
-					/>
-				</div>
-
-				<section className="bg-white p-6 rounded-xl shadow-lg">
-					<h3 className="text-xl font-bold mb-4 text-gray-700 flex items-center">
-						<Hammer className="w-5 h-5 mr-2" /> Your Active Posts
-					</h3>
-					{posts.length === 0 ? (
-						<p className="text-gray-500 p-4 border rounded-lg bg-gray-50">
-							You currently have no active work posts. Click "Post New Work" to
-							list your availability.
+						<p className="text-gray-600">
+							Welcome back, {user?.name}! 👋 Manage your work, services, and
+							earnings
 						</p>
-					) : (
-						<div className="space-y-4">
-							{posts.map((post) => (
-								<div
-									key={post.id}
-									className="p-4 border border-indigo-200 rounded-lg bg-indigo-50 flex justify-between items-center transition hover:shadow-md"
-								>
-									<div>
-										<p className="font-semibold text-indigo-700">
-											{post.workerType} - {post.datePosted}
-										</p>
-										<p className="text-sm text-gray-600">
-											₹{post.chargePerDay} / day for {post.hours} hrs
-										</p>
+					</div>
+					<div>
+						<button
+							onClick={logout}
+							className="p-2 hover:bg-red-50 rounded-lg text-red-600 transition-colors"
+							title="Logout"
+						>
+							<LogOut className="h-5 w-5" />
+						</button>
+					</div>
+				</div>
+
+				{/* Stats Cards */}
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+					<div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="flex items-center justify-between mb-2">
+							<Briefcase size={32} className="opacity-80" />
+							<span className="text-3xl font-bold">{stats.totalWork}</span>
+						</div>
+						<p className="text-blue-100 font-semibold">Total Work</p>
+					</div>
+
+					<div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="flex items-center justify-between mb-2">
+							<CheckCircle size={32} className="opacity-80" />
+							<span className="text-3xl font-bold">{stats.accepted}</span>
+						</div>
+						<p className="text-green-100 font-semibold">Accepted</p>
+					</div>
+
+					<div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="flex items-center justify-between mb-2">
+							<Clock size={32} className="opacity-80" />
+							<span className="text-3xl font-bold">{stats.pending}</span>
+						</div>
+						<p className="text-yellow-100 font-semibold">Pending Requests</p>
+					</div>
+
+					<div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="flex items-center justify-between mb-2">
+							<IndianRupee size={32} className="opacity-80" />
+							<span className="text-3xl font-bold">₹{stats.totalEarnings}</span>
+						</div>
+						<p className="text-purple-100 font-semibold">Total Earnings</p>
+					</div>
+				</div>
+
+				{/* Tab Navigation */}
+				<div className="bg-white rounded-2xl shadow-xl p-2 mb-8">
+					<div className="flex flex-wrap gap-2">
+						<button
+							onClick={() => setActiveTab("overview")}
+							className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								activeTab === "overview"
+									? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+							}`}
+						>
+							<TrendingUp className="mr-2" size={20} />
+							Overview
+						</button>
+
+						<button
+							onClick={() => setActiveTab("services")}
+							className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								activeTab === "services"
+									? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+							}`}
+						>
+							<Briefcase className="mr-2" size={20} />
+							My Services ({myServices.length})
+						</button>
+
+						<button
+							onClick={() => setActiveTab("hire-requests")}
+							className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								activeTab === "hire-requests"
+									? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+							}`}
+						>
+							<Mail className="mr-2" size={20} />
+							Hire Requests (
+							{hireRequests.filter((r) => r.status === "pending").length})
+						</button>
+
+						<button
+							onClick={() => setActiveTab("work")}
+							className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								activeTab === "work"
+									? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+							}`}
+						>
+							<Users className="mr-2" size={20} />
+							My Work ({workOrders.length})
+						</button>
+
+						<button
+							onClick={() => {
+								setActiveTab("available");
+								fetchAvailableJobs();
+							}}
+							className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								activeTab === "available"
+									? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+							}`}
+						>
+							<Search className="mr-2" size={20} />
+							Available Work
+						</button>
+
+						<button
+							onClick={() => {
+								setActiveTab("earnings");
+								fetchTransactions();
+							}}
+							className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								activeTab === "earnings"
+									? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+							}`}
+						>
+							<IndianRupee className="mr-2" size={20} />
+							Earnings
+						</button>
+					</div>
+				</div>
+
+				{/* OVERVIEW TAB */}
+				{activeTab === "overview" && (
+					<div className="space-y-6">
+						{/* Quick Stats Grid */}
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+							<div className="bg-white rounded-xl shadow-lg p-6">
+								<h3 className="text-lg font-bold text-gray-800 mb-4">
+									Work Status
+								</h3>
+								<div className="space-y-3">
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Completed:</span>
+										<span className="font-bold text-green-600">
+											{stats.completed}
+										</span>
 									</div>
-									<button className="text-red-500 hover:text-red-700 text-sm font-medium">
-										Remove Post
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">In Progress:</span>
+										<span className="font-bold text-blue-600">
+											{
+												workOrders.filter((w) => w.status === "confirmed")
+													.length
+											}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Pending:</span>
+										<span className="font-bold text-yellow-600">
+											{stats.pending}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Rejected:</span>
+										<span className="font-bold text-red-600">
+											{stats.rejected}
+										</span>
+									</div>
+								</div>
+							</div>
+
+							<div className="bg-white rounded-xl shadow-lg p-6">
+								<h3 className="text-lg font-bold text-gray-800 mb-4">
+									My Services
+								</h3>
+								<div className="space-y-3">
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Total Services:</span>
+										<span className="font-bold text-green-600">
+											{myServices.length}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Available:</span>
+										<span className="font-bold text-blue-600">
+											{
+												myServices.filter(
+													(s) => s.bookingStatus === "available"
+												).length
+											}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Booked:</span>
+										<span className="font-bold text-yellow-600">
+											{
+												myServices.filter((s) => s.bookingStatus === "booked")
+													.length
+											}
+										</span>
+									</div>
+								</div>
+							</div>
+
+							<div className="bg-white rounded-xl shadow-lg p-6">
+								<h3 className="text-lg font-bold text-gray-800 mb-4">
+									Earnings Summary
+								</h3>
+								<div className="space-y-3">
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Total Earned:</span>
+										<span className="font-bold text-green-600">
+											₹{stats.totalEarnings}
+										</span>
+									</div>
+									<div className="flex justify-between items-center">
+										<span className="text-gray-600">Pending Payment:</span>
+										<span className="font-bold text-yellow-600">
+											₹
+											{workOrders
+												.filter(
+													(w) =>
+														w.paymentStatus !== "paid" &&
+														w.status === "completed"
+												)
+												.reduce((sum, w) => sum + w.totalCost, 0)}
+										</span>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						{/* Recent Activity */}
+						<div className="bg-white rounded-xl shadow-lg p-6">
+							<h3 className="text-xl font-bold text-gray-800 mb-4">
+								Recent Activity
+							</h3>
+							{workOrders.length === 0 && hireRequests.length === 0 ? (
+								<div className="text-center py-12">
+									<AlertCircle
+										className="mx-auto mb-4 text-gray-400"
+										size={64}
+									/>
+									<p className="text-gray-500">No recent activity</p>
+								</div>
+							) : (
+								<div className="space-y-4">
+									{[...hireRequests, ...workOrders]
+										.sort(
+											(a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+										)
+										.slice(0, 5)
+										.map((item, index) => (
+											<div
+												key={index}
+												className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+											>
+												<div className="flex items-center">
+													{item.status === "pending" ? (
+														<Clock className="mr-3 text-yellow-600" size={24} />
+													) : item.status === "accepted" ||
+													  item.status === "confirmed" ? (
+														<CheckCircle
+															className="mr-3 text-green-600"
+															size={24}
+														/>
+													) : (
+														<XCircle className="mr-3 text-red-600" size={24} />
+													)}
+													<div>
+														<p className="font-semibold text-gray-800">
+															{item.workerService?.workerType ||
+																item.workType ||
+																"Work Request"}
+														</p>
+														<p className="text-sm text-gray-600">
+															{formatDate(item.createdAt)}
+														</p>
+													</div>
+												</div>
+												<span
+													className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+														item.status
+													)}`}
+												>
+													{item.status.toUpperCase()}
+												</span>
+											</div>
+										))}
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+
+				{/* MY SERVICES TAB */}
+				{activeTab === "services" && (
+					<div className="space-y-6">
+						<div className="bg-white rounded-xl shadow-lg p-6">
+							<div className="flex justify-between items-center mb-4">
+								<h3 className="text-xl font-bold text-gray-800">
+									My Posted Services ({myServices.length})
+								</h3>
+								<button
+									onClick={handleOpenServiceModal}
+									className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center shadow hover:shadow-lg"
+								>
+									<Plus className="mr-2" size={16} />
+									Post New Service
+								</button>
+							</div>
+
+							{myServices.length === 0 ? (
+								<div className="text-center py-12">
+									<Briefcase className="mx-auto mb-4 text-gray-400" size={64} />
+									<h3 className="text-xl font-semibold text-gray-700 mb-2">
+										No Services Posted
+									</h3>
+									<p className="text-gray-500 mb-4">
+										Post your services to get hired by farmers
+									</p>
+									<button
+										onClick={handleOpenServiceModal}
+										className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+									>
+										Post Your First Service
 									</button>
 								</div>
-							))}
+							) : (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{myServices.map((service) => (
+										<div
+											key={service._id}
+											className="bg-white rounded-xl shadow-lg overflow-hidden border-2 border-gray-200 hover:border-green-500 transition-all"
+										>
+											<div className="bg-gradient-to-r from-green-500 to-blue-500 p-4 text-white">
+												<div className="flex justify-between items-start">
+													<h3 className="text-lg font-bold">
+														{service.workerType}
+													</h3>
+													{/* ✅ FIXED: Check bookingStatus or availability */}
+													{service.bookingStatus === "booked" ? (
+														<span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-bold">
+															⏳ Booked
+														</span>
+													) : service.bookingStatus === "completed" ? (
+														<span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+															✅ Completed
+														</span>
+													) : (
+														<span className="px-3 py-1 bg-white text-green-600 rounded-full text-xs font-bold">
+															✓ Available
+														</span>
+													)}
+												</div>
+											</div>
+
+											<div className="p-4 space-y-3">
+												<div className="flex items-center text-gray-700">
+													<IndianRupee
+														className="mr-2 text-green-600"
+														size={18}
+													/>
+													<span className="font-semibold">Rate:</span>
+													<span className="ml-2 font-bold text-green-600">
+														₹{service.chargePerDay}/day
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Briefcase
+														className="mr-2 text-green-600"
+														size={18}
+													/>
+													<span className="font-semibold">Experience:</span>
+													<span className="ml-2">
+														{service.experience} years
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Clock className="mr-2 text-green-600" size={18} />
+													<span className="font-semibold">Hours:</span>
+													<span className="ml-2">
+														{service.workingHours}hrs/day
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<MapPin className="mr-2 text-green-600" size={18} />
+													<span className="font-semibold">Location:</span>
+													<span className="ml-2 text-sm">
+														{service.location?.district || "N/A"}
+													</span>
+												</div>
+
+												{service.skills && service.skills.length > 0 && (
+													<div>
+														<p className="font-semibold text-gray-700 mb-2 text-sm">
+															Skills:
+														</p>
+														<div className="flex flex-wrap gap-1">
+															{service.skills.slice(0, 3).map((skill, idx) => (
+																<span
+																	key={idx}
+																	className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold"
+																>
+																	{skill}
+																</span>
+															))}
+															{service.skills.length > 3 && (
+																<span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold">
+																	+{service.skills.length - 3}
+																</span>
+															)}
+														</div>
+													</div>
+												)}
+
+												{service.bookingStatus === "booked" &&
+													service.currentBookingId && (
+														<div className="bg-yellow-50 p-3 rounded-lg border-2 border-yellow-200 mt-3">
+															<p className="text-yellow-800 text-sm font-semibold">
+																⏳ Currently Booked
+															</p>
+															<button
+																onClick={() => setActiveTab("work")}
+																className="text-yellow-600 text-sm underline mt-1"
+															>
+																View Booking →
+															</button>
+														</div>
+													)}
+
+												{/* Action Buttons */}
+												<div className="flex gap-2 pt-3 border-t-2">
+													<button
+														onClick={() => handleEditService(service)}
+														disabled={service.bookingStatus === "booked"}
+														className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+													>
+														<Edit className="mr-1" size={14} />
+														Edit
+													</button>
+													<button
+														onClick={() => handleDeleteService(service._id)}
+														disabled={
+															service.bookingStatus === "booked" ||
+															actionLoading === service._id
+														}
+														className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold text-sm flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+													>
+														{actionLoading === service._id ? (
+															<Loader className="animate-spin" size={14} />
+														) : (
+															<Trash2 size={14} />
+														)}
+													</button>
+												</div>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
 						</div>
-					)}
-				</section>
-
-				<section className="bg-white p-6 rounded-xl shadow-lg">
-					<h3 className="text-xl font-bold mb-4 text-gray-700 flex items-center">
-						<Calendar className="w-5 h-5 mr-2" /> Bookings from Farmers
-					</h3>
-					<div className="overflow-x-auto">
-						<table className="min-w-full divide-y divide-gray-200">
-							<thead>
-								<tr className="bg-gray-50">
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Farmer
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Work Type
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Date
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Status
-									</th>
-									<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-										Actions
-									</th>
-								</tr>
-							</thead>
-							<tbody className="bg-white divide-y divide-gray-200">
-								{mockBookings.map((booking) => (
-									<tr key={booking.id} className="hover:bg-gray-50 transition">
-										<td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-											{booking.farmer}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-											{booking.type}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-											{booking.date}
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap">
-											<span
-												className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-													booking.status === "Confirmed"
-														? "bg-green-100 text-green-800"
-														: "bg-yellow-100 text-yellow-800"
-												}`}
-											>
-												{booking.status}
-											</span>
-										</td>
-										<td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-											<button className="text-indigo-600 hover:text-indigo-900 mr-3">
-												View
-											</button>
-											{booking.status === "Pending" && (
-												<button className="text-green-600 hover:text-green-900">
-													Accept
-												</button>
-											)}
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
 					</div>
-				</section>
+				)}
 
-				<section className="bg-white p-6 rounded-xl shadow-lg">
-					<h3 className="text-xl font-bold mb-4 text-gray-700 flex items-center">
-						<Star className="w-5 h-5 mr-2" /> Ratings from Farmers
-					</h3>
-					<div className="space-y-4">
-						{mockRatings.map((rating) => (
-							<div key={rating.id} className="border p-4 rounded-lg bg-gray-50">
-								<div className="flex items-center mb-1">
-									<p className="font-semibold text-gray-800 mr-3">
-										{rating.farmer}
+				{/* HIRE REQUESTS TAB - ✅ FULLY FIXED */}
+				{activeTab === "hire-requests" && (
+					<div className="space-y-6">
+						<div className="bg-white rounded-xl shadow-lg p-6">
+							<h3 className="text-xl font-bold text-gray-800 mb-4">
+								Hire Requests from Farmers ({hireRequests.length})
+							</h3>
+
+							{hireRequests.length === 0 ? (
+								<div className="text-center py-12">
+									<Mail className="mx-auto mb-4 text-gray-400" size={64} />
+									<h3 className="text-xl font-semibold text-gray-700 mb-2">
+										No Hire Requests
+									</h3>
+									<p className="text-gray-500">
+										Farmers' hire requests will appear here
 									</p>
-									<div className="flex">
-										{[...Array(5)].map((_, i) => (
-											<Star
-												key={i}
-												className={`w-4 h-4 ${
-													i < rating.rating
-														? "text-yellow-400 fill-yellow-400"
-														: "text-gray-300"
-												}`}
-											/>
-										))}
+								</div>
+							) : (
+								<div className="space-y-4">
+									{hireRequests.map((request) => (
+										<div
+											key={request._id}
+											className="bg-white rounded-xl shadow-lg overflow-hidden p-6 border-2 border-gray-200 hover:border-green-500 transition"
+										>
+											<div className="flex justify-between items-start mb-4">
+												<div>
+													<h3 className="text-xl font-bold text-gray-900 mb-1">
+														Hire Request from {request.farmer?.name || "Farmer"}
+													</h3>
+													<p className="text-sm text-gray-600">
+														{request.workerService?.workerType || "Service"}
+													</p>
+												</div>
+												<span
+													className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
+														request.status
+													)}`}
+												>
+													{request.status?.toUpperCase() || "PENDING"}
+												</span>
+											</div>
+
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+												<div className="flex items-center text-gray-700">
+													<IndianRupee
+														className="mr-2 text-green-600"
+														size={18}
+													/>
+													<span className="font-semibold">Amount:</span>
+													<span className="ml-2 font-bold text-green-600">
+														₹{request.agreedAmount || 0}/day
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Clock className="mr-2 text-green-600" size={18} />
+													<span className="font-semibold">Received:</span>
+													<span className="ml-2">
+														{formatDate(request.createdAt)}
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Phone className="mr-2 text-green-600" size={18} />
+													<span className="font-semibold">Contact:</span>
+													<span className="ml-2">
+														{request.farmer?.phone || "N/A"}
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Mail className="mr-2 text-green-600" size={18} />
+													<span className="font-semibold">Email:</span>
+													<span className="ml-2 text-sm">
+														{request.farmer?.email || "N/A"}
+													</span>
+												</div>
+											</div>
+
+											{request.notes && (
+												<div className="bg-blue-50 p-4 rounded-lg mb-4">
+													<p className="text-sm text-gray-700">
+														<span className="font-semibold">Notes:</span>{" "}
+														{request.notes}
+													</p>
+												</div>
+											)}
+
+											{request.workDetails && (
+												<div className="bg-gray-50 p-4 rounded-lg mb-4">
+													<p className="font-semibold text-gray-700 mb-2">
+														Work Details:
+													</p>
+													<div className="text-sm text-gray-600 space-y-1">
+														{request.workDetails.startDate && (
+															<p>
+																Start Date:{" "}
+																{formatDate(request.workDetails.startDate)}
+															</p>
+														)}
+														{request.workDetails.duration && (
+															<p>
+																Duration: {request.workDetails.duration} day(s)
+															</p>
+														)}
+														{request.workDetails.workDescription && (
+															<p>Work: {request.workDetails.workDescription}</p>
+														)}
+														{request.workDetails.location?.district && (
+															<p>
+																Location:{" "}
+																{request.workDetails.location.district}
+															</p>
+														)}
+													</div>
+												</div>
+											)}
+
+											{request.status === "pending" && (
+												<div className="flex gap-2 pt-4 border-t-2">
+													<button
+														onClick={() => handleAcceptHireRequest(request._id)}
+														disabled={actionLoading === request._id}
+														className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
+													>
+														{actionLoading === request._id ? (
+															<Loader className="animate-spin mr-2" size={16} />
+														) : (
+															<CheckCircle className="mr-2" size={16} />
+														)}
+														Accept & Book
+													</button>
+													<button
+														onClick={() => handleRejectHireRequest(request._id)}
+														disabled={actionLoading === request._id}
+														className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
+													>
+														<XCircle className="mr-2" size={16} />
+														Reject
+													</button>
+												</div>
+											)}
+
+											{request.status === "accepted" && (
+												<div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+													<p className="text-green-800 font-semibold flex items-center mb-2">
+														<CheckCircle className="mr-2" size={20} />✅ Request
+														accepted! Booking created.
+													</p>
+													<button
+														onClick={() => setActiveTab("work")}
+														className="text-green-600 font-semibold underline"
+													>
+														View Booking →
+													</button>
+												</div>
+											)}
+
+											{request.status === "rejected" && (
+												<div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+													<p className="text-red-800 font-semibold flex items-center">
+														<XCircle className="mr-2" size={20} />❌ Request
+														rejected
+													</p>
+													{request.rejectionReason && (
+														<p className="text-red-600 text-sm mt-2">
+															Reason: {request.rejectionReason}
+														</p>
+													)}
+												</div>
+											)}
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					</div>
+				)}
+
+				{/* MY WORK TAB */}
+				{activeTab === "work" && (
+					<div className="space-y-6">
+						{/* Sub-tabs for My Work */}
+						<div className="bg-white rounded-xl shadow-lg p-2">
+							<div className="flex gap-2">
+								<button
+									onClick={() => setActiveWorkSubTab("accepted")}
+									className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
+										activeWorkSubTab === "accepted"
+											? "bg-green-600 text-white"
+											: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+									}`}
+								>
+									Active Work (
+									{workOrders.filter((w) => w.status === "confirmed").length})
+								</button>
+								<button
+									onClick={() => setActiveWorkSubTab("completed")}
+									className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
+										activeWorkSubTab === "completed"
+											? "bg-green-600 text-white"
+											: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+									}`}
+								>
+									Completed (
+									{workOrders.filter((w) => w.status === "completed").length})
+								</button>
+								<button
+									onClick={() => setActiveWorkSubTab("cancelled")}
+									className={`flex-1 py-2 px-4 rounded-lg font-semibold transition ${
+										activeWorkSubTab === "cancelled"
+											? "bg-green-600 text-white"
+											: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+									}`}
+								>
+									Cancelled (
+									{workOrders.filter((w) => w.status === "cancelled").length})
+								</button>
+							</div>
+						</div>
+
+						{/* Work Orders List */}
+						{workOrders
+							.filter((w) => {
+								if (activeWorkSubTab === "accepted")
+									return w.status === "confirmed";
+								if (activeWorkSubTab === "completed")
+									return w.status === "completed";
+								if (activeWorkSubTab === "cancelled")
+									return w.status === "cancelled";
+								return false;
+							})
+							.map((work) => (
+								<div
+									key={work._id}
+									className="bg-white rounded-xl shadow-lg overflow-hidden"
+								>
+									<div
+										className={`p-6 bg-gradient-to-r ${
+											work.status === "confirmed"
+												? "from-blue-500 to-blue-600"
+												: work.status === "completed"
+												? "from-green-500 to-green-600"
+												: "from-red-500 to-red-600"
+										} text-white`}
+									>
+										<div className="flex justify-between items-start">
+											<div>
+												<h3 className="text-xl font-bold mb-1">
+													{work.workType || work.serviceType}
+												</h3>
+												<p className="text-sm opacity-90">
+													Work ID: {work._id.slice(-8).toUpperCase()}
+												</p>
+											</div>
+											<span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
+												{work.status.toUpperCase()}
+											</span>
+										</div>
+									</div>
+
+									<div className="p-6">
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+											<div className="flex items-center text-gray-700">
+												<Calendar className="mr-2 text-green-600" size={18} />
+												<span className="font-semibold">Date:</span>
+												<span className="ml-2">
+													{formatDate(work.bookingDate)}
+												</span>
+											</div>
+
+											<div className="flex items-center text-gray-700">
+												<IndianRupee
+													className="mr-2 text-green-600"
+													size={18}
+												/>
+												<span className="font-semibold">Amount:</span>
+												<span className="ml-2 font-bold text-green-600">
+													₹{work.totalCost}
+												</span>
+											</div>
+
+											<div className="flex items-center text-gray-700">
+												<MapPin className="mr-2 text-green-600" size={18} />
+												<span className="font-semibold">Location:</span>
+												<span className="ml-2 text-sm">
+													{work.location?.district ||
+														work.location?.village ||
+														"N/A"}
+												</span>
+											</div>
+
+											<div className="flex items-center text-gray-700">
+												<Clock className="mr-2 text-green-600" size={18} />
+												<span className="font-semibold">Duration:</span>
+												<span className="ml-2">{work.duration} day(s)</span>
+											</div>
+										</div>
+
+										{/* Action Buttons for Active Work */}
+										{work.status === "confirmed" && (
+											<div className="flex gap-2 pt-4 border-t-2">
+												<button
+													onClick={() => handleCompleteWork(work._id)}
+													disabled={actionLoading === work._id}
+													className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
+												>
+													{actionLoading === work._id ? (
+														<Loader className="animate-spin mr-2" size={16} />
+													) : (
+														<CheckCircle className="mr-2" size={16} />
+													)}
+													Mark as Completed
+												</button>
+											</div>
+										)}
+
+										{work.paymentStatus === "paid" && (
+											<div className="bg-green-50 p-4 rounded-lg border-2 border-green-200 mt-4">
+												<p className="text-green-800 font-semibold flex items-center">
+													<CheckCircle className="mr-2" size={20} />
+													💰 Payment Received Successfully
+												</p>
+											</div>
+										)}
+
+										{work.paymentStatus !== "paid" &&
+											work.status === "completed" && (
+												<div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mt-4">
+													<p className="text-yellow-800 font-semibold flex items-center">
+														<Clock className="mr-2" size={20} />⏳ Waiting for
+														payment from farmer...
+													</p>
+												</div>
+											)}
 									</div>
 								</div>
-								<p className="text-gray-600 italic">"{rating.comment}"</p>
-							</div>
-						))}
-					</div>
-				</section>
-			</main>
+							))}
 
-			{showForm && (
-				<WorkerForm
-					formData={formData}
-					handleChange={handleChange}
-					handleSubmit={handleSubmit}
-					handleClose={() => setShowForm(false)}
-				/>
-			)}
+						{workOrders.filter((w) => {
+							if (activeWorkSubTab === "accepted")
+								return w.status === "confirmed";
+							if (activeWorkSubTab === "completed")
+								return w.status === "completed";
+							if (activeWorkSubTab === "cancelled")
+								return w.status === "cancelled";
+							return false;
+						}).length === 0 && (
+							<div className="bg-white rounded-xl shadow-lg p-12 text-center">
+								<AlertCircle className="mx-auto mb-4 text-gray-400" size={64} />
+								<h3 className="text-xl font-semibold text-gray-700 mb-2">
+									No {activeWorkSubTab} Work
+								</h3>
+								<p className="text-gray-500">
+									Your {activeWorkSubTab} work will appear here
+								</p>
+							</div>
+						)}
+					</div>
+				)}
+
+				{/* AVAILABLE WORK TAB */}
+				{activeTab === "available" && (
+					<div className="space-y-6">
+						{/* Search and Filters */}
+						<div className="bg-white rounded-xl shadow-lg p-6">
+							<h3 className="text-xl font-bold mb-4 flex items-center text-gray-800">
+								<Search className="mr-2 text-green-600" size={24} />
+								Find Available Jobs
+							</h3>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+								<input
+									type="text"
+									placeholder="Search by District"
+									value={jobSearch.district}
+									onChange={(e) =>
+										setJobSearch({ ...jobSearch, district: e.target.value })
+									}
+									className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+								/>
+
+								<select
+									value={jobSearch.workType}
+									onChange={(e) =>
+										setJobSearch({ ...jobSearch, workType: e.target.value })
+									}
+									className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+								>
+									<option value="">All Work Types</option>
+									<option value="Farm Labor">Farm Labor</option>
+									<option value="Harvester">Harvester</option>
+									<option value="Irrigator">Irrigator</option>
+									<option value="Sprayer">Sprayer</option>
+									<option value="General Helper">General Helper</option>
+									<option value="Ploughing">Ploughing</option>
+									<option value="Seeding">Seeding</option>
+									<option value="Pesticide Application">
+										Pesticide Application
+									</option>
+								</select>
+
+								<input
+									type="number"
+									placeholder="Max Wage ₹"
+									value={jobSearch.maxBudget}
+									onChange={(e) =>
+										setJobSearch({ ...jobSearch, maxBudget: e.target.value })
+									}
+									className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+								/>
+
+								<div className="flex gap-2">
+									<button
+										onClick={handleSearchJobs}
+										disabled={loading}
+										className="flex-1 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+									>
+										<Search className="mr-2" size={18} />
+										{loading ? "Searching..." : "Search"}
+									</button>
+
+									<button
+										onClick={handleResetFilters}
+										className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
+									>
+										<Filter size={18} />
+									</button>
+								</div>
+							</div>
+						</div>
+
+						{/* Jobs Grid */}
+						{loading ? (
+							<div className="flex justify-center py-12">
+								<div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-600"></div>
+							</div>
+						) : availableJobs.length === 0 ? (
+							<div className="bg-white rounded-xl shadow-lg p-12 text-center">
+								<Search className="mx-auto mb-4 text-gray-400" size={64} />
+								<h3 className="text-xl font-semibold text-gray-700 mb-2">
+									No Available Jobs
+								</h3>
+								<p className="text-gray-500 mb-4">
+									Try adjusting your search filters or check back later
+								</p>
+								<button
+									onClick={handleResetFilters}
+									className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+								>
+									Reset Filters
+								</button>
+							</div>
+						) : (
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+								{availableJobs.map((job) => {
+									const alreadyApplied = appliedJobs.find(
+										(applied) => applied.workerService?._id === job._id
+									);
+
+									return (
+										<div
+											key={job._id}
+											className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-green-500"
+										>
+											<div className="bg-gradient-to-r from-purple-500 to-indigo-500 p-6 text-white">
+												<div className="flex items-center justify-between mb-2">
+													<h3 className="text-xl font-bold flex items-center">
+														<Briefcase className="mr-2" size={20} />
+														{job.workType}
+													</h3>
+													{job.status === "open" && (
+														<span className="px-3 py-1 bg-white text-purple-600 rounded-full text-xs font-bold shadow">
+															✓ Open
+														</span>
+													)}
+												</div>
+												<p className="text-purple-100 text-sm font-semibold">
+													Posted by {job.farmer?.name}
+												</p>
+											</div>
+
+											<div className="p-6 space-y-4">
+												<div className="flex items-center text-gray-700">
+													<IndianRupee
+														className="mr-3 text-green-600"
+														size={20}
+													/>
+													<span className="font-semibold">Wage:</span>
+													<span className="ml-2 text-lg font-bold text-green-600">
+														₹{job.wagesOffered}/day
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Calendar className="mr-3 text-green-600" size={20} />
+													<span className="font-semibold">Start Date:</span>
+													<span className="ml-2">
+														{formatDate(job.startDate)}
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Clock className="mr-3 text-green-600" size={20} />
+													<span className="font-semibold">Duration:</span>
+													<span className="ml-2">{job.workDuration}</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<MapPin className="mr-3 text-green-600" size={20} />
+													<span className="font-semibold">Location:</span>
+													<span className="ml-2 text-sm">
+														{job.location?.district}, {job.location?.state}
+													</span>
+												</div>
+
+												<div className="flex items-center text-gray-700">
+													<Phone className="mr-3 text-green-600" size={20} />
+													<span className="font-semibold">Contact:</span>
+													<span className="ml-2 text-sm">
+														{job.farmer?.phone || "N/A"}
+													</span>
+												</div>
+
+												{(job.foodProvided || job.transportationProvided) && (
+													<div className="bg-blue-50 p-3 rounded-lg">
+														<p className="text-sm font-semibold text-gray-700 mb-1">
+															Benefits:
+														</p>
+														<div className="flex flex-wrap gap-2">
+															{job.foodProvided && (
+																<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+																	🍽️ Food Provided
+																</span>
+															)}
+															{job.transportationProvided && (
+																<span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">
+																	🚗 Transport Provided
+																</span>
+															)}
+														</div>
+													</div>
+												)}
+
+												{job.notes && (
+													<div className="bg-gray-50 p-3 rounded-lg">
+														<p className="text-sm text-gray-700">
+															<span className="font-semibold">Notes:</span>{" "}
+															{job.notes}
+														</p>
+													</div>
+												)}
+
+												{/* Status Messages */}
+												{alreadyApplied &&
+													alreadyApplied.status === "pending" && (
+														<div className="bg-yellow-50 p-3 rounded-lg border-2 border-yellow-200">
+															<p className="text-yellow-800 text-sm font-semibold flex items-center">
+																<Clock className="mr-2" size={16} />⏳
+																Application Pending...
+															</p>
+														</div>
+													)}
+
+												{alreadyApplied &&
+													alreadyApplied.status === "accepted" && (
+														<div className="bg-green-50 p-3 rounded-lg border-2 border-green-200">
+															<p className="text-green-800 text-sm font-semibold flex items-center">
+																<CheckCircle className="mr-2" size={16} />✅
+																Application Accepted!
+															</p>
+															<button
+																onClick={() => setActiveTab("work")}
+																className="text-green-600 text-sm underline mt-1"
+															>
+																View Work →
+															</button>
+														</div>
+													)}
+
+												{alreadyApplied &&
+													alreadyApplied.status === "rejected" && (
+														<div className="bg-red-50 p-3 rounded-lg border-2 border-red-200">
+															<p className="text-red-800 text-sm font-semibold flex items-center">
+																<XCircle className="mr-2" size={16} />❌
+																Application Rejected
+															</p>
+														</div>
+													)}
+
+												{/* Action Button */}
+												<div className="pt-4 border-t-2">
+													{alreadyApplied ? (
+														alreadyApplied.status === "pending" ? (
+															<button
+																disabled
+																className="w-full px-4 py-2 bg-gray-400 text-white rounded-lg font-semibold flex items-center justify-center cursor-not-allowed"
+															>
+																<Clock className="mr-2" size={16} />
+																Application Pending
+															</button>
+														) : alreadyApplied.status === "accepted" ? (
+															<button
+																onClick={() => setActiveTab("work")}
+																className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center shadow hover:shadow-lg"
+															>
+																<CheckCircle className="mr-2" size={16} />
+																View My Work
+															</button>
+														) : (
+															<button
+																disabled
+																className="w-full px-4 py-2 bg-gray-400 text-white rounded-lg font-semibold flex items-center justify-center cursor-not-allowed"
+															>
+																<XCircle className="mr-2" size={16} />
+																Rejected
+															</button>
+														)
+													) : (
+														<button
+															onClick={() => handleApplyForJob(job)}
+															disabled={
+																job.status !== "open" ||
+																actionLoading === job._id
+															}
+															className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center shadow hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+														>
+															{actionLoading === job._id ? (
+																<Loader
+																	className="animate-spin mr-2"
+																	size={16}
+																/>
+															) : (
+																<CheckCircle className="mr-2" size={16} />
+															)}
+															Apply for Job
+														</button>
+													)}
+												</div>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</div>
+				)}
+
+				{/* EARNINGS TAB */}
+				{activeTab === "earnings" && (
+					<div className="space-y-6">
+						{/* Earnings Summary Cards */}
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+							<div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-6">
+								<div className="flex items-center justify-between mb-2">
+									<IndianRupee size={32} className="opacity-80" />
+									<span className="text-3xl font-bold">
+										₹{stats.totalEarnings}
+									</span>
+								</div>
+								<p className="text-green-100 font-semibold">Total Earnings</p>
+							</div>
+
+							<div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg p-6">
+								<div className="flex items-center justify-between mb-2">
+									<CheckCircle size={32} className="opacity-80" />
+									<span className="text-3xl font-bold">{stats.completed}</span>
+								</div>
+								<p className="text-blue-100 font-semibold">Completed Works</p>
+							</div>
+
+							<div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-xl shadow-lg p-6">
+								<div className="flex items-center justify-between mb-2">
+									<Clock size={32} className="opacity-80" />
+									<span className="text-3xl font-bold">
+										₹
+										{workOrders
+											.filter(
+												(w) =>
+													w.paymentStatus !== "paid" && w.status === "completed"
+											)
+											.reduce((sum, w) => sum + w.totalCost, 0)}
+									</span>
+								</div>
+								<p className="text-yellow-100 font-semibold">Pending Payment</p>
+							</div>
+						</div>
+
+						{/* Earnings List */}
+						<div className="bg-white rounded-xl shadow-lg p-6">
+							<h3 className="text-xl font-bold text-gray-800 mb-4">
+								Earnings History
+							</h3>
+
+							{workOrders.filter((w) => w.paymentStatus === "paid").length ===
+							0 ? (
+								<div className="text-center py-12">
+									<IndianRupee
+										className="mx-auto mb-4 text-gray-400"
+										size={64}
+									/>
+									<h3 className="text-xl font-semibold text-gray-700 mb-2">
+										No Earnings Yet
+									</h3>
+									<p className="text-gray-500">
+										Your payment history will appear here
+									</p>
+								</div>
+							) : (
+								<div className="space-y-4">
+									{workOrders
+										.filter((w) => w.paymentStatus === "paid")
+										.sort(
+											(a, b) =>
+												new Date(b.paidAt || b.updatedAt) -
+												new Date(a.paidAt || a.updatedAt)
+										)
+										.map((work) => (
+											<div
+												key={work._id}
+												className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
+											>
+												<div className="flex items-center">
+													<div className="bg-green-100 p-3 rounded-full mr-4">
+														<CheckCircle className="text-green-600" size={24} />
+													</div>
+													<div>
+														<p className="font-semibold text-gray-800">
+															{work.workType || work.serviceType}
+														</p>
+														<p className="text-sm text-gray-600">
+															{formatDate(work.paidAt || work.updatedAt)} •{" "}
+															{work.duration} day(s)
+														</p>
+													</div>
+												</div>
+												<div className="text-right">
+													<p className="text-xl font-bold text-green-600">
+														₹{work.totalCost}
+													</p>
+													<p className="text-xs text-gray-500">Paid</p>
+												</div>
+											</div>
+										))}
+								</div>
+							)}
+						</div>
+
+						{/* Pending Payments */}
+						{workOrders.filter(
+							(w) => w.paymentStatus !== "paid" && w.status === "completed"
+						).length > 0 && (
+							<div className="bg-white rounded-xl shadow-lg p-6">
+								<h3 className="text-xl font-bold text-gray-800 mb-4">
+									Pending Payments
+								</h3>
+								<div className="space-y-4">
+									{workOrders
+										.filter(
+											(w) =>
+												w.paymentStatus !== "paid" && w.status === "completed"
+										)
+										.map((work) => (
+											<div
+												key={work._id}
+												className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg border-2 border-yellow-200"
+											>
+												<div className="flex items-center">
+													<div className="bg-yellow-100 p-3 rounded-full mr-4">
+														<Clock className="text-yellow-600" size={24} />
+													</div>
+													<div>
+														<p className="font-semibold text-gray-800">
+															{work.workType || work.serviceType}
+														</p>
+														<p className="text-sm text-gray-600">
+															Completed:{" "}
+															{formatDate(
+																work.workCompletedAt || work.updatedAt
+															)}
+														</p>
+													</div>
+												</div>
+												<div className="text-right">
+													<p className="text-xl font-bold text-yellow-600">
+														₹{work.totalCost}
+													</p>
+													<p className="text-xs text-yellow-700">
+														Awaiting Payment
+													</p>
+												</div>
+											</div>
+										))}
+								</div>
+							</div>
+						)}
+					</div>
+				)}
+
+				{/* POST SERVICE MODAL - ✅ ALREADY CORRECT */}
+				{showServiceModal && (
+					<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+						<div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+							{/* Modal Header */}
+							<div className="bg-gradient-to-r from-green-500 to-blue-500 p-6 text-white rounded-t-2xl">
+								<div className="flex justify-between items-center">
+									<h2 className="text-2xl font-bold">
+										{editingService ? "Edit Service" : "Post New Service"}
+									</h2>
+									<button
+										onClick={handleCloseServiceModal}
+										className="text-white hover:bg-white/20 rounded-full p-2 transition"
+									>
+										<X size={24} />
+									</button>
+								</div>
+							</div>
+
+							{/* Modal Form */}
+							<form onSubmit={handlePostService} className="p-6 space-y-4">
+								{/* Work Type */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Work Type <span className="text-red-500">*</span>
+									</label>
+									<select
+										name="workerType"
+										value={serviceFormData.workerType}
+										onChange={handleServiceFormChange}
+										required
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+									>
+										<option value="">Select Work Type</option>
+										<option value="Farm Labor">Farm Labor</option>
+										<option value="Harvester">Harvester</option>
+										<option value="Irrigator">Irrigator</option>
+										<option value="Sprayer">Sprayer</option>
+										<option value="General Helper">General Helper</option>
+										<option value="Ploughing">Ploughing</option>
+										<option value="Seeding">Seeding</option>
+										<option value="Pesticide Application">
+											Pesticide Application
+										</option>
+										<option value="Other">Other</option>
+									</select>
+								</div>
+
+								{/* Charge Per Day */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Charge Per Day (₹) <span className="text-red-500">*</span>
+									</label>
+									<input
+										type="number"
+										name="chargePerDay"
+										value={serviceFormData.chargePerDay}
+										onChange={handleServiceFormChange}
+										required
+										min="0"
+										placeholder="500"
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+									/>
+								</div>
+
+								{/* Experience */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Experience (years) <span className="text-red-500">*</span>
+									</label>
+									<input
+										type="number"
+										name="experience"
+										value={serviceFormData.experience}
+										onChange={handleServiceFormChange}
+										required
+										min="0"
+										max="50"
+										placeholder="5"
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+									/>
+								</div>
+
+								{/* Working Hours */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Working Hours Per Day
+									</label>
+									<input
+										type="number"
+										name="workingHours"
+										value={serviceFormData.workingHours}
+										onChange={handleServiceFormChange}
+										min="1"
+										max="24"
+										placeholder="8"
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+									/>
+								</div>
+
+								{/* Contact Number */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Contact Number <span className="text-red-500">*</span>
+									</label>
+									<input
+										type="tel"
+										name="contactNumber"
+										value={serviceFormData.contactNumber}
+										onChange={handleServiceFormChange}
+										required
+										placeholder="9876543210"
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+									/>
+								</div>
+
+								{/* Location - District, State, Pincode */}
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+									<div>
+										<label className="block text-sm font-semibold text-gray-700 mb-2">
+											District
+										</label>
+										<input
+											type="text"
+											name="location.district"
+											value={serviceFormData.location.district}
+											onChange={handleServiceFormChange}
+											placeholder="Pune"
+											className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+										/>
+									</div>
+
+									<div>
+										<label className="block text-sm font-semibold text-gray-700 mb-2">
+											State
+										</label>
+										<input
+											type="text"
+											name="location.state"
+											value={serviceFormData.location.state}
+											onChange={handleServiceFormChange}
+											placeholder="Maharashtra"
+											className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+										/>
+									</div>
+
+									<div>
+										<label className="block text-sm font-semibold text-gray-700 mb-2">
+											Pincode
+										</label>
+										<input
+											type="text"
+											name="location.pincode"
+											value={serviceFormData.location.pincode}
+											onChange={handleServiceFormChange}
+											placeholder="411001"
+											maxLength="6"
+											className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+										/>
+									</div>
+								</div>
+
+								{/* Skills */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Skills (comma separated)
+									</label>
+									<input
+										type="text"
+										name="skills"
+										value={serviceFormData.skills}
+										onChange={handleServiceFormChange}
+										placeholder="Tractor Driving, Harvesting, Irrigation"
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+									/>
+									<p className="text-xs text-gray-500 mt-1">
+										Separate multiple skills with commas
+									</p>
+								</div>
+
+								{/* Description */}
+								<div>
+									<label className="block text-sm font-semibold text-gray-700 mb-2">
+										Description
+									</label>
+									<textarea
+										name="description"
+										value={serviceFormData.description}
+										onChange={handleServiceFormChange}
+										rows="3"
+										placeholder="Describe your service..."
+										className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition resize-none"
+									></textarea>
+								</div>
+
+								{/* Action Buttons */}
+								<div className="flex gap-4 pt-4">
+									<button
+										type="button"
+										onClick={handleCloseServiceModal}
+										className="flex-1 px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold"
+									>
+										Cancel
+									</button>
+									<button
+										type="submit"
+										disabled={actionLoading === "posting"}
+										className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+									>
+										{actionLoading === "posting" ? (
+											<>
+												<Loader className="animate-spin mr-2" size={20} />
+												{editingService ? "Updating..." : "Posting..."}
+											</>
+										) : (
+											<>
+												<CheckCircle className="mr-2" size={20} />
+												{editingService ? "Update Service" : "Post Service"}
+											</>
+										)}
+									</button>
+								</div>
+							</form>
+						</div>
+					</div>
+				)}
+			</div>
 		</div>
 	);
 }

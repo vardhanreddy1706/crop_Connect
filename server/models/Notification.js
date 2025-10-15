@@ -10,23 +10,38 @@ const notificationSchema = new mongoose.Schema(
 		type: {
 			type: String,
 			enum: [
+				// Authentication
+				"login",
+				"registration",
+				// Requirements
 				"new_requirement",
+				"requirement_posted",
+				// Bids
 				"bid_placed",
 				"bid_accepted",
 				"bid_rejected",
+				// Bookings
 				"booking_confirmed",
+				"booking_created",
+				"booking_cancelled",
+				"booking_completed",
+				"work_completed", // ✅ ADD THIS LINE
+				// Payments
 				"payment_received",
 				"payment_sent",
+				"payment_failed",
+				// Services
 				"service_posted",
 				"service_cancelled",
-				"booking_received",
-				"bid_placed",
-				"bid_accepted", 
-				"bid_rejected", 
-				"work_marked_complete", 
+				// Workers
+				"worker_hired",
+				"application_received",
+				// General
+				"general",
 			],
 			required: true,
 		},
+
 		title: {
 			type: String,
 			required: true,

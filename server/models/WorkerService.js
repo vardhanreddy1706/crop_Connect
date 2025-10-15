@@ -9,14 +9,18 @@ const workerServiceSchema = new mongoose.Schema(
 		},
 		workerType: {
 			type: String,
+			required: true,
 			enum: [
 				"Farm Labor",
 				"Harvester",
 				"Irrigator",
 				"Sprayer",
 				"General Helper",
+				"Ploughing",
+				"Seeding",
+				"Pesticide Application",
+				"Other",
 			],
-			required: true,
 		},
 		experience: {
 			type: Number,
@@ -25,7 +29,7 @@ const workerServiceSchema = new mongoose.Schema(
 		},
 		chargePerDay: {
 			type: Number,
-			required: [true, "Please provide charge per day"],
+			required: true,
 			min: 0,
 		},
 		workingHours: {
@@ -39,21 +43,36 @@ const workerServiceSchema = new mongoose.Schema(
 			district: String,
 			state: String,
 			pincode: String,
+			coordinates: {
+				type: {
+					type: String,
+					enum: ["Point"],
+				},
+				coordinates: [Number], // [longitude, latitude]
+			},
 		},
 		availability: {
 			type: Boolean,
 			default: true,
 		},
+		// ✅ NEW: Track booking status
+		bookingStatus: {
+			type: String,
+			enum: ["available", "booked", "completed"],
+			default: "available",
+		},
+		// ✅ NEW: Current booking reference
+		currentBookingId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "Booking",
+		},
 		availableDates: [
 			{
-				type: Date,
+				startDate: Date,
+				endDate: Date,
 			},
 		],
-		skills: [
-			{
-				type: String,
-			},
-		],
+		skills: [String],
 		contactNumber: {
 			type: String,
 			required: true,
@@ -70,13 +89,30 @@ const workerServiceSchema = new mongoose.Schema(
 				default: 0,
 			},
 		},
+		reviews: [
+			{
+				farmer: {
+					type: mongoose.Schema.Types.ObjectId,
+					ref: "User",
+				},
+				rating: Number,
+				comment: String,
+				createdAt: {
+					type: Date,
+					default: Date.now,
+				},
+			},
+		],
 	},
 	{
 		timestamps: true,
 	}
 );
 
-// ✅ FIX: Check if model exists before creating
-module.exports =
-	mongoose.models.WorkerService ||
-	mongoose.model("WorkerService", workerServiceSchema);
+// ✅ Indexes
+workerServiceSchema.index({ location: "2dsphere" });
+workerServiceSchema.index({ worker: 1, availability: 1 });
+workerServiceSchema.index({ workerType: 1, availability: 1 });
+workerServiceSchema.index({ bookingStatus: 1 });
+
+module.exports = mongoose.model("WorkerService", workerServiceSchema);

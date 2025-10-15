@@ -70,6 +70,10 @@ const userSchema = new mongoose.Schema(
 			type: String,
 			default: "",
 		},
+		totalspent: {
+			type: Number,
+			default: 0,
+		},
 	},
 	{
 		timestamps: true,

@@ -1,97 +1,131 @@
+// src/pages/Crops.jsx
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import api from "../config/api";
+import toast from "react-hot-toast";
 
-const crops = [
-	{
-		id: 1,
-		name: "Onion",
-		img: "/onion.jpeg",
-		price: 1350,
-		seller: "Ravi Kumar",
-	},
-	{
-		id: 2,
-		name: "Tomato",
-		img: "/tomato.jpeg",
-		price: 2250,
-		seller: "Sita Devi",
-	},
-	{
-		id: 3,
-		name: "Paddy",
-		img: "/paddy.jpeg",
-		price: 1800,
-		seller: "Mohan Singh",
-	},
-	{
-		id: 4,
-		name: "Cotton",
-		img: "/cotton.jpeg",
-		price: 5500,
-		seller: "Lakshmi Reddy",
-	},
-	{
-		id: 5,
-		name: "Wheat",
-		img: "/wheat.jpeg",
-		price: 2100,
-		seller: "Rajesh Patel",
-	},
-];
+const isValidObjectId = (val) => /^[0-9a-fA-F]{24}$/.test(String(val || ""));
+
+const placeholderFor = (name) =>
+	`https://ui-avatars.com/api/?name=${encodeURIComponent(
+		name || "Crop"
+	)}&size=400&background=random&color=fff&bold=true&length=2`;
+
+const handleImgError = (e, name) => {
+	e.currentTarget.onerror = null;
+	e.currentTarget.src = placeholderFor(name);
+};
 
 export default function Crops() {
+	const [crops, setCrops] = useState([]);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		const fetchCrops = async () => {
+			try {
+				const res = await api.get("/crops");
+				if (res.data?.success) {
+					setCrops(res.data.crops || []);
+				} else {
+					toast.error(res.data?.message || "Failed to load crops");
+				}
+			} catch (error) {
+				console.error("Error fetching crops:", error);
+				toast.error("Failed to load crops");
+			} finally {
+				setLoading(false);
+			}
+		};
+		fetchCrops();
+	}, []);
+
+	if (loading) {
+		return (
+			<div className="flex items-center justify-center min-h-[50vh]">
+				<div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600" />
+			</div>
+		);
+	}
+
+	const safeCrops = Array.isArray(crops) ? crops : [];
+
 	return (
-		<div className="min-h-screen bg-gray-50">
-			{/* Header */}
-			<div className="bg-green-700 text-white py-16">
-				<div className="max-w-7xl mx-auto px-8">
-					<h1 className="text-4xl font-bold mb-4">🌾 Available Crops</h1>
-					<p className="text-lg">
-						Fresh crops from verified sellers across India
-					</p>
-				</div>
-			</div>
+		<div className="max-w-6xl mx-auto px-4 py-8">
+			<h1 className="text-3xl font-bold mb-2">Fresh Crops</h1>
+			<p className="text-gray-600 mb-6">
+				Fresh crops from verified sellers across India
+			</p>
 
-			{/* Crops Grid */}
-			<div className="max-w-7xl mx-auto px-8 py-12">
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-					{crops.map((crop) => (
-						<div
-							key={crop.id}
-							className="border rounded-xl p-6 shadow-lg hover:shadow-2xl transition bg-white"
-						>
-							<img
-								src={crop.img}
-								alt={crop.name}
-								className="rounded-lg w-full h-48 object-cover mb-4"
-								onError={(e) => {
-									e.target.src =
-										"https://via.placeholder.com/400x300?text=" + crop.name;
-								}}
-							/>
-							<h3 className="text-xl font-semibold mb-2">{crop.name}</h3>
-							<p className="text-gray-600 text-sm mb-2">
-								Seller: {crop.seller}
-							</p>
-							<p className="text-green-700 text-2xl font-bold mb-4">
-								₹{crop.price}/quintal
-							</p>
-							<Link
-								to={`/crops/${crop.id}`}
-								className="block w-full text-center bg-green-700 text-white px-4 py-3 rounded-lg hover:bg-green-800 transition font-semibold"
+			{safeCrops.length === 0 ? (
+				<p className="text-gray-600">No crops found.</p>
+			) : (
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+					{safeCrops.map((crop) => {
+						const validId = isValidObjectId(crop?._id);
+						const unitPrice = Number(crop?.pricePerUnit || 0);
+						const unit = crop?.unit || "quintal";
+						return (
+							<div
+								key={
+									crop?._id || `${crop?.cropName || "Crop"}-${Math.random()}`
+								}
+								className="p-4 border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition"
 							>
-								View Details
-							</Link>
-						</div>
-					))}
-				</div>
+								{/* Image */}
+								<div className="mb-3">
+									<img
+										src={crop?.image || placeholderFor(crop?.cropName)}
+										alt={crop?.cropName || "Crop"}
+										onError={(e) => handleImgError(e, crop?.cropName)}
+										className="w-full h-48 object-cover rounded-md bg-gray-100"
+										loading="lazy"
+									/>
+								</div>
 
-				{/* Back to Home */}
-				<div className="mt-8 text-center">
-					<Link to="/" className="text-green-700 font-semibold hover:underline">
-						← Back to Home
-					</Link>
+								{/* Title and meta */}
+								<h3 className="text-xl font-semibold">
+									{crop?.cropName || "Unnamed Crop"}
+								</h3>
+
+								<div className="mt-1 text-sm text-gray-600">
+									<div>Seller: {crop?.seller?.name || "Unknown Seller"}</div>
+									{crop?.location && (
+										<div>
+											Location: {crop.location.district || "N/A"},{" "}
+											{crop.location.state || "N/A"}
+										</div>
+									)}
+								</div>
+
+								<p className="mt-2 font-bold">
+									₹{unitPrice.toLocaleString()}/{unit}
+								</p>
+
+								{/* Actions */}
+								<div className="mt-4">
+									{validId ? (
+										<Link
+											to={`/crops/${crop._id}`}
+											className="inline-block px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+										>
+											View Details
+										</Link>
+									) : (
+										<button
+											type="button"
+											disabled
+											className="inline-block px-4 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
+											title="Invalid crop ID"
+										>
+											View Details
+										</button>
+									)}
+								</div>
+							</div>
+						);
+					})}
 				</div>
-			</div>
+			)}
 		</div>
 	);
 }

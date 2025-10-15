@@ -2,6 +2,7 @@ const Transaction = require("../models/Transaction");
 const Booking = require("../models/Booking");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
+const NotificationService = require("../services/notificationService");
 
 // @desc Get transaction dashboard data
 // @route GET /api/transactions/dashboard
@@ -239,38 +240,35 @@ exports.getPaymentOptions = async (req, res) => {
 	}
 };
 
-// @desc Get transactions
-// @route GET /api/transactions
-// @access Private
 exports.getTransactions = async (req, res) => {
 	try {
 		const transactions = await Transaction.find({
-			$or: [{ farmerId: req.user._id }, { tractorOwnerId: req.user._id }],
+			$or: [
+				{ farmerId: req.user._id },
+				{ tractorOwnerId: req.user._id },
+				{ workerId: req.user._id }, // ✅ ADD THIS
+			],
 		})
-			.populate("bookingId", "workType landSize bookingDate status")
+			.populate("bookingId")
 			.populate("farmerId", "name phone")
 			.populate("tractorOwnerId", "name phone")
+			.populate("workerId", "name phone") // ✅ ADD THIS
 			.sort({ createdAt: -1 });
 
-		const transactionsWithType = transactions.map((t) => ({
-			...t.toObject(),
-			transactionType:
-				t.farmerId._id.toString() === req.user._id.toString()
-					? "outgoing"
-					: "incoming",
-		}));
-
-		res
-			.status(200)
-			.json({
-				success: true,
-				count: transactions.length,
-				transactions: transactionsWithType,
-			});
+		res.status(200).json({
+			success: true,
+			count: transactions.length,
+			transactions,
+		});
 	} catch (error) {
-		res.status(500).json({ success: false, message: error.message });
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
 	}
 };
+
+
 
 // @desc Legacy cash payment (kept for compatibility)
 // @route POST /api/transactions/cash-payment
@@ -405,5 +403,28 @@ exports.verifyRazorpayPayment = async (req, res) => {
 			});
 	} catch (error) {
 		res.status(500).json({ success: false, message: error.message });
+	}
+};
+exports.getWorkerTransactions = async (req, res) => {
+	try {
+		const transactions = await Transaction.find({
+			$or: [{ senderId: req.user.id }, { receiverId: req.user.id }],
+		})
+			.populate("senderId", "name email")
+			.populate("receiverId", "name email")
+			.populate("bookingId")
+			.sort({ createdAt: -1 });
+
+		res.status(200).json({
+			success: true,
+			count: transactions.length,
+			transactions,
+		});
+	} catch (error) {
+		console.error("Get worker transactions error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message || "Failed to fetch transactions",
+		});
 	}
 };

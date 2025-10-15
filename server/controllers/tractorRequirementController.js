@@ -3,6 +3,7 @@ const TractorService = require("../models/TractorService");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const Booking = require("../models/Booking");
+const NotificationService = require("../services/notificationService");
 
 // ==================== EXISTING FUNCTIONS (ENHANCED) ====================
 
@@ -15,6 +16,11 @@ exports.createTractorRequirement = async (req, res) => {
 			...req.body,
 			farmer: req.user._id,
 		});
+		        await NotificationService.notifyTractorRequirementPosted(
+							req.user,
+							requirement
+						);
+
 
 		// 🆕 NEW: Find all tractor owners in the same district/state
 		const nearbyTractorOwners = await User.find({

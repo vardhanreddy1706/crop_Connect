@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { protect, authorize } = require("../middlewares/authMiddleware"); // ← ADD authorize import
+const { protect, authorize } = require("../middlewares/authMiddleware");
+
 const {
 	getFarmerTractorBookings,
 	getFarmerWorkerBookings,
@@ -13,13 +14,14 @@ const {
 	completeWork,
 	cancelBooking,
 	createBooking,
-	completeBooking, // ← REMOVE DUPLICATE getTractorOwnerBookings
+	completeBooking,
+	getWorkerBookings,
 } = require("../controllers/bookingController");
 
-// ==================== BOOKING CREATION ====================
+// BOOKING CREATION
 router.post("/create", protect, createBooking);
 
-// ==================== FARMER ROUTES ====================
+// FARMER ROUTES
 router.get("/farmer/tractors", protect, getFarmerTractorBookings);
 router.get("/farmer/workers", protect, getFarmerWorkerBookings);
 router.get(
@@ -30,27 +32,27 @@ router.get(
 router.get("/farmer/worker-requirements", protect, getFarmerWorkerRequirements);
 router.get("/farmer", protect, getAllFarmerBookings);
 
-// ==================== TRACTOR OWNER ROUTES ====================
+// TRACTOR OWNER ROUTES
 router.get(
 	"/tractor-owner",
 	protect,
 	authorize("tractor_owner"),
 	getTractorOwnerBookings
 );
-router.post(
-	"/:id/complete",
-	protect,
-	authorize("tractor_owner"),
-	completeBooking
-);
 
-// ==================== PAYMENT ROUTES ====================
+// WORKER ROUTES
+router.get("/worker", protect, authorize("worker"), getWorkerBookings);
+
+// ✅ FIXED: WORK COMPLETION - Remove authorization, handle in controller
+router.post("/:id/complete", protect, completeWork);
+router.post("/:id/complete-work", protect, completeWork);
+
+// PAYMENT ROUTES
 router.post("/:id/create-order", protect, createRazorpayOrder);
 router.post("/:id/verify-payment", protect, verifyPayment);
 router.post("/:id/pay-after-work", protect, choosePayAfterWork);
 
-// ==================== WORK MANAGEMENT ====================
-router.post("/:id/complete-work", protect, completeWork);
+// BOOKING MANAGEMENT
 router.post("/:id/cancel", protect, cancelBooking);
 
 module.exports = router;

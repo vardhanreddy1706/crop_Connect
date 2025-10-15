@@ -2,9 +2,12 @@ const Booking = require("../models/Booking");
 const Transaction = require("../models/Transaction");
 const Notification = require("../models/Notification");
 const TractorRequirement = require("../models/TractorRequirement");
+const NotificationService = require("../services/notificationService");
+const User = require("../models/User");
 
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+
 
 // Initialize Razorpay (put this at the top of the file, after imports)
 const razorpay = new Razorpay({
@@ -12,99 +15,95 @@ const razorpay = new Razorpay({
 	key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// Create direct booking (when farmer books a tractor directly)
+/// ✅ FIXED: Create direct booking
 const createBooking = async (req, res) => {
-    try {
-        const {
-            tractorServiceId,
-            bookingDate,
-            duration,
-            location,
-            workType,
-            landSize,
-            notes,
-        } = req.body;
+  try {
+    const {
+      tractorServiceId,
+      bookingDate,
+      duration,
+      location,
+      workType,
+      landSize,
+      notes,
+    } = req.body;
 
-        // Get tractor service
-        const TractorService = require("../models/TractorService");
-        const tractorService = await TractorService.findById(tractorServiceId);
+    // Get tractor service FIRST
+    const TractorService = require("../models/TractorService");
+    const tractorService = await TractorService.findById(tractorServiceId);
 
-        if (!tractorService) {
-            return res.status(404).json({
-                success: false,
-                message: "Tractor service not found",
-            });
-        }
-
-        if (!tractorService.availability) {
-            return res.status(400).json({
-                success: false,
-                message: "This tractor is not available",
-            });
-        }
-
-        // Calculate cost
-        const totalCost = Math.round(tractorService.chargePerAcre * (landSize || 1));
-
-        // Create booking
-        const booking = await Booking.create({
-            farmer: req.user._id,
-            tractorOwnerId: tractorService.owner,
-            serviceType: "tractor",
-            serviceId: tractorServiceId,
-            serviceModel: "TractorService",
-            bookingDate,
-            duration: duration || 8,
-            totalCost,
-            location,
-            workType: workType || tractorService.typeOfPlowing,
-            landSize,
-            status: "confirmed",
-            paymentStatus: "pending",
-            notes,
-        });
-
-        // Populate tractor owner details
-        await booking.populate("tractorOwnerId", "name phone email");
-
-        // Create notification for tractor owner
-        // await Notification.create({
-        //     recipientId: tractorService.owner,
-        //     type: "booking_received",
-        //     title: "🎉 New Booking Received!",
-        //     message: `${req.user.name} has booked your tractor for ${workType}`,
-        //     relatedUserId: req.user._id,
-        //     data: {
-        //         bookingId: booking._id,
-        //         workType,
-        //         landSize,
-        //         totalCost,
-        //         bookingDate,
-        //     },
-        // });
-
-        // Socket notification
-        if (req.io) {
-            req.io.to(tractorService.owner.toString()).emit("notification", {
-                type: "booking_received",
-                title: "🎉 New Booking!",
-                message: `New booking for ${workType}`,
-                bookingId: booking._id,
-            });
-        }
-
-        res.status(201).json({
-            success: true,
-            message: "Booking created successfully",
-            booking,
-        });
-    } catch (error) {
-        console.error("Create booking error:", error);
-        res.status(500).json({
-            success: false,
-            message: error.message || "Failed to create booking",
-        });
+    if (!tractorService) {
+      return res.status(404).json({
+        success: false,
+        message: "Tractor service not found",
+      });
     }
+
+    if (!tractorService.availability) {
+      return res.status(400).json({
+        success: false,
+        message: "This tractor is not available",
+      });
+    }
+
+    // Calculate cost
+    const totalCost = Math.round(tractorService.chargePerAcre * (landSize || 1));
+
+    // ✅ CREATE booking FIRST
+    const booking = await Booking.create({
+      farmer: req.user._id,
+      tractorOwnerId: tractorService.owner,
+      serviceType: "tractor",
+      serviceId: tractorServiceId,
+      serviceModel: "TractorService",
+      bookingDate,
+      duration: duration || 8,
+      totalCost,
+      location,
+      workType: workType || tractorService.typeOfPlowing,
+      landSize,
+      status: "confirmed",
+      paymentStatus: "pending",
+      notes,
+    });
+
+    // Populate tractor owner details
+    await booking.populate("tractorOwnerId", "name phone email");
+
+    // ✅ NOW call notification AFTER booking exists
+    try {
+      await NotificationService.notifyBookingCreated(
+        req.user,
+        booking,
+        "Tractor"
+      );
+    } catch (notifError) {
+      console.error("Notification error:", notifError);
+      // Don't fail the whole booking if notification fails
+    }
+
+    // Socket notification
+    if (req.io) {
+      req.io.to(tractorService.owner.toString()).emit("notification", {
+        type: "booking_received",
+        title: "🎉 New Booking!",
+        message: `New booking for ${workType}`,
+        bookingId: booking._id,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Booking created successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Create booking error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to create booking",
+    });
+  }
 };
 
 
@@ -454,34 +453,105 @@ const choosePayAfterWork = async (req, res) => {
 	}
 };
 
-// Complete work
+// ✅ FIXED: Complete work function
 const completeWork = async (req, res) => {
-	try {
-		const booking = await Booking.findById(req.params.id);
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate("farmer", "name phone email")
+      .populate("tractorOwnerId", "name phone email");
 
-		if (!booking) {
-			return res.status(404).json({
-				success: false,
-				message: "Booking not found",
-			});
-		}
+    if (!booking) {
+      return res.status(404).json({ success: false, message: "Booking not found" });
+    }
 
-		booking.status = "completed";
-		booking.workCompletedAt = new Date();
-		await booking.save();
+    // Authorization checks
+    const isFarmer = booking.farmer._id.toString() === req.user._id.toString();
+    const isTractorOwner = booking.tractorOwnerId &&
+      booking.tractorOwnerId._id.toString() === req.user._id.toString();
+    const isWorkerBooking = booking.serviceType === "worker";
+    const isAuthorizedWorker = isWorkerBooking && isTractorOwner;
 
-		res.status(200).json({
-			success: true,
-			message: "Work marked as completed",
-			booking,
-		});
-	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
-	}
+    if (!isFarmer && !isTractorOwner && !isAuthorizedWorker) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to complete this booking"
+      });
+    }
+
+    if (booking.status === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Booking already marked as completed"
+      });
+    }
+
+    // Update booking status
+    booking.status = "completed";
+    booking.workCompletedAt = new Date();
+    await booking.save();
+
+    // Update service availability
+    if (booking.serviceType === "worker") {
+      const WorkerService = require("../models/WorkerService");
+      await WorkerService.findByIdAndUpdate(booking.serviceId, {
+        availability: true,
+        bookingStatus: "available",
+        currentBookingId: null,
+      });
+    } else if (booking.serviceType === "tractor") {
+      const TractorService = require("../models/TractorService");
+      await WorkerService.findByIdAndUpdate(booking.serviceId, {
+        availability: true,
+      });
+    }
+
+    // ✅ FIXED: Use 'booking_completed' instead of 'work_completed'
+    try {
+      await Notification.create({
+        recipientId: booking.farmer._id,
+        type: "booking_completed",  // ✅ Changed from 'work_completed'
+        title: "✅ Work Completed!",
+        message: `${req.user.name} has marked the work as completed.`,
+        relatedBookingId: booking._id,
+        data: {
+          bookingId: booking._id,
+          totalCost: booking.totalCost,
+          workType: booking.workType,
+        },
+      });
+    } catch (notifError) {
+      console.error("Notification error:", notifError);
+      // Don't fail the whole request if notification fails
+    }
+
+    // Socket notification
+    if (req.io) {
+      req.io.to(booking.farmer._id.toString()).emit("notification", {
+        type: "booking_completed",
+        title: "✅ Work Completed!",
+        message: `${req.user.name} has completed the work`,
+        bookingId: booking._id,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Work marked as completed successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Complete work error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to complete work",
+    });
+  }
 };
+
+
+
+
+
 
 // Cancel booking
 const cancelBooking = async (req, res) => {
@@ -494,9 +564,14 @@ const cancelBooking = async (req, res) => {
                 message: "Booking not found",
             });
         }
-
+        
         booking.status = "cancelled";
         await booking.save();
+               await NotificationService.notifyBookingCancelled(
+									otherUser,
+									booking,
+									req.user.name
+								);
 
         res.status(200).json({
             success: true,
@@ -510,76 +585,149 @@ const cancelBooking = async (req, res) => {
         });
     }
 };
-
-// ✅ ADD THIS FUNCTION - Complete Booking (Tractor Owner marks work done)
+// ✅ FIXED
 const completeBooking = async (req, res) => {
-    try {
-        const booking = await Booking.findById(req.params.id);
+  try {
+    const booking = await Booking.findById(req.params.id);
 
-        if (!booking) {
-            return res.status(404).json({
-                success: false,
-                message: "Booking not found",
-            });
-        }
-
-        if (booking.tractorOwnerId.toString() !== req.user._id.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: "Not authorized to complete this booking",
-            });
-        }
-
-        if (booking.status === "completed") {
-            return res.status(400).json({
-                success: false,
-                message: "Booking already marked as completed",
-            });
-        }
-
-        booking.status = "completed";
-        booking.workCompletedAt = new Date();
-        await booking.save();
-
-        // Notify farmer
-        await Notification.create({
-            recipientId: booking.farmer,
-            type: "work_completed",
-            title: "🎊 Work Completed!",
-            message: `${req.user.name} has marked the work as completed. Please proceed with payment.`,
-            data: {
-                bookingId: booking._id,
-                totalCost: booking.totalCost,
-            },
-        });
-
-        res.status(200).json({
-            success: true,
-            message: "Work marked as completed successfully",
-            booking,
-        });
-    } catch (error) {
-        console.error("Complete booking error:", error);
-        res.status(500).json({
-            success: false,
-            message: error.message || "Failed to complete booking",
-        });
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
     }
+
+    if (booking.tractorOwnerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to complete this booking",
+      });
+    }
+
+    if (booking.status === "completed") {
+      return res.status(400).json({
+        success: false,
+        message: "Booking already marked as completed",
+      });
+    }
+
+    booking.status = "completed";
+    booking.workCompletedAt = new Date();
+    await booking.save();
+
+    // ✅ FIXED: Use 'booking_completed' instead of 'work_completed'
+    try {
+      await Notification.create({
+        recipientId: booking.farmer,
+        type: "booking_completed",  // ✅ Changed here too
+        title: "🎊 Work Completed!",
+        message: `${req.user.name} has marked the work as completed. Please proceed with payment.`,
+        relatedBookingId: booking._id,
+        data: {
+          bookingId: booking._id,
+          totalCost: booking.totalCost,
+        },
+      });
+    } catch (notifError) {
+      console.error("Notification error:", notifError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Work marked as completed successfully",
+      booking,
+    });
+  } catch (error) {
+    console.error("Complete booking error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to complete booking",
+    });
+  }
 };
 
-// ✅ NOW YOUR module.exports WILL WORK
+
+const getWorkerBookings = async (req, res) => {
+	try {
+		const bookings = await Booking.find({
+			tractorOwnerId: req.user.id,
+			serviceType: "worker",
+		})
+			.populate("farmer", "name email phone")
+			.populate({
+				path: "serviceId",
+				model: "WorkerService",
+			})
+			.sort({ createdAt: -1 });
+
+		res.status(200).json({
+			success: true,
+			count: bookings.length,
+			bookings,
+		});
+	} catch (error) {
+		console.error("Get worker bookings error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message || "Failed to fetch bookings",
+		});
+	}
+};
+
+// POST /api/bookings/:id/complete - Mark booking as complete
+const markBookingComplete = async (req, res) => {
+	try {
+		const booking = await Booking.findById(req.params.id);
+
+		if (!booking) {
+			return res.status(404).json({
+				success: false,
+				message: "Booking not found",
+			});
+		}
+
+		// Check if user is the service provider
+		if (booking.tractorOwnerId.toString() !== req.user.id.toString()) {
+			return res.status(403).json({
+				success: false,
+				message: "Not authorized to update this booking",
+			});
+		}
+
+		booking.status = "completed";
+		booking.workCompletedAt = new Date();
+		await booking.save();
+
+		res.status(200).json({
+			success: true,
+			message: "Booking marked as completed",
+			booking,
+		});
+	} catch (error) {
+		console.error("Mark complete error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message || "Failed to mark as complete",
+		});
+	}
+};
+
+
+
 module.exports = {
-    getFarmerTractorBookings,
-    getFarmerWorkerBookings,
-    getFarmerTractorRequirements,
-    getFarmerWorkerRequirements,
-    getAllFarmerBookings,
-    getTractorOwnerBookings,
-    createRazorpayOrder,
-    verifyPayment,
-    choosePayAfterWork,
-    completeWork,
-    cancelBooking,
-    createBooking,
-    completeBooking, 
+	getFarmerTractorBookings,
+	getFarmerWorkerBookings,
+	getFarmerTractorRequirements,
+	getFarmerWorkerRequirements,
+	getAllFarmerBookings,
+	getTractorOwnerBookings,
+	createRazorpayOrder,
+	verifyPayment,
+	choosePayAfterWork,
+	completeWork,
+	cancelBooking,
+	createBooking,
+	completeBooking,
+	getWorkerBookings,
+	markBookingComplete,
 };

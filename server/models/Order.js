@@ -1,8 +1,30 @@
+// server/models/Order.js
 const mongoose = require("mongoose");
+
+const orderItemSchema = new mongoose.Schema({
+	itemId: {
+		type: mongoose.Schema.Types.ObjectId,
+		required: true,
+	},
+	name: {
+		type: String,
+		required: true,
+	},
+	quantity: {
+		type: Number,
+		required: true,
+		min: 1,
+	},
+	price: {
+		type: Number,
+		required: true,
+		min: 0,
+	},
+});
 
 const orderSchema = new mongoose.Schema(
 	{
-		buyer: {
+		user: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
@@ -12,37 +34,11 @@ const orderSchema = new mongoose.Schema(
 			enum: ["crop", "product"],
 			required: true,
 		},
-		items: [
-			{
-				itemId: {
-					type: mongoose.Schema.Types.ObjectId,
-					required: true,
-					refPath: "orderType",
-				},
-				name: String,
-				quantity: {
-					type: Number,
-					required: true,
-					min: 1,
-				},
-				price: {
-					type: Number,
-					required: true,
-					min: 0,
-				},
-			},
-		],
+		items: [orderItemSchema],
 		totalAmount: {
 			type: Number,
 			required: true,
 			min: 0,
-		},
-		deliveryAddress: {
-			village: String,
-			district: String,
-			state: String,
-			pincode: String,
-			contactNumber: String,
 		},
 		status: {
 			type: String,
@@ -54,9 +50,12 @@ const orderSchema = new mongoose.Schema(
 			enum: ["pending", "completed", "failed"],
 			default: "pending",
 		},
-		paymentMethod: {
-			type: String,
-			enum: ["cash", "upi", "card", "net_banking"],
+		shippingAddress: {
+			village: String,
+			district: String,
+			state: String,
+			pincode: String,
+			contactNumber: String,
 		},
 	},
 	{

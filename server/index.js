@@ -38,36 +38,39 @@ const io = new Server(server, {
 	},
 });
 
-// 🆕 SAFER: Try to load nodemailer, but don't crash if it's not available
+// ✅ PROPER: Load nodemailer and configure email transporter ONCE
 let emailTransporter = null;
 try {
 	const nodemailer = require("nodemailer");
 
+	// Check if email credentials are provided
 	if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-		emailTransporter = nodemailer.createTransporter({
-			service: "gmail",
+		emailTransporter = nodemailer.createTransport({
+			host: process.env.EMAIL_HOST || "smtp.gmail.com",
+			port: parseInt(process.env.EMAIL_PORT) || 587,
+			secure: false, // true for 465, false for 587
 			auth: {
 				user: process.env.EMAIL_USER,
 				pass: process.env.EMAIL_PASS,
 			},
 		});
-		console.log("✅ Email service configured");
+
+		// Verify connection
+		emailTransporter.verify((error, success) => {
+			if (error) {
+				console.log("❌ Email verification failed:", error.message);
+				emailTransporter = null;
+			} else {
+				console.log("✅ Email service verified and ready");
+			}
+		});
 	} else {
-		console.log(
-			"⚠️  Email credentials not found in .env - email notifications disabled"
-		);
+		console.log("⚠️  Email credentials not found in .env");
 	}
 } catch (error) {
 	console.log("⚠️  nodemailer not installed - email notifications disabled");
 	console.log("   Run: npm install nodemailer");
 }
-
-// Make io and emailTransporter available in req object
-app.use((req, res, next) => {
-	req.io = io;
-	req.emailTransporter = emailTransporter;
-	next();
-});
 
 // ========================
 // SECURITY MIDDLEWARES
@@ -76,15 +79,6 @@ app.use((req, res, next) => {
 // 1. Helmet - Set security headers
 app.use(helmet());
 
-// 2. Rate limiting
-const limiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	max: 100,
-	message: "Too many requests from this IP, please try again later.",
-	standardHeaders: true,
-	legacyHeaders: false,
-});
-app.use("/api/", limiter);
 
 // 3. CORS Configuration
 const corsOptions = {
@@ -116,6 +110,24 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+
+// 2. Rate limiting - ✅ FIXED: More permissive for development
+const limiter = rateLimit({
+  windowMs: 1 * 60 * 1000,  // ✅ 1 minute window (shorter but resets faster)
+  max: 100,  // ✅ 100 requests per minute (much more permissive)
+  message: "Too many requests from this IP, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+  // ✅ Skip rate limiting for development
+  skip: (req) => process.env.NODE_ENV === "development",
+});
+
+// ✅ Apply rate limiter AFTER CORS (so CORS headers are always sent)
+// We'll move this below CORS middleware
+
+app.use("/api/", limiter);
+
+
 // 4. Compression
 app.use(compression());
 
@@ -125,6 +137,13 @@ app.use(compression());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
+
+// ✅ Make io and emailTransporter available in req object (MUST be BEFORE routes)
+app.use((req, res, next) => {
+	req.io = io;
+	req.emailTransporter = emailTransporter;
+	next();
+});
 
 // ========================
 // LOGGING MIDDLEWARE (Development)
@@ -136,7 +155,9 @@ if (process.env.NODE_ENV === "development") {
 	});
 }
 
+// ========================
 // Socket.IO Connection Handler
+// ========================
 io.on("connection", (socket) => {
 	console.log(`🔌 User connected: ${socket.id}`);
 
@@ -166,6 +187,10 @@ const transactionRoutes = require("./routes/transactionRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const debugRoutes = require("./routes/debugRoutes");
 const bidRoutes = require("./routes/bidRoutes");
+const workerHireRoutes = require("./routes/workHireRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const cartRoutes = require("./routes/cartRoutes");
+
 // ========================
 // API ROUTES
 // ========================
@@ -182,9 +207,9 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/debug", debugRoutes);
 app.use("/api/bids", bidRoutes);
-
-
-
+app.use("/api/worker-hires", workerHireRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/cart", cartRoutes);
 
 // ========================
 // WELCOME ROUTE
@@ -207,6 +232,8 @@ app.get("/", (req, res) => {
 			tractorRequirements: "/api/tractor-requirements",
 			notifications: "/api/notifications",
 			transactions: "/api/transactions",
+			bids: "/api/bids",
+			debug: "/api/debug",
 		},
 	});
 });
@@ -221,7 +248,7 @@ app.get("/api/health", (req, res) => {
 		uptime: process.uptime(),
 		timestamp: Date.now(),
 		socketIO: "Connected",
-		emailService: emailTransporter ? "Configured" : "Not configured",
+		emailService: emailTransporter ? "Configured ✅" : "Not configured ⚠️",
 	});
 });
 
@@ -252,9 +279,9 @@ server.listen(PORT, () => {
 	);
 	console.log(`🌐 Server URL: http://localhost:${PORT}`);
 	console.log(`📡 API Base: http://localhost:${PORT}/api`);
-	console.log(`🔒 JWT Authentication: Enabled`);
-	console.log(`🌍 CORS: Enabled for http://localhost:5174`);
-	console.log(`🔌 Socket.IO: Enabled for real-time notifications`);
+	console.log(`🔐 JWT Authentication: Enabled`);
+	console.log(`🌐 CORS: Enabled for http://localhost:5174`);
+	console.log(`🔔 Socket.IO: Enabled for real-time notifications`);
 	console.log(
 		`📧 Email Service: ${
 			emailTransporter ? "Configured ✅" : "Not configured ⚠️"
@@ -277,9 +304,5 @@ process.on("SIGINT", () => {
 		process.exit(0);
 	});
 });
-
-
-
-
 
 module.exports = { app, io, emailTransporter };

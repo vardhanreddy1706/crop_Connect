@@ -21,6 +21,11 @@ const cropSchema = new mongoose.Schema(
 			required: [true, "Please provide quantity"],
 			min: 0,
 		},
+		pricePerUnit: {
+			type: Number,
+			required: [true, "Please provide price per unit"],
+			min: 0,
+		},
 		unit: {
 			type: String,
 			enum: ["kg", "quintal", "ton"],
@@ -40,11 +45,7 @@ const cropSchema = new mongoose.Schema(
 		harvestDate: {
 			type: Date,
 		},
-		quality: {
-			type: String,
-			enum: ["Premium", "Grade A", "Grade B", "Standard"],
-			default: "Standard",
-		},
+		
 		description: {
 			type: String,
 			maxlength: 500,
@@ -59,10 +60,7 @@ const cropSchema = new mongoose.Schema(
 			enum: ["available", "sold", "pending"],
 			default: "available",
 		},
-		contactNumber: {
-			type: String,
-			required: true,
-		},
+		
 	},
 	{
 		timestamps: true,

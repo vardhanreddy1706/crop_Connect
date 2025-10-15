@@ -1,10 +1,10 @@
 import React from "react";
 import { Bell, X } from "lucide-react";
-import { useNotifications } from "../hooks/useNotifications";
+import { useNotificationContext } from "../context/NotificationContext";
 
 export const NotificationBell = () => {
 	const { notifications, unreadCount, markAsRead, deleteNotif, markAllAsRead } =
-		useNotifications();
+		useNotificationContext();
 	const [showDropdown, setShowDropdown] = React.useState(false);
 
 	return (

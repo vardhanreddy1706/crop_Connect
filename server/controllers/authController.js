@@ -1,12 +1,15 @@
 // authController.js
+
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
+const NotificationService = require("../services/notificationService");
 
-// @desc    Register user
-// @route   POST /api/auth/register
-// @access  Public
+// @desc Register user
+// @route POST /api/auth/register
+// @access Public
 exports.register = async (req, res) => {
-	 console.log("REGISTER ENDPOINT HIT:", req.body);
+	console.log("REGISTER ENDPOINT HIT:", req.body);
+
 	try {
 		// Extract all possible fields from req.body
 		const {
@@ -78,6 +81,12 @@ exports.register = async (req, res) => {
 		// Respond with user info and token
 		if (user) {
 			const token = generateToken(user._id);
+
+			// Send registration email notification (non-blocking) with emailTransporter
+			NotificationService.notifyRegistration(user, req.emailTransporter).catch(
+				(err) => console.error("Registration notification error:", err)
+			);
+
 			res.status(201).json({
 				success: true,
 				message: "User registered successfully",
@@ -108,7 +117,7 @@ exports.register = async (req, res) => {
 			});
 		}
 	} catch (error) {
-		console.error("❌ Registration error:", error);
+		console.error("Registration error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message || "Server error during registration",
@@ -116,31 +125,29 @@ exports.register = async (req, res) => {
 	}
 };
 
-// ... (rest of your authController.js, e.g. login, getMe, updateProfile, etc.)
-
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
+// @desc Login user
+// @route POST /api/auth/login
+// @access Public
 exports.login = async (req, res) => {
 	try {
-		console.log("🔐 Login attempt:", { email: req.body.email });
+		console.log("Login attempt:", { email: req.body.email });
 
 		const { email, password } = req.body;
 
 		// Validation
 		if (!email || !password) {
-			console.log("❌ Missing email or password");
+			console.log("Missing email or password");
 			return res.status(400).json({
 				success: false,
 				message: "Please provide email and password",
 			});
 		}
 
-		// Check for user
+		// Declare 'user' FIRST before using it
 		const user = await User.findOne({ email }).select("+password");
 
 		if (!user) {
-			console.log("❌ User not found:", email);
+			console.log("User not found:", email);
 			return res.status(401).json({
 				success: false,
 				message: "Invalid email or password",
@@ -151,16 +158,21 @@ exports.login = async (req, res) => {
 		const isMatch = await user.matchPassword(password);
 
 		if (!isMatch) {
-			console.log("❌ Invalid password for:", email);
+			console.log("Invalid password for:", email);
 			return res.status(401).json({
 				success: false,
 				message: "Invalid email or password",
 			});
 		}
 
-		console.log("✅ Login successful:", user.email);
+		console.log("Login successful:", user.email);
 
 		const token = generateToken(user._id);
+
+		// Send login notification AFTER user is declared (non-blocking) with emailTransporter
+		NotificationService.notifySuccessfulLogin(user, req.emailTransporter).catch(
+			(err) => console.error("Login notification error:", err)
+		);
 
 		res.status(200).json({
 			success: true,
@@ -176,7 +188,7 @@ exports.login = async (req, res) => {
 			token,
 		});
 	} catch (error) {
-		console.error("❌ Login error:", error);
+		console.error("Login error:", error);
 		res.status(500).json({
 			success: false,
 			message: error.message || "Server error during login",
@@ -184,13 +196,12 @@ exports.login = async (req, res) => {
 	}
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
+// @desc Get current user
+// @route GET /api/auth/me
+// @access Private
 exports.getMe = async (req, res) => {
 	try {
 		const user = await User.findById(req.user._id);
-
 		res.status(200).json({
 			success: true,
 			user,
@@ -203,9 +214,9 @@ exports.getMe = async (req, res) => {
 	}
 };
 
-// @desc    Update user profile
-// @route   PUT /api/auth/profile
-// @access  Private
+// @desc Update user profile
+// @route PUT /api/auth/profile
+// @access Private
 exports.updateProfile = async (req, res) => {
 	try {
 		const user = await User.findById(req.user._id);

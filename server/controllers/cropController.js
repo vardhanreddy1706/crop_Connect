@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Crop = require("../models/Crop");
 
 // @desc    Create new crop listing
@@ -63,6 +64,13 @@ exports.getAllCrops = async (req, res) => {
 // @access  Public
 exports.getCropById = async (req, res) => {
 	try {
+		if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+			return res.status(400).json({
+				success: false,
+				message: "Invalid crop ID format",
+			});
+		}
+
 		const crop = await Crop.findById(req.params.id).populate(
 			"seller",
 			"name phone email address"

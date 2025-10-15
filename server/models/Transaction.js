@@ -10,12 +10,17 @@ const transactionSchema = new mongoose.Schema(
 		farmerId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
-			required: true,
+			// ✅ REMOVE required: true (make it optional)
 		},
 		tractorOwnerId: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
-			required: true,
+			// ✅ REMOVE required: true (make it optional)
+		},
+		workerId: {
+			// ✅ ADD THIS FIELD
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
 		},
 		amount: {
 			type: Number,
@@ -54,6 +59,7 @@ const transactionSchema = new mongoose.Schema(
 // Indexes
 transactionSchema.index({ farmerId: 1, status: 1 });
 transactionSchema.index({ tractorOwnerId: 1, status: 1 });
+transactionSchema.index({ workerId: 1, status: 1 }); // ✅ ADD THIS
 transactionSchema.index({ bookingId: 1 });
 
 module.exports = mongoose.model("Transaction", transactionSchema);
