@@ -15,11 +15,16 @@ const workerHireRequestSchema = new mongoose.Schema(
 		workerService: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "WorkerService",
-			required: true,
+			required: false, // ✅ CHANGED - Not always required when applying from requirement
+		},
+		requirementId: {
+			// ✅ ADD THIS - Link to the requirement
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "WorkerRequirement",
 		},
 		requestType: {
 			type: String,
-			enum: ["farmer_to_worker", "worker_to_farmer"], // ✅ Track who initiated
+			enum: ["farmer_to_worker", "worker_to_farmer"],
 			required: true,
 		},
 		status: {
@@ -29,7 +34,7 @@ const workerHireRequestSchema = new mongoose.Schema(
 		},
 		workDetails: {
 			startDate: Date,
-			duration: Number,
+			duration: String, // ✅ CHANGED FROM Number TO String - supports "1 day", "3 days", etc.
 			workDescription: String,
 			location: {
 				village: String,
@@ -52,7 +57,7 @@ const workerHireRequestSchema = new mongoose.Schema(
 	{ timestamps: true }
 );
 
-// ✅ Index for faster queries
+// Index for faster queries
 workerHireRequestSchema.index({ farmer: 1, status: 1 });
 workerHireRequestSchema.index({ worker: 1, status: 1 });
 workerHireRequestSchema.index({ workerService: 1 });

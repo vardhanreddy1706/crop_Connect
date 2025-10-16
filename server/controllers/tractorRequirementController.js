@@ -3,32 +3,29 @@ const TractorService = require("../models/TractorService");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const Booking = require("../models/Booking");
-const NotificationService = require("../services/notificationService");
 
-// ==================== EXISTING FUNCTIONS (ENHANCED) ====================
+// ✅ REMOVED: const NotificationService = require("../services/notificationService");
 
-// @desc    Create tractor requirement (ENHANCED with auto-notification)
-// @route   POST /api/tractor-requirements
-// @access  Private (Farmer)
+// @desc Create tractor requirement (ENHANCED with auto-notification)
+// @route POST /api/tractor-requirements
+// @access Private (Farmer)
 exports.createTractorRequirement = async (req, res) => {
 	try {
 		const tractorRequirement = await TractorRequirement.create({
 			...req.body,
 			farmer: req.user._id,
 		});
-		        await NotificationService.notifyTractorRequirementPosted(
-							req.user,
-							requirement
-						);
 
+		// ✅ REMOVED INVALID CALL:
+		// await NotificationService.notifyTractorRequirementPosted(req.user, requirement);
 
-		// 🆕 NEW: Find all tractor owners in the same district/state
+		// Find all tractor owners in the same district/state
 		const nearbyTractorOwners = await User.find({
 			role: "tractor_owner",
 			"address.district": { $regex: req.body.location.district, $options: "i" },
 		}).select("_id name");
 
-		// 🆕 NEW: Create notifications for all nearby tractor owners
+		// Create notifications for all nearby tractor owners
 		const notifications = nearbyTractorOwners.map((owner) => ({
 			recipientId: owner._id,
 			type: "new_requirement",
@@ -53,7 +50,7 @@ exports.createTractorRequirement = async (req, res) => {
 			await Notification.insertMany(notifications);
 		}
 
-		// 🆕 NEW: Real-time notification via WebSocket
+		// Real-time notification via WebSocket
 		if (req.io && nearbyTractorOwners.length > 0) {
 			nearbyTractorOwners.forEach((owner) => {
 				req.io.to(owner._id.toString()).emit("notification", {
@@ -70,9 +67,10 @@ exports.createTractorRequirement = async (req, res) => {
 			success: true,
 			message: "Tractor requirement posted successfully",
 			tractorRequirement,
-			notifiedOwners: nearbyTractorOwners.length, // Shows how many owners were notified
+			notifiedOwners: nearbyTractorOwners.length,
 		});
 	} catch (error) {
+		console.error("Create requirement error:", error); // ✅ Added logging
 		res.status(500).json({
 			success: false,
 			message: error.message,
@@ -86,7 +84,6 @@ exports.createTractorRequirement = async (req, res) => {
 exports.getAllTractorRequirements = async (req, res) => {
 	try {
 		const { workType, landType, district, state, urgency, status } = req.query;
-
 		let query = {};
 
 		if (workType) query.workType = workType;
@@ -95,12 +92,12 @@ exports.getAllTractorRequirements = async (req, res) => {
 		if (state) query["location.state"] = new RegExp(state, "i");
 		if (urgency) query.urgency = urgency;
 		if (status) query.status = status;
-		else query.status = "open"; // Default show only open requirements
+		else query.status = "open";
 
 		const tractorRequirements = await TractorRequirement.find(query)
 			.populate("farmer", "name phone email address")
-			.populate("acceptedBy", "name phone email") // ✅ FIXED - removed acceptedResponse
-			.populate("responses.tractorOwner", "name phone email") // ✅ Correct nested path
+			.populate("acceptedBy", "name phone email")
+			.populate("responses.tractorOwner", "name phone email")
 			.sort({ createdAt: -1 })
 			.lean();
 
@@ -124,8 +121,8 @@ exports.getTractorRequirementById = async (req, res) => {
 	try {
 		const tractorRequirement = await TractorRequirement.findById(req.params.id)
 			.populate("farmer", "name phone email address")
-			.populate("acceptedBy", "name phone email") // ✅ FIXED
-			.populate("responses.tractorOwner", "name phone email"); // ✅ FIXED
+			.populate("acceptedBy", "name phone email")
+			.populate("responses.tractorOwner", "name phone email");
 
 		if (!tractorRequirement) {
 			return res.status(404).json({
@@ -155,8 +152,8 @@ exports.getMyTractorRequirements = async (req, res) => {
 		const tractorRequirements = await TractorRequirement.find({
 			farmer: req.user._id,
 		})
-			.populate("acceptedBy", "name phone email") // ✅ FIXED
-			.populate("responses.tractorOwner", "name phone email") // ✅ FIXED
+			.populate("acceptedBy", "name phone email")
+			.populate("responses.tractorOwner", "name phone email")
 			.sort({ createdAt: -1 })
 			.lean();
 
@@ -173,9 +170,9 @@ exports.getMyTractorRequirements = async (req, res) => {
 	}
 };
 
-// @desc    Update tractor requirement
-// @route   PUT /api/tractor-requirements/:id
-// @access  Private (Farmer - Owner only)
+// @desc Update tractor requirement
+// @route PUT /api/tractor-requirements/:id
+// @access Private (Farmer - Owner only)
 exports.updateTractorRequirement = async (req, res) => {
 	try {
 		let tractorRequirement = await TractorRequirement.findById(req.params.id);
@@ -187,7 +184,6 @@ exports.updateTractorRequirement = async (req, res) => {
 			});
 		}
 
-		// Check ownership
 		if (tractorRequirement.farmer.toString() !== req.user._id.toString()) {
 			return res.status(403).json({
 				success: false,
@@ -207,7 +203,7 @@ exports.updateTractorRequirement = async (req, res) => {
 		res.status(200).json({
 			success: true,
 			message: "Requirement updated successfully",
-			tractorRequirement, // Changed from 'requirement'
+			tractorRequirement,
 		});
 	} catch (error) {
 		res.status(500).json({
@@ -217,9 +213,9 @@ exports.updateTractorRequirement = async (req, res) => {
 	}
 };
 
-// @desc    Delete tractor requirement
-// @route   DELETE /api/tractor-requirements/:id
-// @access  Private (Farmer - Owner only)
+// @desc Delete tractor requirement
+// @route DELETE /api/tractor-requirements/:id
+// @access Private (Farmer - Owner only)
 exports.deleteTractorRequirement = async (req, res) => {
 	try {
 		const tractorRequirement = await TractorRequirement.findById(req.params.id);
@@ -231,7 +227,6 @@ exports.deleteTractorRequirement = async (req, res) => {
 			});
 		}
 
-		// Check ownership
 		if (tractorRequirement.farmer.toString() !== req.user._id.toString()) {
 			return res.status(403).json({
 				success: false,
@@ -253,9 +248,9 @@ exports.deleteTractorRequirement = async (req, res) => {
 	}
 };
 
-// @desc    Respond to tractor requirement (Tractor Owner places bid)
-// @route   POST /api/tractor-requirements/:id/respond
-// @access  Private (Tractor Owner)
+// @desc Respond to tractor requirement (Tractor Owner places bid)
+// @route POST /api/tractor-requirements/:id/respond
+// @access Private (Tractor Owner)
 exports.respondToRequirement = async (req, res) => {
 	try {
 		const { message, quotedPrice, contactNumber, estimatedDuration, notes } =
@@ -279,7 +274,6 @@ exports.respondToRequirement = async (req, res) => {
 			});
 		}
 
-		// Check if already responded
 		const alreadyResponded = tractorRequirement.responses.some(
 			(response) => response.tractorOwner.toString() === req.user._id.toString()
 		);
@@ -291,7 +285,6 @@ exports.respondToRequirement = async (req, res) => {
 			});
 		}
 
-		// Add response (bid)
 		tractorRequirement.responses.push({
 			tractorOwner: req.user._id,
 			message: message || notes || "",
@@ -303,7 +296,6 @@ exports.respondToRequirement = async (req, res) => {
 
 		await tractorRequirement.save();
 
-		// Get tractor service details
 		const tractorService = await TractorService.findOne({
 			owner: req.user._id,
 		}).select("brand model vehicleNumber chargePerAcre rating");
@@ -312,7 +304,6 @@ exports.respondToRequirement = async (req, res) => {
 			"name phone address profileImage"
 		);
 
-		// Create notification for farmer
 		await Notification.create({
 			recipientId: tractorRequirement.farmer._id,
 			type: "bid_placed",
@@ -331,7 +322,6 @@ exports.respondToRequirement = async (req, res) => {
 			},
 		});
 
-		// 🆕 NEW: Real-time notification to farmer
 		if (req.io) {
 			req.io.to(tractorRequirement.farmer._id.toString()).emit("notification", {
 				type: "bid_placed",
@@ -359,117 +349,109 @@ exports.respondToRequirement = async (req, res) => {
 // @route POST /api/tractor-requirements/:id/accept
 // @access Private (Tractor Owner)
 exports.acceptRequirement = async (req, res) => {
-  try {
-    const requirement = await TractorRequirement.findById(req.params.id)
-      .populate("farmer", "name phone email");
+	try {
+		const requirement = await TractorRequirement.findById(
+			req.params.id
+		).populate("farmer", "name phone email");
 
-    if (!requirement) {
-      return res.status(404).json({
-        success: false,
-        message: "Tractor requirement not found",
-      });
-    }
+		if (!requirement) {
+			return res.status(404).json({
+				success: false,
+				message: "Tractor requirement not found",
+			});
+		}
 
-    console.log("Requirement status:", requirement.status);
-    console.log("Accepted by:", requirement.acceptedBy);
+		if (requirement.acceptedBy) {
+			const acceptedUser = await User.findById(requirement.acceptedBy);
+			return res.status(400).json({
+				success: false,
+				message: `This requirement has already been accepted by ${
+					acceptedUser?.name || "another tractor owner"
+				}`,
+			});
+		}
 
-    // ✅ FIXED - Only check if already accepted by someone
-    if (requirement.acceptedBy) {
-      const acceptedUser = await User.findById(requirement.acceptedBy);
-      return res.status(400).json({
-        success: false,
-        message: `This requirement has already been accepted by ${acceptedUser?.name || 'another tractor owner'}`,
-      });
-    }
+		const tractorService = await TractorService.findOne({
+			owner: req.user._id,
+		});
 
-    // Get tractor service
-    const tractorService = await TractorService.findOne({
-      owner: req.user._id,
-    });
+		if (!tractorService) {
+			return res.status(400).json({
+				success: false,
+				message: "Please create a tractor service first",
+			});
+		}
 
-    if (!tractorService) {
-      return res.status(400).json({
-        success: false,
-        message: "Please create a tractor service first",
-      });
-    }
+		let durationHours = 8;
+		if (requirement.duration) {
+			const match = requirement.duration.match(/(\d+)/);
+			if (match) {
+				durationHours = parseInt(match[1]);
+			}
+		}
 
-    // Parse duration
-    let durationHours = 8;
-    if (requirement.duration) {
-      const match = requirement.duration.match(/(\d+)/);
-      if (match) {
-        durationHours = parseInt(match[1]);
-      }
-    }
+		const costPerAcre =
+			tractorService.chargePerAcre ||
+			requirement.maxBudget / requirement.landSize;
+		const totalCost = Math.round(costPerAcre * requirement.landSize);
 
-    // Calculate cost
-    const costPerAcre = tractorService.chargePerAcre || (requirement.maxBudget / requirement.landSize);
-    const totalCost = Math.round(costPerAcre * requirement.landSize);
+		const booking = await Booking.create({
+			farmer: requirement.farmer._id,
+			tractorOwnerId: req.user._id,
+			serviceType: "tractor",
+			serviceId: tractorService._id,
+			serviceModel: "TractorService",
+			bookingDate: requirement.expectedDate,
+			duration: durationHours,
+			totalCost: totalCost,
+			location: requirement.location,
+			workType: requirement.workType,
+			landSize: requirement.landSize,
+			status: "confirmed",
+			paymentStatus: "pending",
+			notes: `Booking created from requirement. Work: ${requirement.workType}, Land: ${requirement.landSize} acres`,
+		});
 
-    // Create booking
-    const booking = await Booking.create({
-      farmer: requirement.farmer._id,
-      tractorOwnerId: req.user._id,
-      serviceType: "tractor",
-      serviceId: tractorService._id,
-      serviceModel: "TractorService",
-      bookingDate: requirement.expectedDate,
-      duration: durationHours,
-      totalCost: totalCost,
-      location: requirement.location,
-      workType: requirement.workType,
-      landSize: requirement.landSize,
-      status: "confirmed",
-      paymentStatus: "pending",
-      notes: `Booking created from requirement. Work: ${requirement.workType}, Land: ${requirement.landSize} acres`,
-    });
+		requirement.status = "in_progress";
+		requirement.acceptedBy = req.user._id;
+		requirement.acceptedAt = new Date();
+		await requirement.save();
 
-    // Update requirement
-    requirement.status = "in_progress";
-    requirement.acceptedBy = req.user._id;
-    requirement.acceptedAt = new Date();
-    await requirement.save();
+		await requirement.populate("farmer", "name phone email");
 
-    // Populate farmer details for response
-    await requirement.populate("farmer", "name phone email");
+		try {
+			await Notification.create({
+				recipientId: requirement.farmer._id,
+				type: "requirement_accepted",
+				title: "🎉 Requirement Accepted!",
+				message: `${req.user.name} has accepted your ${requirement.workType} request`,
+				relatedUserId: req.user._id,
+				relatedRequirementId: requirement._id,
+				data: {
+					bookingId: booking._id,
+					tractorOwner: req.user.name,
+					workType: requirement.workType,
+					totalCost,
+				},
+			});
+		} catch (notifError) {
+			console.error("Notification creation error:", notifError);
+		}
 
-    // Create notification
-    try {
-      await Notification.create({
-        recipientId: requirement.farmer._id,
-        type: "requirement_accepted",
-        title: "🎉 Requirement Accepted!",
-        message: `${req.user.name} has accepted your ${requirement.workType} request`,
-        relatedUserId: req.user._id,
-        relatedRequirementId: requirement._id,
-        data: {
-          bookingId: booking._id,
-          tractorOwner: req.user.name,
-          workType: requirement.workType,
-          totalCost,
-        },
-      });
-    } catch (notifError) {
-      console.error("Notification creation error:", notifError);
-      // Don't fail the accept if notification fails
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Requirement accepted successfully",
-      booking,
-      requirement,
-    });
-  } catch (error) {
-    console.error("Accept requirement error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to accept requirement",
-    });
-  }
+		res.status(200).json({
+			success: true,
+			message: "Requirement accepted successfully",
+			booking,
+			requirement,
+		});
+	} catch (error) {
+		console.error("Accept requirement error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message || "Failed to accept requirement",
+		});
+	}
 };
-
 
 // @desc Complete work (Tractor Owner marks work as done)
 // @route POST /api/tractor-requirements/:id/complete
@@ -492,12 +474,10 @@ exports.completeWork = async (req, res) => {
 			});
 		}
 
-		// Update requirement
 		requirement.status = "completed";
 		requirement.completedAt = new Date();
 		await requirement.save();
 
-		// Update booking
 		const booking = await Booking.findOne({
 			serviceId: requirement.acceptedBy,
 			farmer: requirement.farmer,
@@ -509,7 +489,6 @@ exports.completeWork = async (req, res) => {
 			await booking.save();
 		}
 
-		// Notify farmer
 		await Notification.create({
 			recipientId: requirement.farmer,
 			type: "work_completed",

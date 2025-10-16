@@ -31,6 +31,11 @@ const cropSchema = new mongoose.Schema(
 			enum: ["kg", "quintal", "ton"],
 			default: "quintal",
 		},
+		farmer: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+			required: true, // ✅ This is the seller
+		},
 		pricePerUnit: {
 			type: Number,
 			required: [true, "Please provide price per unit"],
@@ -45,7 +50,7 @@ const cropSchema = new mongoose.Schema(
 		harvestDate: {
 			type: Date,
 		},
-		
+
 		description: {
 			type: String,
 			maxlength: 500,
@@ -60,7 +65,6 @@ const cropSchema = new mongoose.Schema(
 			enum: ["available", "sold", "pending"],
 			default: "available",
 		},
-		
 	},
 	{
 		timestamps: true,

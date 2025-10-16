@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const bookingSchema = new mongoose.Schema(
+const BookingSchema = new mongoose.Schema(
 	{
 		farmer: {
 			type: mongoose.Schema.Types.ObjectId,
@@ -19,13 +19,13 @@ const bookingSchema = new mongoose.Schema(
 		},
 		serviceId: {
 			type: mongoose.Schema.Types.ObjectId,
-			required: true,
 			refPath: "serviceModel",
+			required: false, // ✅ CHANGED: Make optional for worker applications
 		},
 		serviceModel: {
 			type: String,
-			required: true,
 			enum: ["TractorService", "WorkerService"],
+			required: false, // ✅ CHANGED: Make optional
 		},
 		bookingDate: {
 			type: Date,
@@ -34,80 +34,45 @@ const bookingSchema = new mongoose.Schema(
 		duration: {
 			type: Number,
 			required: true,
-			min: 1,
 		},
 		totalCost: {
 			type: Number,
 			required: true,
-			min: 0,
 		},
 		location: {
-			village: String,
 			district: String,
 			state: String,
 			pincode: String,
 		},
-		workType: {
-			type: String,
-		},
-		landSize: {
-			type: Number,
-			min: 0,
-		},
+		workType: String,
 		status: {
 			type: String,
 			enum: ["pending", "confirmed", "in_progress", "completed", "cancelled"],
 			default: "confirmed",
 		},
-		// Add to existing Booking schema
-		bidId: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: "Bid",
-		},
-		workCompletedAt: {
-			type: Date,
-		},
-		workStatus: {
-			type: String,
-			enum: ["pending", "in_progress", "completed", "cancelled"],
-			default: "pending",
-		},
 		paymentStatus: {
 			type: String,
-			enum: ["pending", "paid", "failed", "refunded"],
+			enum: ["pending", "paid", "refunded"],
 			default: "pending",
 		},
-		paymentMethod: {
-			type: String,
-			enum: ["pay_now", "pay_after_work"],
+		paymentCompleted: {
+			type: Boolean,
+			default: false,
 		},
-		razorpayOrderId: {
-			type: String,
+		hireRequestId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "WorkerHireRequest",
 		},
-		razorpayPaymentId: {
-			type: String,
+		requirementId: {
+			// ✅ ADD THIS - Link to WorkerRequirement
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "WorkerRequirement",
 		},
-		razorpaySignature: {
-			type: String,
-		},
-		paidAt: {
-			type: Date,
-		},
-		workCompletedAt: {
-			type: Date,
-		},
-		notes: {
-			type: String,
-		},
+		notes: String,
 	},
 	{
 		timestamps: true,
 	}
 );
 
-// Indexes for faster queries
-bookingSchema.index({ farmer: 1, status: 1 });
-bookingSchema.index({ tractorOwnerId: 1, status: 1 });
-bookingSchema.index({ paymentStatus: 1 });
-
-module.exports = mongoose.model("Booking", bookingSchema);
+module.exports = mongoose.model("Booking", BookingSchema);

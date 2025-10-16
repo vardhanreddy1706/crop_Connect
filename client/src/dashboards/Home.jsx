@@ -87,7 +87,7 @@ export default function FarmerDashboard() {
 								Products
 							</Link>
 							<Link
-								to="/crops"
+								to="/farmer/orders"
 								className="text-gray-500 text-base font-medium hover:text-gray-900 hover:border-b-2 hover:border-green-600 pb-1 transition-all"
 							>
 								Crops
@@ -286,8 +286,6 @@ export default function FarmerDashboard() {
 												/>
 											</svg>
 										</Link>
-
-										
 									</div>
 								</div>
 							</div>

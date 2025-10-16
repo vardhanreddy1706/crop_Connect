@@ -1,36 +1,20 @@
 const express = require("express");
 const router = express.Router();
-
+const { protect } = require("../middlewares/authMiddleware");
 const {
 	createWorkerRequirement,
 	getAllWorkerRequirements,
-	getMyRequirements,
-	applyForRequirement,
-	updateWorkerRequirement,
+	getMyWorkerRequirements,
 	deleteWorkerRequirement,
+	applyForRequirement,
+	getWorkerApplications, // ✅ NEW
 } = require("../controllers/WorkerRequirementController");
 
-const { protect } = require("../middlewares/authMiddleware");
-
-// Farmer creates requirement
 router.post("/", protect, createWorkerRequirement);
-
-// ✅ ADD THIS NEW ROUTE - Get all requirements (for workers to browse)
-router.get("/available", getAllWorkerRequirements);
-
-// Get all requirements (public/workers can see)
-router.get("/", getAllWorkerRequirements);
-
-// Get farmer's own requirements
-router.get("/my-requirements", protect, getMyRequirements);
-
-// Worker applies to requirement
-router.post("/:id/apply", protect, applyForRequirement);
-
-// Update requirement
-router.put("/:id", protect, updateWorkerRequirement);
-
-// Delete requirement
+router.get("/", protect, getAllWorkerRequirements);
+router.get("/my-requirements", protect, getMyWorkerRequirements);
+router.get("/applications", protect, getWorkerApplications); // ✅ NEW - Must be before /:id
 router.delete("/:id", protect, deleteWorkerRequirement);
+router.post("/:id/apply", protect, applyForRequirement);
 
 module.exports = router;

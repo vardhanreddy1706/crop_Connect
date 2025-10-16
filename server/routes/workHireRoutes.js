@@ -1,77 +1,70 @@
 const express = require("express");
 const router = express.Router();
+const { protect, authorize } = require("../middlewares/authMiddleware");
 const {
-	farmerHiresWorker,
-	workerAcceptHire,
-	workerRejectHire,
-	workerAppliesForJob,
-	farmerAcceptApplication,
-	farmerRejectApplication,
+	createHireRequest,
 	getWorkerHireRequests,
 	getFarmerHireRequests,
-	getWorkerApplications,
+	acceptWorkerApplication,
+	rejectWorkerApplication,
+	workerAcceptHireRequest,
+	workerRejectHireRequest,
+	farmerHiresWorker, // ✅ ADD THIS (it's an alias)
 } = require("../controllers/WorkerHireController");
-const { protect, authorize } = require("../middlewares/authMiddleware");
 
 // ==========================================
-// SCENARIO 1: FARMER HIRES WORKER
+// FARMER ROUTES - Accept/Reject Applications
 // ==========================================
-router.post("/hire-worker", protect, authorize("farmer"), farmerHiresWorker);
-router.post(
-	"/:id/worker-accept",
-	protect,
-	authorize("worker"),
-	workerAcceptHire
-);
-router.post(
-	"/:id/worker-reject",
-	protect,
-	authorize("worker"),
-	workerRejectHire
-);
-
-// ==========================================
-// SCENARIO 2: WORKER APPLIES FOR JOB
-// ==========================================
-router.post(
-	"/apply-for-job",
-	protect,
-	authorize("worker"),
-	workerAppliesForJob
-);
 router.post(
 	"/:id/farmer-accept",
 	protect,
 	authorize("farmer"),
-	farmerAcceptApplication
+	acceptWorkerApplication
 );
 router.post(
 	"/:id/farmer-reject",
 	protect,
 	authorize("farmer"),
-	farmerRejectApplication
+	rejectWorkerApplication
 );
 
-// ==========================================
-// COMMON: GET REQUESTS
-// ==========================================
-router.get(
-	"/worker-requests",
-	protect,
-	authorize("worker"),
-	getWorkerHireRequests
-);
+// Get farmer's hire requests
 router.get(
 	"/farmer-requests",
 	protect,
 	authorize("farmer"),
 	getFarmerHireRequests
 );
-router.get(
-	"/worker-applications",
+
+// Create hire request (farmer hires worker from Browse Workers)
+router.post("/create", protect, authorize("farmer"), createHireRequest);
+
+// ==========================================
+// WORKER ROUTES - Accept/Reject Hire Requests
+// ==========================================
+router.post(
+	"/:id/worker-accept",
 	protect,
-	getWorkerApplications
+	authorize("worker"),
+	workerAcceptHireRequest
 );
+router.post(
+	"/:id/worker-reject",
+	protect,
+	authorize("worker"),
+	workerRejectHireRequest
+);
+
+// Get worker's hire requests
+router.get(
+	"/worker-requests",
+	protect,
+	authorize("worker"),
+	getWorkerHireRequests
+);
+
+router.post("/hire-worker", protect, authorize("farmer"), farmerHiresWorker);
+
 
 
 module.exports = router;

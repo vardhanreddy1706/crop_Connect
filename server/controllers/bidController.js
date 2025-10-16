@@ -4,9 +4,9 @@ const Booking = require("../models/Booking");
 const Notification = require("../models/Notification");
 const TractorService = require("../models/TractorService");
 
-// @desc    Place a bid on a tractor requirement
-// @route   POST /api/bids
-// @access  Private (Tractor Owner)
+// @desc Place a bid on a tractor requirement
+// @route POST /api/bids
+// @access Private (Tractor Owner)
 exports.placeBid = async (req, res) => {
 	try {
 		const {
@@ -15,15 +15,7 @@ exports.placeBid = async (req, res) => {
 			proposedDuration,
 			proposedDate,
 			message,
-        } = req.body;
-        
-                await NotificationService.notifyBidPlaced(
-									farmer,
-									tractorOwner,
-									requirement,
-									bidData
-								);
-
+		} = req.body;
 
 		// Check if requirement exists
 		const requirement = await TractorRequirement.findById(
@@ -97,9 +89,9 @@ exports.placeBid = async (req, res) => {
 	}
 };
 
-// @desc    Get bids for a farmer (on their requirements)
-// @route   GET /api/bids/farmer
-// @access  Private (Farmer)
+// @desc Get bids for a farmer (on their requirements)
+// @route GET /api/bids/farmer
+// @access Private (Farmer)
 exports.getFarmerBids = async (req, res) => {
 	try {
 		// Find all requirements by this farmer
@@ -132,9 +124,9 @@ exports.getFarmerBids = async (req, res) => {
 	}
 };
 
-// @desc    Get bids placed by tractor owner
-// @route   GET /api/bids/tractor-owner
-// @access  Private (Tractor Owner)
+// @desc Get bids placed by tractor owner
+// @route GET /api/bids/tractor-owner
+// @access Private (Tractor Owner)
 exports.getTractorOwnerBids = async (req, res) => {
 	try {
 		const bids = await Bid.find({
@@ -168,27 +160,21 @@ exports.getTractorOwnerBids = async (req, res) => {
 	}
 };
 
-// @desc    Accept a bid (Farmer)
-// @route   POST /api/bids/:id/accept
-// @access  Private (Farmer)
+// @desc Accept a bid (Farmer)
+// @route POST /api/bids/:id/accept
+// @access Private (Farmer)
 exports.acceptBid = async (req, res) => {
 	try {
 		const bid = await Bid.findById(req.params.id)
 			.populate("tractorOwnerId", "name phone email")
 			.populate("requirementId");
 
-        
 		if (!bid) {
 			return res.status(404).json({
 				success: false,
 				message: "Bid not found",
 			});
 		}
-
-                await NotificationService.notifyBidAccepted(
-									tractorOwner,
-									booking
-								);
 
 		// Check if user is the farmer who posted the requirement
 		if (bid.requirementId.farmer.toString() !== req.user._id.toString()) {
@@ -278,9 +264,9 @@ exports.acceptBid = async (req, res) => {
 	}
 };
 
-// @desc    Reject a bid (Farmer)
-// @route   POST /api/bids/:id/reject
-// @access  Private (Farmer)
+// @desc Reject a bid (Farmer)
+// @route POST /api/bids/:id/reject
+// @access Private (Farmer)
 exports.rejectBid = async (req, res) => {
 	try {
 		const bid = await Bid.findById(req.params.id).populate("requirementId");
@@ -332,5 +318,3 @@ exports.rejectBid = async (req, res) => {
 		});
 	}
 };
-
-

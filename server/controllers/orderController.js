@@ -1,221 +1,335 @@
-// server/controllers/orderController.js
 const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Crop = require("../models/Crop");
-const User = require("../models/User");
-const createNotification = require("../middlewares/createNotification");
+const Notification = require("../models/Notification");
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
 
-// @desc    Get user's orders
-// @route   GET /api/orders/my-orders
-// @access  Private
-exports.getMyOrders = async (req, res) => {
+// Initialize Razorpay
+const razorpay = new Razorpay({
+	key_id: process.env.RAZORPAY_KEY_ID,
+	key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+// @desc Create Razorpay order
+// @route POST /api/orders/create-razorpay-order
+// @access Private (Buyer)
+exports.createRazorpayOrder = async (req, res) => {
 	try {
-		const orders = await Order.find({ user: req.user._id })
-			.sort({ createdAt: -1 })
-			.lean();
+		const { amount, currency = "INR" } = req.body;
 
-		// Transform orders to match frontend
-		const transformedOrders = orders.map((order) => ({
-			_id: order._id,
-			items: order.items.map((item) => ({
-				name: item.name,
-				quantity: item.quantity,
-				price: item.price,
-			})),
-			totalAmount: order.totalAmount,
-			status: order.status,
-			paymentStatus: order.paymentStatus,
-			createdAt: order.createdAt,
-		}));
+		const options = {
+			amount: amount * 100, // Convert to paise
+			currency,
+			receipt: `order_${Date.now()}`,
+		};
+
+		const razorpayOrder = await razorpay.orders.create(options);
 
 		res.status(200).json({
 			success: true,
-			orders: transformedOrders,
+			order: razorpayOrder,
 		});
 	} catch (error) {
-		console.error("Get orders error:", error);
+		console.error("Razorpay order creation error:", error);
 		res.status(500).json({
 			success: false,
-			message: "Server Error",
+			message: error.message,
+		});
+	}
+};
+// ✅ FIXED: Create order with correct payment method handling
+exports.createOrder = async (req, res) => {
+    try {
+        const {
+            items,
+            totalAmount,
+            paymentMethod,
+            vehicleDetails,
+            pickupSchedule,
+            deliveryAddress,
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+        } = req.body;
+
+        // Validate required fields
+        if (!items || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "No items in order",
+            });
+        }
+
+        if (!deliveryAddress || !deliveryAddress.fullAddress) {
+            return res.status(400).json({
+                success: false,
+                message: "Delivery address is required",
+            });
+        }
+
+        console.log("Creating order with payment method:", paymentMethod); // Debug
+
+        // Get seller from first crop
+        const Crop = require("../models/Crop");
+        const firstCrop = await Crop.findById(items[0].crop).select("seller");
+
+        if (!firstCrop || !firstCrop.seller) {
+            return res.status(404).json({
+                success: false,
+                message: "Seller information not found",
+            });
+        }
+
+        // ✅ Determine payment status based on method
+        let paymentStatus = "pending";
+        if (paymentMethod === "razorpay" && razorpayPaymentId) {
+            paymentStatus = "completed";
+        } else if (paymentMethod === "payAfterDelivery") {
+            paymentStatus = "pending"; // Will be paid on delivery
+        }
+
+        // Create order
+        const order = new Order({
+            buyer: req.user._id || req.user.id,
+            seller: firstCrop.seller,
+            items: items.map(item => ({
+                crop: item.crop,
+                quantity: item.quantity,
+                pricePerUnit: item.pricePerUnit,
+                total: item.total,
+            })),
+            totalAmount,
+            paymentMethod: paymentMethod || "razorpay", // ✅ Use camelCase
+            paymentStatus,
+            vehicleDetails,
+            pickupSchedule,
+            deliveryAddress: {
+                village: deliveryAddress.village || "",
+                district: deliveryAddress.district || "",
+                state: deliveryAddress.state || "",
+                pincode: deliveryAddress.pincode || "",
+                fullAddress: deliveryAddress.fullAddress,
+            },
+            razorpayOrderId,
+            razorpayPaymentId,
+            razorpaySignature,
+        });
+
+        await order.save();
+
+        console.log("Order created successfully:", order._id);
+
+        // Update crop quantities
+        for (const item of items) {
+            await Crop.findByIdAndUpdate(item.crop, {
+                $inc: { quantity: -item.quantity },
+            });
+        }
+
+        // Clear buyer's cart
+        const Cart = require("../models/Cart");
+        await Cart.findOneAndUpdate(
+            { user: req.user._id || req.user.id },
+            { items: [] }
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: "Order created successfully",
+            order,
+        });
+    } catch (error) {
+        console.error("Create order error:", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Failed to create order",
+        });
+    }
+};
+
+// @desc Get buyer's orders
+// @route GET /api/orders/buyer
+// @access Private (Buyer)
+exports.getBuyerOrders = async (req, res) => {
+	try {
+		const orders = await Order.find({ buyer: req.user._id })
+			.populate("seller", "name phone email")
+			.populate("items.crop")
+			.sort({ createdAt: -1 });
+
+		res.status(200).json({
+			success: true,
+			orders,
+		});
+	} catch (error) {
+		console.error("Get buyer orders error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message,
 		});
 	}
 };
 
-// @desc    Cancel order
-// @route   PUT /api/orders/:orderId/cancel
-// @access  Private
-exports.cancelOrder = async (req, res) => {
-	// Start a session for transaction
-	const session = await Order.startSession();
-
+// @desc Get seller's orders
+// @route GET /api/orders/seller
+// @access Private (Farmer)
+exports.getSellerOrders = async (req, res) => {
 	try {
-		await session.withTransaction(async () => {
-			const order = await Order.findOne({
-				_id: req.params.orderId,
-				user: req.user._id,
-			}).session(session);
+		const orders = await Order.find({ seller: req.user._id })
+			.populate("buyer", "name phone email")
+			.populate("items.crop")
+			.sort({ createdAt: -1 });
 
-			if (!order) {
-				throw new Error("Order not found");
-			}
+		res.status(200).json({
+			success: true,
+			orders,
+		});
+	} catch (error) {
+		console.error("Get seller orders error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
 
-			// Check if order can be cancelled
-			if (!["pending", "processing"].includes(order.status)) {
-				throw new Error("Order cannot be cancelled in current status");
-			}
+// @desc Update order status
+// @route PUT /api/orders/:id/status
+// @access Private
+exports.updateOrderStatus = async (req, res) => {
+	try {
+		const { status } = req.body;
+		const order = await Order.findById(req.params.id);
 
-			// Get user document
-			const user = await User.findById(req.user._id).session(session);
-			if (!user) {
-				throw new Error("User not found");
-			}
+		if (!order) {
+			return res.status(404).json({
+				success: false,
+				message: "Order not found",
+			});
+		}
 
-			// Only update totalSpent if the order is not already cancelled
-			if (order.status !== "cancelled") {
-				user.totalSpent = Math.max(
-					0,
-					(user.totalSpent || 0) - order.totalAmount
-				);
-				await user.save({ session });
-			}
+		// Authorization check
+		const isBuyer = order.buyer.toString() === req.user._id.toString();
+		const isSeller = order.seller.toString() === req.user._id.toString();
 
-			// Update order status
-			order.status = "cancelled";
-			await order.save({ session });
+		if (!isBuyer && !isSeller) {
+			return res.status(403).json({
+				success: false,
+				message: "Not authorized",
+			});
+		}
 
-			// Create notification
-			try {
-				// Pass the notification creation as a promise to be handled within the transaction
-				await Promise.resolve().then(async () => {
-					await createNotification({
-						userId: order.user,
-						message: `Order #${order._id} has been cancelled`,
-						type: "order_cancelled",
-						orderId: order._id,
-					});
-				});
-			} catch (notifError) {
-				console.error("Notification error:", notifError);
-				// Don't throw the error, just log it
-			}
+		// Update status
+		order.status = status;
+		order.statusTimestamps[status] = new Date();
+		await order.save();
+
+		// Notify relevant party
+		const notifyId = isBuyer ? order.seller : order.buyer;
+		const statusMessages = {
+			confirmed: "✅ Order Confirmed!",
+			picked: "🚚 Order Picked Up!",
+			completed: "✨ Order Completed!",
+			cancelled: "❌ Order Cancelled",
+		};
+
+		await Notification.create({
+			recipientId: notifyId,
+			type: "order_status_update",
+			title: statusMessages[status] || "Order Status Updated",
+			message: `Order #${order._id
+				.toString()
+				.substring(0, 8)} is now ${status}`,
+			relatedUserId: req.user._id,
+			data: {
+				orderId: order._id,
+				status,
+			},
 		});
 
-		// Send success response after transaction completes
-		return res.json({
+		res.status(200).json({
+			success: true,
+			message: "Order status updated",
+			order,
+		});
+	} catch (error) {
+		console.error("Update order status error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message,
+		});
+	}
+};
+
+// @desc Cancel order
+// @route PUT /api/orders/:id/cancel
+// @access Private (Buyer)
+exports.cancelOrder = async (req, res) => {
+	try {
+		const { reason } = req.body;
+		const order = await Order.findById(req.params.id).populate("items.crop");
+
+		if (!order) {
+			return res.status(404).json({
+				success: false,
+				message: "Order not found",
+			});
+		}
+
+		if (order.buyer.toString() !== req.user._id.toString()) {
+			return res.status(403).json({
+				success: false,
+				message: "Not authorized",
+			});
+		}
+
+		if (order.status === "picked" || order.status === "completed") {
+			return res.status(400).json({
+				success: false,
+				message: "Cannot cancel order after pickup",
+			});
+		}
+
+		// Restore crop quantities
+		for (const item of order.items) {
+			await Crop.findByIdAndUpdate(item.crop._id, {
+				$inc: { quantity: item.quantity },
+			});
+		}
+
+		order.status = "cancelled";
+		order.cancellationReason = reason;
+		order.statusTimestamps.cancelled = new Date();
+		await order.save();
+
+		// Notify seller
+		await Notification.create({
+			recipientId: order.seller,
+			type: "order_cancelled",
+			title: "❌ Order Cancelled",
+			message: `${req.user.name} cancelled order #${order._id
+				.toString()
+				.substring(0, 8)}. Reason: ${reason || "Not specified"}`,
+			relatedUserId: req.user._id,
+			data: {
+				orderId: order._id,
+				reason,
+			},
+		});
+
+		res.status(200).json({
 			success: true,
 			message: "Order cancelled successfully",
+			order,
 		});
 	} catch (error) {
 		console.error("Cancel order error:", error);
-		return res
-			.status(error.message.includes("cannot be cancelled") ? 400 : 500)
-			.json({
-				success: false,
-				message: error.message || "Server Error",
-			});
-	} finally {
-		await session.endSession();
-	}
-};
-
-// @desc    Create order
-// @route   POST /api/orders/create
-// @access  Private
-exports.createOrder = async (req, res) => {
-	try {
-		const { items, orderType = "crop", totalAmount } = req.body;
-
-		if (!items || !Array.isArray(items) || items.length === 0) {
-			return res.status(400).json({
-				success: false,
-				message: "No items provided for order",
-			});
-		}
-
-		// Validate items format
-		const validItems = items.map((item) => ({
-			itemId: item.itemId,
-			name: item.name,
-			quantity: item.quantity,
-			price: item.price,
-		}));
-
-		// Verify total amount
-		const calculatedTotal = validItems.reduce(
-			(sum, item) => sum + item.price,
-			0
-		);
-		if (totalAmount !== calculatedTotal) {
-			return res.status(400).json({
-				success: false,
-				message: "Total amount mismatch",
-			});
-		}
-		const checkoutCart = async () => {
-			if (cart.length === 0) {
-				toast.error("Cart is empty");
-				return;
-			}
-			try {
-				// Build items and total from cart flat shape
-				const items = cart.map((item) => ({
-					itemId: item.itemId,
-					name: item.name,
-					quantity: item.quantity,
-					price: item.price * item.quantity,
-				}));
-				const totalAmount = items.reduce((sum, i) => sum + i.price, 0);
-
-				const res = await api.post("/orders/create", {
-					orderType: "crop",
-					items,
-					totalAmount,
-				});
-
-				toast.success("🎉 Order placed successfully! Thanks for buying.");
-				setCart([]);
-				localStorage.setItem("cartCount", "0");
-				await fetchDashboardData();
-				setActiveTab("orders");
-			} catch (error) {
-				toast.error(error.response?.data?.message || "Failed to place order");
-			}
-		};
-
-		// Create order with validated data
-		const order = await Order.create({
-			user: req.user._id,
-			orderType,
-			items,
-			totalAmount,
-			shippingAddress: {
-				village: "Default Village",
-				district: "Default District",
-				state: "Default State",
-				pincode: "000000",
-				contactNumber: req.user.phone || "9999999999",
-			},
-		});
-
-		// Clear cart after successful order
-		await Cart.findOneAndDelete({ user: req.user._id });
-
-		res.status(201).json({
-			success: true,
-			message: "Order created successfully",
-			order: {
-				_id: order._id,
-				items: order.items,
-				totalAmount: order.totalAmount,
-				status: order.status,
-				createdAt: order.createdAt,
-			},
-		});
-	} catch (error) {
-		console.error("Create order error:", error);
 		res.status(500).json({
 			success: false,
-			message: "Server Error",
+			message: error.message,
 		});
 	}
 };
+
+module.exports = exports;

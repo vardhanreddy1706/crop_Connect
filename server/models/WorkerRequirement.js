@@ -7,85 +7,66 @@ const workerRequirementSchema = new mongoose.Schema(
 			ref: "User",
 			required: true,
 		},
-		requiredAge: {
-			min: { type: Number, default: 18 },
-			max: { type: Number, default: 65 },
-		},
-		preferredGender: {
+		workType: {
 			type: String,
-			enum: ["any", "male", "female", "other"],
-			default: "any",
-		},
-		minExperience: {
-			type: Number,
 			required: true,
-			min: 0,
 		},
-		wagesOffered: {
-			type: Number,
-			required: true,
-			min: 0,
+		workDescription: {
+			type: String,
 		},
 		location: {
 			village: String,
 			district: String,
 			state: String,
-			fullAddress: String,
-		},
-		workDuration: {
-			type: String,
-			required: true,
-		},
-		workType: {
-			type: String,
-			enum: [
-				"Farm Labor",
-				"Harvester",
-				"Irrigator",
-				"Sprayer",
-				"General Helper",
-				"Other",
-			],
-			default: "Farm Labor",
-		},
-		foodProvided: {
-			type: Boolean,
-			default: false,
-		},
-		transportationProvided: {
-			type: Boolean,
-			default: false,
+			pincode: String,
 		},
 		startDate: {
 			type: Date,
 			required: true,
 		},
-		endDate: {
-			type: Date,
+		duration: {
+			type: String, // e.g., "3 days", "1 week"
+			required: false, // ✅ CHANGED TO FALSE
+			default: "1 day", // ✅ ADD DEFAULT VALUE
 		},
+		wagesOffered: {
+			type: Number,
+			required: true,
+		},
+		numberOfWorkers: {
+			type: Number,
+			default: 1,
+		},
+		skillsRequired: [String],
 		status: {
 			type: String,
-			enum: ["open", "filled", "closed", "cancelled"],
+			enum: ["open", "in_progress", "completed", "cancelled", "accepted"],
 			default: "open",
 		},
+		// Track who applied
 		applicants: [
 			{
 				worker: {
 					type: mongoose.Schema.Types.ObjectId,
 					ref: "User",
 				},
-				appliedAt: {
-					type: Date,
-					default: Date.now,
-				},
 				status: {
 					type: String,
 					enum: ["pending", "accepted", "rejected"],
 					default: "pending",
 				},
+				appliedAt: {
+					type: Date,
+					default: Date.now,
+				},
 			},
 		],
-		notes: String,
+		acceptedBy: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
+		},
+		acceptedAt: Date,
+		completedAt: Date,
 	},
 	{
 		timestamps: true,

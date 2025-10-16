@@ -70,6 +70,65 @@ const postWorkerAvailability = async (req, res) => {
 		});
 	}
 };
+// ADD THIS FUNCTION to workerController.js
+
+// @desc Create worker service (with same-day check)
+// @route POST /api/workers/services
+// @access Private (Worker)
+exports.createWorkerService = async (req, res) => {
+  try {
+    const { serviceType, skills, experience, dailyWage, availability, workDate, location, description } = req.body;
+
+    // ✅ Check if worker already has a service posted for this date
+    const startOfDay = new Date(workDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(workDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingService = await WorkerService.findOne({
+      worker: req.user._id,
+      workDate: {
+        $gte: startOfDay,
+        $lt: endOfDay,
+      },
+    });
+
+    if (existingService) {
+      return res.status(400).json({
+        success: false,
+        message: "You already have a service posted for this date. Cannot post multiple services on the same day.",
+      });
+    }
+
+    const workerService = await WorkerService.create({
+      worker: req.user._id,
+      serviceType: serviceType || req.body.workerType, // Support both field names
+      skills: Array.isArray(skills) ? skills : [skills],
+      experience: experience || 0,
+      dailyWage: dailyWage || req.body.chargePerDay, // Support both field names
+      availability: availability !== false,
+      workDate: workDate || new Date(),
+      location: location || req.user.address,
+      description: description || "",
+      isBooked: false,
+      bookingStatus: "available",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Worker service posted successfully",
+      workerService,
+    });
+  } catch (error) {
+    console.error("Create worker service error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 
 // @desc Get all available workers (For Farmers to browse)
 // @route GET /api/workers/available

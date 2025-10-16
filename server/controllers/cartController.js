@@ -3,133 +3,215 @@
 const Cart = require("../models/Cart");
 const Crop = require("../models/Crop");
 
-// GET /api/cart
+// ✅ UPDATED: GET /api/cart
 exports.getCart = async (req, res) => {
-	try {
-		let cart = await Cart.findOne({ user: req.user._id });
-		if (!cart) {
-			cart = await Cart.create({ user: req.user._id, items: [] });
-		}
-		const cartItems = cart.items.map((item) => ({
-			_id: item._id,
-			itemId: item.itemId?.toString(),
-			name: item.name,
-			quantity: item.quantity,
-			price: item.price,
-			unit: item.unit,
-			image: item.image,
-		}));
-		return res.status(200).json({ success: true, cart: cartItems });
-	} catch (error) {
-		console.error("Get cart error:", error);
-		return res.status(500).json({ success: false, message: "Server Error" });
-	}
+    try {
+        let cart = await Cart.findOne({ user: req.user.id });
+
+        if (!cart) {
+            cart = await Cart.create({ user: req.user.id, items: [] });
+        }
+
+        // ✅ Populate crop details including quantity
+        await cart.populate({
+            path: 'items.itemId',
+            select: 'cropName pricePerUnit unit quantity', // ✅ Include quantity
+        });
+
+        const cartItems = cart.items.map((item) => ({
+            _id: item._id,
+            itemId: item.itemId?._id?.toString(),
+            name: item.itemId?.cropName || item.name,
+            quantity: item.quantity,
+            price: item.itemId?.pricePerUnit || item.price,
+            unit: item.itemId?.unit || item.unit,
+            image: item.image,
+            availableQuantity: item.itemId?.quantity || 0, // ✅ Add available quantity
+        }));
+
+        return res.status(200).json({
+            success: true,
+            cart: cartItems,
+        });
+    } catch (error) {
+        console.error("Get cart error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server Error",
+        });
+    }
 };
 
-// POST /api/cart/add
+
+// ✅ ADD TO CART - With quantity validation
 exports.addToCart = async (req, res) => {
-	try {
-		const { items } = req.body;
-		if (!items || !Array.isArray(items) || items.length === 0) {
-			return res
-				.status(400)
-				.json({ success: false, message: "Invalid items data" });
-		}
+    try {
+        const { items } = req.body;
 
-		let cart = await Cart.findOne({ user: req.user._id });
-		if (!cart) {
-			cart = await Cart.create({ user: req.user._id, items: [] });
-		}
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid items data",
+            });
+        }
 
-		// Normalize each item based on the Crop record
-		for (const input of items) {
-			const crop = await Crop.findById(input.itemId).select(
-				"cropName pricePerUnit unit image"
-			);
-			if (!crop) continue;
+        let cart = await Cart.findOne({ user: req.user.id });
 
-			const idx = cart.items.findIndex(
-				(i) => i.itemId?.toString() === crop._id.toString()
-			);
-			if (idx > -1) {
-				cart.items[idx].quantity += Math.max(1, Number(input.quantity) || 1);
-			} else {
-				cart.items.push({
-					itemId: crop._id,
-					name: crop.cropName,
-					quantity: Math.max(1, Number(input.quantity) || 1),
-					price: crop.pricePerUnit,
-					unit: crop.unit || "quintal",
-					image: crop.image,
-				});
-			}
-		}
+        if (!cart) {
+            cart = await Cart.create({ user: req.user.id, items: [] });
+        }
 
-		await cart.save();
+        for (const input of items) {
+            const crop = await Crop.findById(input.itemId).select(
+                "cropName pricePerUnit unit quantity"
+            );
 
-		const cartItems = cart.items.map((item) => ({
-			_id: item._id,
-			itemId: item.itemId?.toString(),
-			name: item.name,
-			quantity: item.quantity,
-			price: item.price,
-			unit: item.unit,
-			image: item.image,
-		}));
+            if (!crop) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Crop not found",
+                });
+            }
 
-		return res
-			.status(200)
-			.json({ success: true, message: "Item added to cart", cart: cartItems });
-	} catch (error) {
-		console.error("Add to cart error:", error);
-		return res.status(500).json({ success: false, message: "Server Error" });
-	}
+            // ✅ CHECK AVAILABLE QUANTITY
+            if (input.quantity > crop.quantity) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Only ${crop.quantity} ${crop.unit} available for ${crop.cropName}`,
+                });
+            }
+
+            const existingIndex = cart.items.findIndex(
+                (item) => item.itemId?.toString() === input.itemId
+            );
+
+            if (existingIndex > -1) {
+                // ✅ CHECK TOTAL QUANTITY
+                const newQuantity = cart.items[existingIndex].quantity + input.quantity;
+                
+                if (newQuantity > crop.quantity) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Cannot add more. Only ${crop.quantity} ${crop.unit} available`,
+                    });
+                }
+
+                cart.items[existingIndex].quantity = newQuantity;
+            } else {
+                cart.items.push({
+                    itemId: crop._id,
+                    name: crop.cropName,
+                    quantity: input.quantity,
+                    price: crop.pricePerUnit,
+                    unit: crop.unit,
+                });
+            }
+        }
+
+        await cart.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Items added to cart",
+            cart: cart.items,
+        });
+    } catch (error) {
+        console.error("Add to cart error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server Error",
+        });
+    }
 };
-
-// PUT /api/cart/update
+// ✅ PUT /api/cart/update - Update cart quantity with STRICT stock validation
 exports.updateCartQuantity = async (req, res) => {
-	try {
-		const { itemId, quantity } = req.body;
-		if (!itemId || Number(quantity) < 1) {
-			return res
-				.status(400)
-				.json({ success: false, message: "Quantity must be at least 1" });
-		}
+    try {
+        const { itemId, quantity } = req.body;
 
-		const cart = await Cart.findOne({ user: req.user._id });
-		if (!cart)
-			return res
-				.status(404)
-				.json({ success: false, message: "Cart not found" });
+        // Validate input
+        if (!itemId || quantity < 1) {
+            return res.status(400).json({
+                success: false,
+                message: "Quantity must be at least 1",
+            });
+        }
 
-		const idx = cart.items.findIndex(
-			(i) => i.itemId?.toString() === itemId.toString()
-		);
-		if (idx === -1)
-			return res
-				.status(404)
-				.json({ success: false, message: "Item not found in cart" });
+        // Find user's cart
+        const userId = req.user.id || req.user._id;
+        const cart = await Cart.findOne({ user: userId });
 
-		cart.items[idx].quantity = Math.max(1, Number(quantity));
-		await cart.save();
+        if (!cart) {
+            return res.status(404).json({
+                success: false,
+                message: "Cart not found",
+            });
+        }
 
-		const cartItems = cart.items.map((item) => ({
-			_id: item._id,
-			itemId: item.itemId?.toString(),
-			name: item.name,
-			quantity: item.quantity,
-			price: item.price,
-			unit: item.unit,
-			image: item.image,
-		}));
+        // ✅ CRITICAL: Check crop available quantity
+        const crop = await Crop.findById(itemId).select('cropName pricePerUnit unit quantity');
 
-		return res
-			.status(200)
-			.json({ success: true, message: "Cart updated", cart: cartItems });
-	} catch (error) {
-		console.error("Update cart error:", error);
-		return res.status(500).json({ success: false, message: "Server Error" });
-	}
+        if (!crop) {
+            return res.status(404).json({
+                success: false,
+                message: "Crop not found",
+            });
+        }
+
+        // ✅ STRICT VALIDATION: Prevent exceeding available stock
+        if (quantity > crop.quantity) {
+            return res.status(400).json({
+                success: false,
+                message: `Only ${crop.quantity} ${crop.unit} available in stock`,
+                availableQuantity: crop.quantity,
+            });
+        }
+
+        // Find item in cart
+        const itemIndex = cart.items.findIndex(
+            (item) => item.itemId?.toString() === itemId.toString()
+        );
+
+        if (itemIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                message: "Item not found in cart",
+            });
+        }
+
+        // Update quantity (enforce minimum 1, maximum available)
+        cart.items[itemIndex].quantity = Math.min(crop.quantity, Math.max(1, Number(quantity)));
+        await cart.save();
+
+        // Populate crop details for response
+        await cart.populate({
+            path: 'items.itemId',
+            select: 'cropName pricePerUnit unit quantity',
+        });
+
+        // Return updated cart with available quantities
+        const cartItems = cart.items.map((item) => ({
+            _id: item._id,
+            itemId: item.itemId?._id?.toString(),
+            name: item.itemId?.cropName || item.name,
+            quantity: item.quantity,
+            price: item.itemId?.pricePerUnit || item.price,
+            unit: item.itemId?.unit || item.unit,
+            image: item.image,
+            availableQuantity: item.itemId?.quantity || 0,
+        }));
+
+        return res.status(200).json({
+            success: true,
+            message: "Cart updated successfully",
+            cart: cartItems,
+        });
+    } catch (error) {
+        console.error("Update cart error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Server Error",
+        });
+    }
 };
 
 // DELETE /api/cart/remove/:itemId

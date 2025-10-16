@@ -26,7 +26,8 @@ import FarmerBookings from "./pages/BookingsHistory";
 import TransactionHistory from "./pages/TransactionHistory";
 import { NotificationProvider } from "./context/NotificationContext";
 import FarmerMyBookings from "./pages/FarmerBookings";
-
+import { LanguageProvider } from "./context/LanguageContext";
+import FarmerOrders from "./pages/FarmerOrders";
 // Dashboards
 import BuyerDashboard from "./dashboards/BuyerDashboard";
 import TractorDashboard from "./dashboards/TractorDashboard";
@@ -255,6 +256,8 @@ function AppRoutes() {
 				}
 			/>
 
+			<Route path="/farmer/orders" element={<FarmerOrders />} />
+
 			{/* Role-Based Dashboards - Protected */}
 			<Route
 				path="/farmer-dashboard"
@@ -321,13 +324,15 @@ function AppRoutes() {
 
 function App() {
 	return (
-		<NotificationProvider>
-			<Router>
-				<AuthProvider>
-					<AppRoutes />
-				</AuthProvider>
-			</Router>
-		</NotificationProvider>
+		<LanguageProvider>
+			<NotificationProvider>
+				<Router>
+					<AuthProvider>
+						<AppRoutes />
+					</AuthProvider>
+				</Router>
+			</NotificationProvider>
+		</LanguageProvider>
 	);
 }
 

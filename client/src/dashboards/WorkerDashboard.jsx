@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../config/api";
@@ -35,8 +36,7 @@ function WorkerDashboard() {
 	const [hireRequests, setHireRequests] = useState([]); // Requests from farmers
 	const [availableJobs, setAvailableJobs] = useState([]); // Jobs posted by farmers
 	const [appliedJobs, setAppliedJobs] = useState([]); // Jobs I applied for
-	const [setTransactions] = useState([]);
-
+	const [transactions, setTransactions] = useState([]);
 
 	const [loading, setLoading] = useState(true);
 	const [actionLoading, setActionLoading] = useState(null);
@@ -82,34 +82,22 @@ function WorkerDashboard() {
 		}
 	}, [activeTab]);
 
-	// ✅ Fetch all data at once
+	// ✅ CORRECTED: Fetch all data at once
 	const fetchAllData = async () => {
 		setLoading(true);
 		await Promise.all([
 			fetchWorkOrders(),
 			fetchHireRequests(),
 			fetchMyServices(),
-		
-			fetchWorkerApplications(),
+			fetchAvailableJobs(),
 		]);
 		setLoading(false);
 	};
 
-	const fetchWorkerApplications = async () => {
-		try {
-			const { data } = await api.get("/worker-hires/worker-applications");
-			setAppliedJobs(data.applications || []);
-			console.log("✅ Applications loaded:", data.applications?.length || 0);
-		} catch (error) {
-			console.error("Fetch applications error:", error);
-			// Silent fail - endpoint might not exist yet
-		}
-	};
-
-	// ✅ Fetch work orders (bookings where worker is hired)
+	// ✅ CORRECTED: Fetch work orders (bookings where worker is hired)
 	const fetchWorkOrders = async () => {
 		try {
-			const { data } = await api.get("/bookings/worker");
+			const { data } = await api.get("/bookings/worker"); // ✅ This route EXISTS
 			setWorkOrders(data.bookings || []);
 			console.log("✅ Work orders loaded:", data.bookings?.length || 0);
 		} catch (error) {
@@ -117,67 +105,43 @@ function WorkerDashboard() {
 		}
 	};
 
-	// ✅ FIXED: Fetch hire requests (farmers hiring me)
 	const fetchHireRequests = async () => {
 		try {
-			const { data } = await api.get("/worker-hires/worker-requests");
-
-			// ✅ FIXED: Backend returns 'requests', not 'hireRequests'
-			const allRequests = data.requests || data.hireRequests || [];
-
-			// Filter only farmer-to-worker requests (not applications)
-			const farmerRequests = allRequests.filter(
-				(r) => r.requestType === "farmer_to_worker" || !r.requestType
-			);
-
-			setHireRequests(farmerRequests);
-			console.log("✅ Hire requests loaded:", farmerRequests.length);
+			const { data } = await api.get("/worker-hires/worker-requests"); // ✅ Plural "hires"
+			setHireRequests(data.hireRequests || []);
+			console.log("✅ Hire requests loaded:", data.hireRequests?.length || 0);
 		} catch (error) {
 			console.error("Fetch hire requests error:", error);
 		}
 	};
 
-	// ✅ FIXED: Fetch worker applications separately
-	// const fetchWorkerApplications = async () => {
-	// 	try {
-	// 		const { data } = await api.get("/worker-hires/worker-applications");
-	// 		setAppliedJobs(data.applications || []);
-	// 		console.log("✅ Applications loaded:", data.applications?.length || 0);
-	// 	} catch (error) {
-	// 		console.error("Fetch applications error:", error);
-	// 	}
-	// };
-
-	// ✅ FIXED: Fetch my posted services
+	// ✅ CORRECTED: Fetch my posted services
 	const fetchMyServices = async () => {
 		try {
-			const { data } = await api.get("/workers/my-posts");
-
-			// ✅ FIXED: Backend may return 'services' or 'workerPosts'
-			const services = data.services || data.workerPosts || [];
-			setMyServices(services);
-			console.log("✅ Services loaded:", services.length);
+			const { data } = await api.get("/workers/my-posts"); // ✅ Correct: "my-posts" not "my-services"
+			setMyServices(data.workerPosts || data.services || []);
+			console.log("✅ Services loaded:", data.workerPosts?.length || 0);
 		} catch (error) {
 			console.error("Fetch my services error:", error);
 		}
 	};
 
-	// ✅ Fetch available jobs (farmer requirements)
+	// ✅ CORRECTED: Fetch available jobs (farmer requirements)
 	const fetchAvailableJobs = async () => {
 		try {
-			setLoading(true);
 			const params = {};
-
-			if (jobSearch.district) params.location = jobSearch.district;
+			if (jobSearch.district) params.district = jobSearch.district;
 			if (jobSearch.workType) params.workType = jobSearch.workType;
-			if (jobSearch.maxBudget) params.minWage = jobSearch.maxBudget;
+			if (jobSearch.maxBudget) params.maxBudget = jobSearch.maxBudget;
 
 			const { data } = await api.get("/worker-requirements", { params });
-			setAvailableJobs(data.workerRequirements || data.requirements || []);
+			setAvailableJobs(data.workerRequirements || []);
+			console.log(
+				"✅ Available jobs loaded:",
+				data.workerRequirements?.length || 0
+			);
 		} catch (error) {
 			console.error("Fetch available jobs error:", error);
-		} finally {
-			setLoading(false);
 		}
 	};
 
@@ -188,7 +152,6 @@ function WorkerDashboard() {
 			setTransactions(data.transactions || []);
 		} catch (error) {
 			console.error("Fetch transactions error:", error);
-			// Silent fail - endpoint might not exist
 		}
 	};
 
@@ -206,18 +169,16 @@ function WorkerDashboard() {
 		});
 		fetchAvailableJobs();
 	};
-	
 
-	// ✅ Accept hire request from farmer
 	const handleAcceptHireRequest = async (requestId) => {
 		if (!window.confirm("Accept this hire request and create booking?")) return;
 
 		try {
 			setActionLoading(requestId);
-			await api.post(`/worker-hires/${requestId}/worker-accept`);
+			await api.post(`/worker-hires/${requestId}/worker-accept`); // ✅ Plural "hires"
 			toast.success("🎉 Hire request accepted! Booking created.");
-			await fetchAllData(); // Refresh all data
-			setActiveTab("work"); // Switch to My Work tab
+			await fetchAllData();
+			setActiveTab("work");
 		} catch (error) {
 			console.error("Accept hire request error:", error);
 			toast.error(error.response?.data?.message || "Failed to accept request");
@@ -225,14 +186,13 @@ function WorkerDashboard() {
 			setActionLoading(null);
 		}
 	};
-
-	// ✅ Reject hire request from farmer
+	// ✅ Reject hire request
 	const handleRejectHireRequest = async (requestId) => {
 		const reason = prompt("Reason for rejection (optional):");
 
 		try {
 			setActionLoading(requestId);
-			await api.post(`/worker-hires/${requestId}/worker-reject`, { reason });
+			await api.post(`/worker-hires/${requestId}/worker-reject`, { reason }); // ✅ Plural "hires"
 			toast.success("Hire request rejected");
 			fetchHireRequests();
 		} catch (error) {
@@ -242,13 +202,11 @@ function WorkerDashboard() {
 			setActionLoading(null);
 		}
 	};
-	const handleApplyForJob = async (requirement) => {
-		// ✅ FIXED: Check if already applied using _id
-		const alreadyApplied = appliedJobs.find(
-			(job) => job.workerRequirement?._id === requirement._id
-		);
 
-		if (alreadyApplied) {
+	// ✅ CORRECTED: Apply for job
+	const handleApplyForJob = async (requirement) => {
+		// Check if already applied
+		if (requirement.hasApplied) {
 			toast.info("You have already applied for this job");
 			return;
 		}
@@ -262,14 +220,10 @@ function WorkerDashboard() {
 		}
 
 		try {
-			setActionLoading(requirement._id); // ✅ Fixed
-			await api.post(`/worker-requirements/${requirement._id}/apply`); // ✅ Fixed
-			toast.success(
-				"✅ Application sent successfully! Farmer will be notified."
-			);
-
+			setActionLoading(requirement._id);
+			await api.post(`/worker-requirements/${requirement._id}/apply`);
+			toast.success("✅ Application sent! Farmer will be notified.");
 			fetchAvailableJobs();
-			fetchWorkerApplications(); // ✅ Refresh applications too
 		} catch (error) {
 			console.error("Apply for job error:", error);
 			toast.error(error.response?.data?.message || "Failed to apply for job");
@@ -302,10 +256,11 @@ function WorkerDashboard() {
 	const handleEditService = (service) => {
 		setEditingService(service);
 		setServiceFormData({
-			workerType: service.workerType,
-			chargePerDay: service.chargePerDay.toString(),
-			experience: service.experience.toString(),
-			workingHours: service.workingHours.toString(),
+			workerType: service.serviceType || service.workerType,
+			chargePerDay:
+				service.dailyWage?.toString() || service.chargePerDay?.toString() || "",
+			experience: service.experience?.toString() || "",
+			workingHours: service.workingHours?.replace("hrs/day", "") || "8",
 			location: {
 				district: service.location?.district || "",
 				state: service.location?.state || "",
@@ -345,7 +300,7 @@ function WorkerDashboard() {
 		}
 	};
 
-	// ✅ The function IS defined in your code:
+	// ✅ Handle complete work
 	const handleCompleteWork = async (bookingId) => {
 		if (!window.confirm("Mark this work as completed?")) return;
 
@@ -354,7 +309,7 @@ function WorkerDashboard() {
 			await api.post(`/bookings/${bookingId}/complete`);
 			toast.success("Work marked as completed!");
 			fetchWorkOrders();
-			fetchMyServices(); // Update service status
+			fetchMyServices();
 		} catch (error) {
 			toast.error(error.response?.data?.message || "Failed to complete work");
 		} finally {
@@ -362,16 +317,13 @@ function WorkerDashboard() {
 		}
 	};
 
-	// ✅ Handle posting/updating service
 	const handlePostService = async (e) => {
 		e.preventDefault();
 
-		// Validation
 		if (
 			!serviceFormData.workerType ||
 			!serviceFormData.chargePerDay ||
-			!serviceFormData.experience ||
-			!serviceFormData.contactNumber
+			!serviceFormData.experience
 		) {
 			toast.error("Please fill in all required fields");
 			return;
@@ -381,21 +333,24 @@ function WorkerDashboard() {
 			setActionLoading("posting");
 
 			const postData = {
-				...serviceFormData,
+				workerType: serviceFormData.workerType,
 				chargePerDay: parseInt(serviceFormData.chargePerDay),
 				experience: parseInt(serviceFormData.experience),
 				workingHours: parseInt(serviceFormData.workingHours),
 				skills: serviceFormData.skills
 					? serviceFormData.skills.split(",").map((s) => s.trim())
 					: [],
+				location: serviceFormData.location,
+				description: serviceFormData.description,
+				contactNumber: serviceFormData.contactNumber,
 			};
 
 			if (editingService) {
-				await api.put(`/workers/availability/${editingService._id}`, postData);
-				toast.success("✅ Service updated successfully!");
+				await api.put(`/workers/availability/${editingService._id}`, postData); // ✅ Correct
+				toast.success("✅ Service updated!");
 			} else {
-				await api.post("/workers/post-availability", postData);
-				toast.success("🎉 Service posted successfully!");
+				await api.post("/workers/post-availability", postData); // ✅ Correct
+				toast.success("🎉 Service posted!");
 			}
 
 			handleCloseServiceModal();
@@ -410,26 +365,27 @@ function WorkerDashboard() {
 
 	// ✅ Delete service
 	const handleDeleteService = async (serviceId) => {
-		if (!window.confirm("Are you sure you want to delete this service?"))
-			return;
+		if (!window.confirm("Delete this service?")) return;
 
 		try {
 			setActionLoading(serviceId);
-			await api.delete(`/workers/availability/${serviceId}`);
-			toast.success("Service deleted successfully");
+			await api.delete(`/workers/availability/${serviceId}`); // ✅ Correct
+			toast.success("Service deleted");
 			fetchMyServices();
 		} catch (error) {
-			toast.error(error.response?.data?.message || "Failed to delete service");
+			toast.error(error.response?.data?.message || "Failed to delete");
 		} finally {
 			setActionLoading(null);
 		}
 	};
 
-	// ✅ FIXED: Calculate stats dynamically
+	// ✅ Calculate stats dynamically
 	const stats = {
 		totalWork: workOrders.length,
 		pending: hireRequests.filter((r) => r.status === "pending").length,
-		accepted: hireRequests.filter((r) => r.status === "accepted").length,
+		accepted: workOrders.filter(
+			(w) => w.status === "confirmed" || w.status === "accepted"
+		).length,
 		completed: workOrders.filter((w) => w.status === "completed").length,
 		rejected: hireRequests.filter((r) => r.status === "rejected").length,
 		totalEarnings: workOrders
@@ -437,7 +393,7 @@ function WorkerDashboard() {
 			.reduce((sum, w) => sum + (w.totalCost || 0), 0),
 		postedServices: myServices.length,
 		availableServices: myServices.filter(
-			(s) => s.bookingStatus === "available" || !s.bookingStatus
+			(s) => s.availability !== false && !s.isBooked
 		).length,
 	};
 
@@ -463,7 +419,7 @@ function WorkerDashboard() {
 		});
 	};
 
-	if (loading && myServices.length === 0) {
+	if (loading && myServices.length === 0 && workOrders.length === 0) {
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
 				<div className="text-center">

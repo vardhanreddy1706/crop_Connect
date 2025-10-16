@@ -79,6 +79,26 @@ function FarmerMyBookings() {
 		}
 	};
 
+	const fetchWorkerApplications = async () => {
+		try {
+			const response = await api.get("/worker-requirements/applications");
+			if (response.data.success) {
+				setWorkerApplications(response.data.applications || []);
+			}
+		} catch (error) {
+			console.error("Fetch worker applications error:", error);
+		}
+	};
+
+	// Call it in useEffect
+	useEffect(() => {
+		if (user) {
+			fetchBookings();
+			fetchBids();
+			fetchWorkerApplications(); // ✅ ADD THIS
+		}
+	}, [user]);
+
 	// ✅ Fetch bids
 	const fetchBids = async () => {
 		try {
@@ -181,7 +201,6 @@ function FarmerMyBookings() {
 		}
 	};
 
-	// ✅ Hire worker (creates hire request - farmer to worker)
 	const handleHireWorker = async (worker) => {
 		// Check if worker is already booked
 		if (worker.bookingStatus === "booked") {
@@ -192,7 +211,7 @@ function FarmerMyBookings() {
 		// Check if already requested
 		const existingRequest = hireRequests.find(
 			(r) =>
-				r.workerService._id === worker._id &&
+				r.workerService?._id === worker._id &&
 				(r.status === "pending" || r.status === "accepted")
 		);
 
@@ -207,7 +226,9 @@ function FarmerMyBookings() {
 
 		if (
 			!window.confirm(
-				`Send hire request to ${worker.worker?.name} for ₹${worker.chargePerDay}/day?`
+				`Send hire request to ${worker.worker?.name} for ₹${
+					worker.chargePerDay || worker.dailyWage
+				}/day?`
 			)
 		) {
 			return;
@@ -216,25 +237,25 @@ function FarmerMyBookings() {
 		try {
 			setActionLoading(worker._id);
 
+			// ✅ FIXED: Send correct data structure
 			const hireRequestData = {
+				workerId: worker.worker?._id, // ✅ ADD THIS
 				workerServiceId: worker._id,
-				workDetails: {
-					startDate: new Date(),
-					duration: 1,
-					workDescription: `Hire for ${worker.workerType}`,
-					location: worker.location,
-				},
-				agreedAmount: worker.chargePerDay,
+				workType: worker.serviceType || worker.workerType,
+				dailyWage: worker.dailyWage || worker.chargePerDay,
+				duration: "1 day",
+				workDate: new Date(),
+				location: worker.location,
 				notes: `Hired via Browse Workers`,
 			};
 
-			await api.post("/worker-hires/hire-worker", hireRequestData);
+			await api.post("/worker-hires/create", hireRequestData); // ✅ FIXED endpoint
 
 			toast.success(
 				`🎉 Hire request sent to ${worker.worker?.name}! Waiting for confirmation...`
 			);
 			fetchHireRequests();
-			setActiveTab("hire-requests"); // Switch to see the request
+			setActiveTab("hire-requests");
 		} catch (error) {
 			console.error("Hire worker error:", error);
 			toast.error(
@@ -245,19 +266,22 @@ function FarmerMyBookings() {
 		}
 	};
 
-	// ✅ Accept worker application (worker applied to farmer's job)
-	const handleAcceptApplication = async (applicationId) => {
-		if (!window.confirm("Accept this worker's application and create booking?"))
-			return;
+	// ✅ CORRECT
+	const handleAcceptApplication = async (hireRequestId) => {
+		if (!window.confirm("Accept this worker application?")) return;
 
+		setActionLoading(hireRequestId);
 		try {
-			setActionLoading(applicationId);
-			await api.post(`/worker-hires/${applicationId}/farmer-accept`);
-			toast.success("🎉 Application accepted! Booking created successfully.");
-			fetchHireRequests();
-			fetchBookings();
-			setActiveTab("bookings"); // Switch to bookings to see new booking
+			const response = await api.post(
+				`/worker-hires/${hireRequestId}/farmer-accept`
+			); // ✅ CORRECT
+			if (response.data.success) {
+				toast.success("Application accepted! Booking created.");
+				fetchWorkerApplications();
+				fetchBookings();
+			}
 		} catch (error) {
+			console.error("Accept application error:", error);
 			toast.error(
 				error.response?.data?.message || "Failed to accept application"
 			);
@@ -266,18 +290,22 @@ function FarmerMyBookings() {
 		}
 	};
 
-	// ✅ Reject worker application
-	const handleRejectApplication = async (applicationId) => {
-		const reason = prompt("Reason for rejection (optional):");
+	// ✅ CORRECT - Reject application
+	const handleRejectApplication = async (hireRequestId) => {
+		const reason = window.prompt("Reason for rejection (optional):");
 
+		setActionLoading(hireRequestId);
 		try {
-			setActionLoading(applicationId);
-			await api.post(`/worker-hires/${applicationId}/farmer-reject`, {
-				reason,
-			});
-			toast.success("Application rejected");
-			fetchHireRequests();
+			const response = await api.post(
+				`/worker-hires/${hireRequestId}/farmer-reject`,
+				{ reason }
+			); // ✅ CORRECT
+			if (response.data.success) {
+				toast.success("Application rejected");
+				fetchWorkerApplications();
+			}
 		} catch (error) {
+			console.error("Reject application error:", error);
 			toast.error(
 				error.response?.data?.message || "Failed to reject application"
 			);
@@ -529,19 +557,19 @@ function FarmerMyBookings() {
 						</div>
 					</div>
 
-					<div className="bg-white p-4 rounded-xl shadow hover:shadow-lg transition">
-						<div className="flex items-center justify-between">
-							<div>
-								<div className="text-sm text-gray-600">Worker Applications</div>
-								<div className="text-2xl font-bold text-blue-600">
-									{
-										workerApplications.filter((a) => a.status === "pending")
-											.length
-									}
-								</div>
+					<div className="bg-white rounded-xl p-6 shadow-md">
+						<div className="flex items-center justify-between mb-4">
+							<div className="flex items-center gap-2">
+								<Users className="text-blue-600" size={24} />
+								<h3 className="text-lg font-semibold">Worker Applications</h3>
 							</div>
-							<Users className="text-blue-600" size={32} />
 						</div>
+						<p className="text-3xl font-bold text-blue-600">
+							{
+								workerApplications.filter((app) => app.status === "pending")
+									.length
+							}
+						</p>
 					</div>
 
 					<div className="bg-white p-4 rounded-xl shadow hover:shadow-lg transition">
@@ -586,14 +614,19 @@ function FarmerMyBookings() {
 
 						<button
 							onClick={() => setActiveTab("applications")}
-							className={`flex-1 min-w-[150px] py-3 px-4 rounded-lg font-semibold transition flex items-center justify-center ${
+							className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition ${
 								activeTab === "applications"
-									? "bg-green-600 text-white shadow-md"
-									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+									? "bg-green-600 text-white"
+									: "bg-white text-gray-700 hover:bg-gray-100"
 							}`}
 						>
-							<Mail className="mr-2" size={18} />
-							Applications ({workerApplications.length})
+							<Mail size={20} />
+							Applications (
+							{
+								workerApplications.filter((app) => app.status === "pending")
+									.length
+							}
+							)
 						</button>
 
 						<button
@@ -662,7 +695,22 @@ function FarmerMyBookings() {
 										} text-white`}
 									>
 										<div className="flex justify-between items-start">
-											<div>
+											<div className="flex-1">
+												{/* ✅ ADD BADGE HERE - Above the title */}
+												<div className="flex items-center gap-2 mb-2">
+													<span
+														className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+															booking.serviceType === "worker"
+																? "bg-blue-100 text-blue-800"
+																: "bg-green-100 text-green-800"
+														}`}
+													>
+														{booking.serviceType === "worker"
+															? "👷 Worker"
+															: "🚜 Tractor"}
+													</span>
+												</div>
+
 												<h3 className="text-xl font-bold mb-1">
 													{booking.workType || booking.serviceType}
 												</h3>

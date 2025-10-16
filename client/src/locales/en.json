@@ -1,0 +1,99 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "About",
+    "services": "Services",
+    "contact": "Contact",
+    "login": "Login",
+    "register": "Register",
+    "dashboard": "Dashboard",
+    "logout": "Logout"
+  },
+  "landing": {
+    "title": "CropConnect",
+    "subtitle": "Connecting Farmers, Workers, and Agricultural Services",
+    "description": "Your one-stop platform for agricultural needs - Find tractors, hire workers, sell crops, and grow your farming business.",
+    "getStarted": "Get Started",
+    "learnMore": "Learn More",
+    "features": {
+      "title": "Our Services",
+      "tractor": {
+        "title": "Tractor Services",
+        "desc": "Book tractors for plowing, harvesting, and more"
+      },
+      "worker": {
+        "title": "Worker Hiring",
+        "desc": "Find skilled agricultural workers for your farm"
+      },
+      "crop": {
+        "title": "Crop Marketplace",
+        "desc": "Buy and sell crops directly with farmers"
+      }
+    }
+  },
+  "auth": {
+    "login": "Login to Your Account",
+    "register": "Create New Account",
+    "email": "Email Address",
+    "password": "Password",
+    "name": "Full Name",
+    "phone": "Phone Number",
+    "role": "Select Role",
+    "farmer": "Farmer",
+    "buyer": "Buyer",
+    "tractorOwner": "Tractor Owner",
+    "worker": "Worker",
+    "loginButton": "Sign In",
+    "registerButton": "Sign Up",
+    "noAccount": "Don't have an account?",
+    "haveAccount": "Already have an account?"
+  },
+  "dashboard": {
+    "welcome": "Welcome",
+    "overview": "Overview",
+    "bookings": "My Bookings",
+    "services": "My Services",
+    "earnings": "Earnings",
+    "profile": "Profile"
+  },
+  "booking": {
+    "title": "Book Tractor Service",
+    "workType": "Work Type",
+    "date": "Booking Date",
+    "duration": "Duration (hours)",
+    "location": "Location",
+    "landSize": "Land Size (acres)",
+    "submit": "Confirm Booking",
+    "cancel": "Cancel Booking",
+    "status": "Status",
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "completed": "Completed",
+    "cancelled": "Cancelled"
+  },
+  "payment": {
+    "title": "Make Payment",
+    "amount": "Total Amount",
+    "payNow": "Pay Now",
+    "payLater": "Pay After Work",
+    "cash": "Cash Payment",
+    "online": "Online Payment"
+  },
+  "common": {
+    "search": "Search",
+    "filter": "Filter",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "submit": "Submit",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "success": "Success",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "viewDetails": "View Details",
+    "close": "Close"
+  }
+}

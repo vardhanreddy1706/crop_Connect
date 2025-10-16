@@ -25,7 +25,6 @@ const notificationSchema = new mongoose.Schema(
 				"booking_created",
 				"booking_cancelled",
 				"booking_completed",
-				"work_completed", // ✅ ADD THIS LINE
 				// Payments
 				"payment_received",
 				"payment_sent",
@@ -36,12 +35,19 @@ const notificationSchema = new mongoose.Schema(
 				// Workers
 				"worker_hired",
 				"application_received",
+				"worker_application",
+				"hire_accepted",
+				"hire_rejected",
+				"hire_request",
+				// ✅ NEW: Orders
+				"new_order",
+				"order_status_update",
+				"order_cancelled",
 				// General
 				"general",
 			],
 			required: true,
 		},
-
 		title: {
 			type: String,
 			required: true,
@@ -71,7 +77,6 @@ const notificationSchema = new mongoose.Schema(
 			default: false,
 		},
 		data: {
-			// Store additional data like tractor owner details, quoted price, etc.
 			type: mongoose.Schema.Types.Mixed,
 		},
 	},
@@ -80,7 +85,6 @@ const notificationSchema = new mongoose.Schema(
 	}
 );
 
-// Index for faster queries
 notificationSchema.index({ recipientId: 1, read: 1 });
 notificationSchema.index({ createdAt: -1 });
 

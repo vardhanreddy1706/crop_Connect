@@ -1,66 +1,89 @@
 // server/models/Order.js
-const mongoose = require("mongoose");
 
-const orderItemSchema = new mongoose.Schema({
-	itemId: {
-		type: mongoose.Schema.Types.ObjectId,
-		required: true,
-	},
-	name: {
-		type: String,
-		required: true,
-	},
-	quantity: {
-		type: Number,
-		required: true,
-		min: 1,
-	},
-	price: {
-		type: Number,
-		required: true,
-		min: 0,
-	},
-});
+const mongoose = require("mongoose");
 
 const orderSchema = new mongoose.Schema(
 	{
-		user: {
+		buyer: {
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "User",
 			required: true,
 		},
-		orderType: {
-			type: String,
-			enum: ["crop", "product"],
+		seller: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: "User",
 			required: true,
 		},
-		items: [orderItemSchema],
+		items: [
+			{
+				crop: {
+					type: mongoose.Schema.Types.ObjectId,
+					ref: "Crop",
+					required: true,
+				},
+				quantity: {
+					type: Number,
+					required: true,
+					min: 1,
+				},
+				pricePerUnit: {
+					type: Number,
+					required: true,
+					min: 0,
+				},
+				total: {
+					type: Number,
+					required: true,
+					min: 0,
+				},
+			},
+		],
 		totalAmount: {
 			type: Number,
 			required: true,
 			min: 0,
 		},
-		status: {
+		// ✅ FIXED: Add paymentMethod field with correct enum values
+		paymentMethod: {
 			type: String,
-			enum: ["pending", "processing", "in_transit", "delivered", "cancelled"],
-			default: "pending",
+			enum: ["razorpay", "payAfterDelivery"], // ✅ Use camelCase, not snake_case
+			default: "razorpay",
 		},
 		paymentStatus: {
 			type: String,
-			enum: ["pending", "completed", "failed"],
+			enum: ["pending", "completed", "failed", "refunded"],
 			default: "pending",
 		},
-		shippingAddress: {
+		vehicleDetails: {
+			vehicleType: String,
+			vehicleNumber: String,
+			driverName: String,
+			driverPhone: String,
+		},
+		pickupSchedule: {
+			date: String,
+			timeSlot: String,
+		},
+		deliveryAddress: {
 			village: String,
 			district: String,
 			state: String,
 			pincode: String,
-			contactNumber: String,
+			fullAddress: {
+				type: String,
+				required: true,
+			},
 		},
+		status: {
+			type: String,
+			enum: ["pending", "confirmed", "picked", "completed", "cancelled"],
+			default: "pending",
+		},
+		razorpayOrderId: String,
+		razorpayPaymentId: String,
+		razorpaySignature: String,
 	},
-	{
-		timestamps: true,
-	}
+	{ timestamps: true }
 );
 
 module.exports = mongoose.model("Order", orderSchema);
