@@ -1,34 +1,89 @@
+// server/routes/orderRoutes.js
+
 const express = require("express");
 const router = express.Router();
-const { protect, authorize } = require("../middlewares/authMiddleware");
+const { protect } = require("../middlewares/authMiddleware");
 const {
-	createRazorpayOrder,
 	createOrder,
+	createRazorpayOrder,
 	getBuyerOrders,
 	getSellerOrders,
-	updateOrderStatus,
+	confirmOrder,
+	markAsPicked,
+	completeOrder,
 	cancelOrder,
+	updateOrderStatus,
 } = require("../controllers/orderController");
 
-// Create Razorpay order (before actual order creation)
-router.post(
-	"/create-razorpay-order",
-	protect,
-	authorize("buyer"),
-	createRazorpayOrder
-);
+// ========================================
+// PROTECT ALL ROUTES
+// ========================================
+router.use(protect);
 
-// Create order with vehicle details
-router.post("/create", protect, authorize("buyer"), createOrder);
+// ========================================
+// PAYMENT ROUTES
+// ========================================
+// @route POST /api/orders/create-razorpay-order
+// @desc Create Razorpay payment order
+// @access Private
+router.post("/create-razorpay-order", createRazorpayOrder);
 
-// Get orders
-router.get("/buyer", protect, authorize("buyer"), getBuyerOrders);
-router.get("/seller", protect, authorize("farmer"), getSellerOrders);
+// ========================================
+// ORDER MANAGEMENT
+// ========================================
+// @route POST /api/orders/create
+// @desc Create new order
+// @access Private (Buyer)
+router.post("/create", createOrder);
 
-// Update order status
-router.put("/:id/status", protect, updateOrderStatus);
+// ========================================
+// GET ORDERS
+// ========================================
+// @route GET /api/orders/buyer
+// @desc Get buyer's orders
+// @access Private (Buyer)
+router.get("/buyer", getBuyerOrders);
 
-// Cancel order
-router.put("/:id/cancel", protect, authorize("buyer"), cancelOrder);
+// @route GET /api/orders/seller
+// @desc Get farmer's orders (crops sold)
+// @access Private (Farmer)
+router.get("/seller", getSellerOrders);
+
+// ========================================
+// FARMER ACTIONS
+// ========================================
+// @route PUT /api/orders/:orderId/confirm
+// @desc Farmer confirms order
+// @access Private (Farmer)
+router.put("/:orderId/confirm", confirmOrder);
+
+// @route PUT /api/orders/:orderId/picked
+// @desc Farmer marks order as picked up
+// @access Private (Farmer)
+router.put("/:orderId/picked", markAsPicked);
+
+// ========================================
+// BUYER ACTIONS
+// ========================================
+// @route PUT /api/orders/:orderId/complete
+// @desc Buyer marks order as complete
+// @access Private (Buyer)
+router.put("/:orderId/complete", completeOrder);
+
+// ========================================
+// CANCEL ORDER (Both Buyer & Farmer)
+// ========================================
+// @route PUT /api/orders/:orderId/cancel
+// @desc Cancel order
+// @access Private (Buyer or Farmer)
+router.put("/:orderId/cancel", cancelOrder);
+
+// ========================================
+// LEGACY ROUTE (For compatibility)
+// ========================================
+// @route PUT /api/orders/:id/status
+// @desc Update order status (generic)
+// @access Private
+router.put("/:id/status", updateOrderStatus);
 
 module.exports = router;

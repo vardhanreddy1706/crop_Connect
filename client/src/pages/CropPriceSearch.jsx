@@ -19,7 +19,7 @@ const CropPriceSearch = () => {
 		markets: [],
 	});
 
-	const API_KEY = "579b464db66ec23bdd000001b7989edc4bf5498b587d7f532ea7c892";
+	const API_KEY = "579b464db66ec23bdd000001c1cf9a43e05746694f244a7f25d954f9";
 	const API_URL = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=${API_KEY}&format=json&limit=all`;
 
 	// Fetch data from Government API

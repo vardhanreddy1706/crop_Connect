@@ -28,6 +28,7 @@ import { NotificationProvider } from "./context/NotificationContext";
 import FarmerMyBookings from "./pages/FarmerBookings";
 import { LanguageProvider } from "./context/LanguageContext";
 import FarmerOrders from "./pages/FarmerOrders";
+import FarmerCropStatus from "./pages/FarmerCropStatus";
 // Dashboards
 import BuyerDashboard from "./dashboards/BuyerDashboard";
 import TractorDashboard from "./dashboards/TractorDashboard";
@@ -291,6 +292,7 @@ function AppRoutes() {
 					</ProtectedRoute>
 				}
 			/>
+			<Route path="/farmer-crop-status" element={<FarmerCropStatus />} />
 
 			{/* Help Routes - Protected */}
 			<Route
