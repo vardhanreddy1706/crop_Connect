@@ -9,6 +9,8 @@ const http = require("http");
 const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const errorHandler = require("./middlewares/errorHandler");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
 
 // Load environment variables
 dotenv.config();
@@ -78,6 +80,15 @@ try {
 
 // 1. Helmet - Set security headers
 app.use(helmet());
+
+app.get("/api/crop-prices", async (req, res) => {
+	const apiRes = await fetch(
+		"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=…&format=json&limit=all"
+	);
+	const data = await apiRes.json();
+	res.header("Access-Control-Allow-Origin", "*");
+	res.json(data);
+});
 
 
 // 3. CORS Configuration
@@ -170,6 +181,120 @@ io.on("connection", (socket) => {
 		console.log(`🔌 User disconnected: ${socket.id}`);
 	});
 });
+
+
+
+// Load environment variables FIRST
+dotenv.config();
+
+// Initialize Gemini AI
+let genAI = null;
+let model = null;
+
+try {
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.log("⚠️  GEMINI_API_KEY not found in .env");
+  } else {
+    console.log("🔑 Gemini API Key loaded:", apiKey.substring(0, 10) + "...");
+    genAI = new GoogleGenerativeAI(apiKey);
+    model = genAI.getGenerativeModel({
+			model: "gemini-2.5-pro",
+		});
+    console.log("✅ Gemini AI initialized successfully");
+  }
+} catch (error) {
+  console.error("❌ Failed to initialize Gemini AI:", error.message);
+}
+
+// ... rest of your server setup ...
+
+// ============================================
+// Chatbot Endpoint (REPLACE existing one)
+// ============================================
+app.post("/api/crop-connect-chat", async (req, res) => {
+	try {
+		const { message } = req.body;
+
+		// Validation
+		if (
+			!message ||
+			typeof message !== "string" ||
+			message.trim().length === 0
+		) {
+			return res.status(400).json({
+				success: false,
+				reply: "Please provide a valid message.",
+			});
+		}
+
+		// Check if Gemini is initialized
+		if (!model) {
+			console.error("❌ Gemini model not initialized");
+			return res.status(500).json({
+				success: false,
+				reply:
+					"AI service is not available. Please check server configuration.",
+			});
+		}
+
+		console.log("💬 User message:", message);
+
+		// Enhanced prompt for better responses
+		const prompt = `You are CropConnect's expert agricultural assistant. You help farmers with:
+- Crop selection and seasonal advice
+- Soil health and fertilization
+- Pest and disease management
+- Weather-based farming tips
+- Market prices and selling strategies
+- Irrigation and water management
+- Government schemes and subsidies
+- Best farming practices
+
+User question: "${message}"
+
+Provide a helpful, practical answer in 2-3 sentences. Be conversational and supportive.`;
+
+		// Generate response
+		const result = await model.generateContent(prompt);
+		const response = await result.response;
+		const text = response.text();
+
+		console.log("✅ AI Response generated");
+
+		res.json({
+			success: true,
+			reply: text.trim(),
+		});
+	} catch (error) {
+		console.error("❌ Chatbot error:", error);
+		console.error("Error details:", error.message);
+		console.error("Stack trace:", error.stack);
+
+		// Handle specific error types
+		if (error.message?.includes("API key")) {
+			return res.status(500).json({
+				success: false,
+				reply: "AI service configuration error. Please contact support.",
+			});
+		}
+
+		if (error.message?.includes("quota") || error.message?.includes("limit")) {
+			return res.status(429).json({
+				success: false,
+				reply: "AI service is temporarily busy. Please try again in a moment.",
+			});
+		}
+
+		res.status(500).json({
+			success: false,
+			reply: "I'm having trouble connecting right now. Please try again later.",
+		});
+	}
+});
+
+
 
 // ========================
 // IMPORT ROUTES

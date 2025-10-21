@@ -37,8 +37,8 @@ import FarmerDashboard from "./dashboards/Home";
 
 // Help Pages
 import HelpLayout from "./help/HelpLayout";
-import Faq from "./help/Faq";
-import PrivacyAndPolicy from "./help/PrivacyAndPolicy";
+import HelpFaqPrices from "./help/Faq";
+import PrivacyPolicy from "./help/PrivacyAndPolicy";
 import TermsAndConditions from "./help/TermsAndConditions";
 
 import "./App.css";
@@ -295,18 +295,12 @@ function AppRoutes() {
 			<Route path="/farmer-crop-status" element={<FarmerCropStatus />} />
 
 			{/* Help Routes - Protected */}
-			<Route
-				path="/help"
-				element={
-					<ProtectedRoute>
-						<HelpLayout />
-					</ProtectedRoute>
-				}
-			>
-				<Route index element={<Faq />} />
-				<Route path="faq" element={<Faq />} />
-				<Route path="privacy" element={<PrivacyAndPolicy />} />
-				<Route path="terms" element={<TermsAndConditions />} />
+
+			<Route path="/help" element={<HelpLayout />}>
+				<Route path="/help/contact" element={<Contact />} />
+				<Route path="/help/faq" element={<HelpFaqPrices />} />
+				<Route path="/help/privacy" element={<PrivacyPolicy />} />
+				<Route path="/help/terms" element={<TermsAndConditions />} />
 			</Route>
 
 			{/* Catch all - Redirect based on auth status */}

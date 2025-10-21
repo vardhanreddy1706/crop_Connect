@@ -1,12 +1,12 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from "react";
-import en from "../locales/en.json";
+
 import hi from "../locales/hi.json";
 import te from "../locales/te.json";
 
 const LanguageContext = createContext();
 
-const translations = { en, hi, te };
+const translations = {  hi, te };
 
 export const LanguageProvider = ({ children }) => {
 	const [language, setLanguage] = useState(() => {

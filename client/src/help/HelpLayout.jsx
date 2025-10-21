@@ -54,7 +54,7 @@ const HelpLayout = ({ title, children }) => {
 					<ul className="space-y-2 text-sm">
 						<li>
 							<Link
-								to="/help/faq-general"
+								to="/help/faq"
 								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
 							>
 								General FAQs
@@ -86,7 +86,7 @@ const HelpLayout = ({ title, children }) => {
 						</li>
 						<li>
 							<Link
-								to="/contact"
+								to="/help/contact"
 								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
 							>
 								Contact Support
@@ -104,7 +104,7 @@ const HelpLayout = ({ title, children }) => {
 						Our support team is here to help you
 					</p>
 					<Link
-						to="/contact"
+						to="/help/contact"
 						className="inline-block px-8 py-3 bg-white text-green-700 font-bold rounded-xl hover:bg-green-50 transition-all shadow-lg"
 					>
 						Contact Support

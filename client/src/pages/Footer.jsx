@@ -49,26 +49,27 @@ export default function Footer() {
 				</div>
 
 				{/* Helps */}
+				{/* Helps */}
 				<div>
 					<h3 className="font-semibold mb-3">Helps</h3>
 					<ul className="space-y-2 text-sm">
 						<li>
-							<Link to="/contact" className="hover:underline">
+							<Link to="/help/contact" className="hover:underline">
 								Contact
 							</Link>
 						</li>
 						<li>
-							<Link to="/faqs" className="hover:underline">
+							<Link to="/help/faq" className="hover:underline">
 								FAQs
 							</Link>
 						</li>
 						<li>
-							<Link to="/terms" className="hover:underline">
-								Terms &amp; Condition
+							<Link to="/help/terms" className="hover:underline">
+								Terms &amp; Conditions
 							</Link>
 						</li>
 						<li>
-							<Link to="/privacy" className="hover:underline">
+							<Link to="/help/privacy" className="hover:underline">
 								Privacy Policy
 							</Link>
 						</li>

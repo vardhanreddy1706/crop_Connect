@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+import Chatbot from "../components/ChatBot";
 
 import {
 	ShoppingCart,
@@ -22,7 +23,7 @@ import {
 	CheckCircle,
 	UserPlus,
 } from "lucide-react";
-import logo from "/cc.png";
+import logo from "/logo1.png";
 
 function CropConnectLanding() {
 	const navigate = useNavigate();
@@ -127,7 +128,7 @@ function CropConnectLanding() {
 					<div className="flex justify-between items-center h-20">
 						{/* Logo Section */}
 						<div className="flex items-center space-x-3">
-							<img src={logo} alt="Crop Connect Logo" className="h-10 w-auto" />
+							<img src={logo} alt="Crop Connect Logo" className="h-20 w-auto" />
 							<div>
 								<h1 className="text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-600 bg-clip-text text-transparent">
 									Crop Connect
@@ -544,6 +545,8 @@ function CropConnectLanding() {
 								</div>
 							</div>
 						</div>
+						{/* Embed Chatbot */}
+						<Chatbot />
 						{/* Social Media Column */}
 						<div>
 							<h3 className="text-xl font-bold mb-4">Follow Us</h3>

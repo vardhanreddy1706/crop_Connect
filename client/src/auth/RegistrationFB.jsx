@@ -31,6 +31,7 @@ const FormInput = ({
 	const isDropdown = !!children;
 
 	return (
+		
 		<div className="mb-4">
 			<label className="block mb-1 font-semibold text-gray-700 flex items-center">
 				{Icon && <Icon className="w-5 h-5 mr-2 text-green-600" />}
@@ -276,41 +277,52 @@ const RegisterFB = () => {
 
 	if (currentStep === "roleSelect") {
 		return (
-			<div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-6">
-				<div className="max-w-2xl w-full">
-					<div className="text-center mb-12">
-						<h1 className="text-4xl font-bold text-green-800 mb-3">
-							Crop Connect
-						</h1>
-						<p className="text-gray-600 text-lg">
-							Select your registration role
-						</p>
-					</div>
+			<div
+				className="min-h-screen relative flex items-center justify-center p-4"
+				style={{
+					backgroundImage: "url('/farm.jpg')",
+					backgroundSize: "cover",
+					backgroundPosition: "center",
+				}}
+			>
+				<div className="min-h-screen bg-gradient-to-br from-green-0 to-emerald-50 flex items-center justify-center p-6">
+					<div className="max-w-2xl w-full">
+						<div className="text-center mb-12">
+							<h1 className="text-4xl font-bold text-green-800 mb-3">
+								Crop Connect
+							</h1>
+							<p className="text-gray-600 text-lg">
+								Select your registration role
+							</p>
+						</div>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-						<button
-							onClick={() => {
-								setSelectedRole("farmer");
-								setCurrentStep("form");
-							}}
-							className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition border-2 border-transparent hover:border-green-500 text-left"
-						>
-							<Leaf className="w-12 h-12 text-green-600 mb-4" />
-							<h2 className="text-2xl font-bold text-gray-800 mb-2">Farmer</h2>
-							<p className="text-gray-600">Sell your agricultural produce</p>
-						</button>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<button
+								onClick={() => {
+									setSelectedRole("farmer");
+									setCurrentStep("form");
+								}}
+								className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition border-2 border-transparent hover:border-green-500 text-left"
+							>
+								<Leaf className="w-12 h-12 text-green-600 mb-4" />
+								<h2 className="text-2xl font-bold text-gray-800 mb-2">
+									Farmer
+								</h2>
+								<p className="text-gray-600">Sell your agricultural produce</p>
+							</button>
 
-						<button
-							onClick={() => {
-								setSelectedRole("buyer");
-								setCurrentStep("form");
-							}}
-							className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition border-2 border-transparent hover:border-green-500 text-left"
-						>
-							<Truck className="w-12 h-12 text-green-600 mb-4" />
-							<h2 className="text-2xl font-bold text-gray-800 mb-2">Buyer</h2>
-							<p className="text-gray-600">Buy fresh products directly</p>
-						</button>
+							<button
+								onClick={() => {
+									setSelectedRole("buyer");
+									setCurrentStep("form");
+								}}
+								className="p-8 bg-white rounded-2xl shadow-lg hover:shadow-2xl transition border-2 border-transparent hover:border-green-500 text-left"
+							>
+								<Truck className="w-12 h-12 text-green-600 mb-4" />
+								<h2 className="text-2xl font-bold text-gray-800 mb-2">Buyer</h2>
+								<p className="text-gray-600">Buy fresh products directly</p>
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
