@@ -64,8 +64,10 @@ export const NotificationBell = () => {
 											{!notif.read && (
 												<button
 													onClick={() => markAsRead(notif._id)}
-													className="text-blue-600 hover:text-blue-800"
-												/>
+													className="text-blue-600 hover:text-blue-800 text-xs"
+												>
+													Mark as read
+												</button>
 											)}
 											<button
 												onClick={() => deleteNotif(notif._id)}

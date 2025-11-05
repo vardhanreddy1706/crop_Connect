@@ -44,6 +44,68 @@ const sendEmail = async (to, subject, message, emailTransporter = null) => {
 
 class NotificationService {
 	// ========================================
+	// 0. GENERIC HELPERS FOR NEW USE CASES
+	// ========================================
+
+	static async notifyNewBookingForProvider(provider, booking, serviceType = "service", emailTransporter = null) {
+		const title = "🎉 New Booking Received";
+		const message = `You have a new ${serviceType} booking. Booking ID: ${booking._id}`;
+		// DB notification
+		await Notification.create({
+			recipientId: provider._id || provider,
+			type: "booking_received",
+			title,
+			message,
+			relatedBookingId: booking._id,
+		});
+		// Email
+		if (provider.email) {
+			await sendEmail(
+				provider.email,
+				"🎉 New Booking Received",
+				`You have received a new <strong>${serviceType}</strong> booking. Booking ID: <strong>${booking._id}</strong>. Please check your dashboard for details.`,
+				emailTransporter
+			);
+		}
+	}
+
+	static async notifyOrderCreatedForSeller(seller, order, emailTransporter = null) {
+		await Notification.create({
+			recipientId: seller._id || seller,
+			type: "new_order",
+			title: "🎉 New Order Received!",
+			message: `You have a new order #${String(order._id).slice(0,8)}`,
+			relatedOrderId: order._id,
+		});
+		if (seller.email) {
+			await sendEmail(
+				seller.email,
+				"🎉 New Order Received",
+				`You received a new order <strong>#${String(order._id).slice(0,8)}</strong> with total amount ₹${order.totalAmount}.`,
+				emailTransporter
+			);
+		}
+	}
+
+	static async notifyOrderCreatedForBuyer(buyer, order, emailTransporter = null) {
+		await Notification.create({
+			recipientId: buyer._id || buyer,
+			type: "order_placed",
+			title: "🛒 Order Placed Successfully",
+			message: `Your order #${String(order._id).slice(0,8)} has been placed`,
+			relatedOrderId: order._id,
+		});
+		if (buyer.email) {
+			await sendEmail(
+				buyer.email,
+				"🛒 Order Placed",
+				`Your order <strong>#${String(order._id).slice(0,8)}</strong> for ₹${order.totalAmount} has been placed successfully. We will keep you updated.`,
+				emailTransporter
+			);
+		}
+	}
+
+	// ========================================
 	// 1. AUTHENTICATION NOTIFICATIONS
 	// ========================================
 

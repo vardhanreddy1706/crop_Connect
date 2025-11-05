@@ -1,19 +1,47 @@
 const TractorService = require("../models/TractorService");
 const User = require("../models/User"); // ← ADD THIS
 const Notification = require("../models/Notification"); // ← ADD THIS
+const NotificationService = require("../services/notificationService");
 
 // @desc    Create tractor service (Enhanced with notifications)
 // @route   POST /api/tractors
 // @access  Private (Tractor Owner)
 exports.createTractorService = async (req, res) => {
 	try {
+		// Validate required scheduling fields
+		const { availableDate, availableTime } = req.body || {};
+		if (!availableDate || !availableTime) {
+			return res.status(400).json({
+				success: false,
+				message: "Available date and time are required",
+			});
+		}
+
+		// Compute a combined datetime for backward compatibility and easy checks
+		let combinedISO;
+		try {
+			const combined = new Date(`${availableDate}T${availableTime}`);
+			combinedISO = combined.toISOString();
+		} catch (e) {
+			return res.status(400).json({ success: false, message: "Invalid date/time" });
+		}
+
 		const tractorService = await TractorService.create({
 			...req.body,
+			availableDates: [combinedISO],
 			owner: req.user._id,
 		});
 
-		// Notify nearby farmers (optional - can be commented out if not needed)
+// Email owner about service posting (best-effort)
 		try {
+			await NotificationService.notifyTractorServicePosted(
+				req.user,
+				tractorService,
+				req.emailTransporter
+			);
+
+			// Notify nearby farmers (optional - can be commented out if not needed)
+			
 			const nearbyFarmers = await User.find({
 				role: "farmer",
 				"address.district": {
@@ -88,9 +116,25 @@ exports.getAllTractorServices = async (req, res) => {
 		if (location) query["location.district"] = new RegExp(location, "i");
 		if (availability) query.availability = availability === "true";
 
-		const tractorServices = await TractorService.find(query)
+		let tractorServices = await TractorService.find(query)
 			.populate("owner", "name phone email")
-			.sort({ createdAt: -1 });
+			.sort({ createdAt: -1 })
+			.lean();
+
+		// Ensure engagement reflects any active bookings
+		const serviceIds = tractorServices.map((s) => s._id);
+		const activeStatuses = ["pending", "confirmed", "in_progress"];
+		const activeBookings = await require("../models/Booking").find({
+			serviceId: { $in: serviceIds },
+			serviceType: "tractor",
+			status: { $in: activeStatuses },
+		}).select("serviceId").lean();
+		const engaged = new Set(activeBookings.map((b) => String(b.serviceId)));
+		tractorServices = tractorServices.map((s) => ({
+			...s,
+			isBooked: s.isBooked || engaged.has(String(s._id)),
+			availability: engaged.has(String(s._id)) ? false : s.availability,
+		}));
 
 		res.status(200).json({
 			success: true,
@@ -213,9 +257,24 @@ exports.deleteTractorService = async (req, res) => {
 // @access  Private (Tractor Owner)
 exports.getMyTractorServices = async (req, res) => {
 	try {
-		const tractorServices = await TractorService.find({
+		let tractorServices = await TractorService.find({
 			owner: req.user._id,
-		}).sort({ createdAt: -1 });
+		}).sort({ createdAt: -1 }).lean();
+
+		// Cross-check with active bookings to mark engaged
+		const serviceIds = tractorServices.map((s) => s._id);
+		const activeStatuses = ["pending", "confirmed", "in_progress"];
+		const activeBookings = await require("../models/Booking").find({
+			serviceId: { $in: serviceIds },
+			serviceType: "tractor",
+			status: { $in: activeStatuses },
+		}).select("serviceId").lean();
+		const engaged = new Set(activeBookings.map((b) => String(b.serviceId)));
+		tractorServices = tractorServices.map((s) => ({
+			...s,
+			isBooked: s.isBooked || engaged.has(String(s._id)),
+			availability: engaged.has(String(s._id)) ? false : s.availability,
+		}));
 
 		res.status(200).json({
 			success: true,

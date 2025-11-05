@@ -1,25 +1,31 @@
 const WorkerRequirement = require("../models/WorkerRequirement");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
-
 // @desc Post worker requirement by farmer
 // @route POST /api/worker-requirements
 // @access Private (Farmer)
 exports.createWorkerRequirement = async (req, res) => {
+
 	try {
 		const workerRequirement = await WorkerRequirement.create({
 			...req.body,
 			farmer: req.user._id,
 		});
 
-		// Find nearby workers
-		const nearbyWorkers = await User.find({
+		// Find nearby workers with gender filter
+		const gender = req.body.preferredGender;
+		const workerQuery = {
 			role: "worker",
 			"address.district": {
 				$regex: req.body.location?.district || "",
 				$options: "i",
 			},
-		}).select("_id name");
+		};
+		if (gender && gender !== "any") {
+			workerQuery.gender = gender;
+		}
+
+		const nearbyWorkers = await User.find(workerQuery).select("_id name");
 
 		// Notify nearby workers
 		const notifications = nearbyWorkers.map((worker) => ({
@@ -35,6 +41,7 @@ exports.createWorkerRequirement = async (req, res) => {
 				duration: req.body.duration || "1 day",
 				wagesOffered: req.body.wagesOffered,
 				location: req.body.location,
+				preferredGender: gender || "any",
 			},
 		}));
 
@@ -71,22 +78,28 @@ exports.getAllWorkerRequirements = async (req, res) => {
 		if (status) query.status = status;
 		else query.status = "open";
 
-		const workerRequirements = await WorkerRequirement.find(query)
+		// Enforce gender visibility: only show requirements matching worker gender or 'any'
+		if (req.user?.gender) {
+			query.preferredGender = { $in: ["any", req.user.gender] };
+		}
+
+		const results = await WorkerRequirement.find(query)
 			.populate("farmer", "name phone email address")
 			.sort({ createdAt: -1 })
 			.lean();
 
-		// ✅ Filter out requirements worker already applied to
-		const requirementsWithApplied = workerRequirements.map((req) => ({
-			...req,
-			hasApplied: req.applicants?.some(
-				(app) => app.worker.toString() === req.user?._id?.toString()
-			),
+		// ✅ Mark whether current worker already applied
+		const workerId = req.user?._id?.toString();
+		const workerRequirements = results.map((item) => ({
+			...item,
+			hasApplied: Array.isArray(item.applicants)
+				? item.applicants.some((app) => app.worker?.toString() === workerId)
+				: false,
 		}));
 
 		res.status(200).json({
 			success: true,
-			workerRequirements: requirementsWithApplied,
+			workerRequirements,
 		});
 	} catch (error) {
 		console.error("Get worker requirements error:", error);
@@ -140,6 +153,23 @@ exports.applyForRequirement = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "This job is no longer available",
+      });
+    }
+
+    // Enforce gender match
+    if (
+      requirement.preferredGender &&
+      requirement.preferredGender !== "any" &&
+      requirement.preferredGender !== req.user.gender
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          requirement.preferredGender === "female"
+            ? "This job is for female workers only"
+            : requirement.preferredGender === "male"
+            ? "This job is for male workers only"
+            : "You are not eligible to apply for this requirement",
       });
     }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 
 import api from "../config/api";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import {
 	Package,
 	Truck,
@@ -12,10 +13,11 @@ import {
 	MapPin,
 	Calendar,
 	Loader,
+	ArrowLeft,
 } from "lucide-react";
 
 function FarmerOrders() {
-
+	const navigate = useNavigate();
 	const [orders, setOrders] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [processing, setProcessing] = useState(null);
@@ -83,7 +85,12 @@ function FarmerOrders() {
 	return (
 		<div className="min-h-screen bg-gray-50 py-8">
 			<div className="max-w-7xl mx-auto px-4">
-				<h1 className="text-3xl font-bold mb-8">Crop Orders</h1>
+				<div className="flex items-center gap-3 mb-8">
+					<button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-200">
+						<ArrowLeft className="w-6 h-6" />
+					</button>
+					<h1 className="text-3xl font-bold">Crop Orders</h1>
+				</div>
 
 				{orders.length === 0 ? (
 					<div className="bg-white rounded-lg shadow p-12 text-center">

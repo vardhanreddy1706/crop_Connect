@@ -6,6 +6,7 @@ const TractorService = require("../models/TractorService"); // ✅ ADD THIS
 const WorkerService = require("../models/WorkerService"); // ✅ ADD THIS
 const User = require("../models/User");
 const Razorpay = require("razorpay");
+const NotificationService = require("../services/notificationService");
 const crypto = require("crypto");
 
 // Initialize Razorpay
@@ -37,17 +38,35 @@ const createBooking = async (req, res) => {
 			});
 		}
 
-		if (!tractorService.availability) {
-			return res.status(400).json({
+		// Prevent double booking when the service is engaged or already booked
+		if (!tractorService.availability || tractorService.isBooked) {
+			return res.status(409).json({
 				success: false,
-				message: "This tractor is not available",
+				message: "This tractor service is currently engaged or unavailable",
+			});
+		}
+		// Defensive: check any active booking exists for this service
+		const existingActive = await Booking.findOne({
+			serviceId: tractorServiceId,
+			serviceType: "tractor",
+			status: { $in: ["pending", "confirmed", "in_progress"] },
+		});
+		if (existingActive) {
+			return res.status(409).json({
+				success: false,
+				message: "This tractor service already has an active booking",
 			});
 		}
 
 		// Calculate cost
-		const totalCost = Math.round(
-			tractorService.chargePerAcre * (landSize || 1)
-		);
+		const acres = parseFloat(landSize || 1) || 1;
+		const totalCost = Math.round(tractorService.chargePerAcre * acres);
+
+		// Normalize location (string -> object)
+		let locationObj = location;
+		if (typeof location === "string") {
+			locationObj = { district: location, fullAddress: location };
+		}
 
 		// Create booking
 		const booking = await Booking.create({
@@ -59,12 +78,18 @@ const createBooking = async (req, res) => {
 			bookingDate,
 			duration: duration || 8,
 			totalCost,
-			location,
+			location: locationObj,
 			workType: workType || tractorService.typeOfPlowing,
-			landSize,
+			landSize: acres,
 			status: "confirmed",
 			paymentStatus: "pending",
 			notes,
+		});
+
+		// Mark the tractor service engaged immediately
+		await TractorService.findByIdAndUpdate(tractorServiceId, {
+			availability: false,
+			isBooked: true,
 		});
 
 		// Populate tractor owner details
@@ -75,23 +100,43 @@ const createBooking = async (req, res) => {
 			recipientId: tractorService.owner,
 			type: "booking_received",
 			title: "🎉 New Booking Received!",
-			message: `${req.user.name} has booked your tractor for ${workType}`,
+			message: `${req.user.name} has booked your tractor for ${workType || tractorService.typeOfPlowing}`,
 			relatedUserId: req.user._id,
 			data: {
 				bookingId: booking._id,
 				workType,
-				landSize,
+				landSize: acres,
 				totalCost,
 				bookingDate,
 			},
 		});
 
-		// Socket notification
+// Email notifications
+		try {
+			// Email farmer (booking confirmation)
+			await NotificationService.notifyBookingCreated(
+				req.user,
+				booking,
+				"tractor",
+				req.emailTransporter
+			);
+			// Email tractor owner (new booking received)
+			await NotificationService.notifyNewBookingForProvider(
+				booking.tractorOwnerId,
+				booking,
+				"tractor",
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (createBooking) error:", e.message);
+		}
+
+// Socket notification
 		if (req.io) {
 			req.io.to(tractorService.owner.toString()).emit("notification", {
 				type: "booking_received",
 				title: "🎉 New Booking!",
-				message: `New booking for ${workType}`,
+			message: `New booking for ${workType || tractorService.typeOfPlowing}`,
 				bookingId: booking._id,
 			});
 		}
@@ -138,9 +183,24 @@ const getFarmerTractorBookings = async (req, res) => {
 // Get farmer's worker bookings
 const getFarmerWorkerBookings = async (req, res) => {
 	try {
+		const bookings = await Booking.find({
+			farmer: req.user._id,
+			serviceType: "worker",
+		})
+			.populate("tractorOwnerId", "name phone email") // this is the worker user
+			.populate("serviceId")
+			.sort({ createdAt: -1 })
+			.lean();
+
+		// normalize to match frontend expectations
+		const normalized = bookings.map((b) => ({
+			...b,
+			serviceProvider: b.tractorOwnerId, // just like tractor bookings
+		}));
+
 		res.status(200).json({
 			success: true,
-			bookings: [],
+			bookings: normalized,
 		});
 	} catch (error) {
 		res.status(500).json({
@@ -174,11 +234,17 @@ const getFarmerTractorRequirements = async (req, res) => {
 };
 
 // Get farmer's worker requirements
+const WorkerRequirement = require("../models/WorkerRequirement");
 const getFarmerWorkerRequirements = async (req, res) => {
 	try {
+		const requirements = await WorkerRequirement.find({ farmer: req.user._id })
+			.populate("acceptedBy", "name phone email")
+			.sort({ createdAt: -1 })
+			.lean();
+
 		res.status(200).json({
 			success: true,
-			requirements: [],
+			requirements,
 		});
 	} catch (error) {
 		res.status(500).json({
@@ -358,6 +424,24 @@ const verifyPayment = async (req, res) => {
 			const isAuthentic = expectedSignature === razorpay_signature;
 
 			if (!isAuthentic) {
+// Email failure notifications (best-effort)
+				try {
+					await NotificationService.notifyPaymentFailed(
+						req.user,
+						{ amount: booking.totalCost, bookingId: booking._id },
+						req.emailTransporter
+					);
+					if (booking.tractorOwnerId) {
+						await NotificationService.notifyPaymentFailed(
+							booking.tractorOwnerId,
+							{ amount: booking.totalCost, bookingId: booking._id },
+							req.emailTransporter
+						);
+					}
+				} catch (e) {
+					console.error("Email notify (payment failed) error:", e.message);
+				}
+
 				return res.status(400).json({
 					success: false,
 					message: "Payment verification failed - Invalid signature",
@@ -386,7 +470,7 @@ const verifyPayment = async (req, res) => {
 			paidAt: new Date(),
 		});
 
-		// Notify tractor owner
+// Realtime notify tractor owner
 		if (req.io) {
 			req.io.to(booking.tractorOwnerId._id.toString()).emit("notification", {
 				type: "payment_received",
@@ -408,6 +492,22 @@ const verifyPayment = async (req, res) => {
 				amount: booking.totalCost,
 			},
 		});
+
+// Email notifications for payment
+		try {
+			await NotificationService.notifyPaymentReceived(
+				booking.tractorOwnerId,
+				transaction,
+				req.emailTransporter
+			);
+			await NotificationService.notifyPaymentSent(
+				req.user,
+				transaction,
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (verifyPayment) error:", e.message);
+		}
 
 		res.status(200).json({
 			success: true,
@@ -508,10 +608,10 @@ const completeWork = async (req, res) => {
 			});
 		}
 
-		// Create notification for farmer
+		// Create notification for farmer (ensure correct id shape)
 		await Notification.create({
-			recipientId: booking.farmer._id,
-			type: "work_completed",
+			recipientId: booking.farmer, // booking.farmer is an ObjectId; no ._id
+			type: "booking_completed",
 			title: "🎊 Work Completed!",
 			message: `${req.user.name} has marked the work as completed.`,
 			data: {
@@ -548,6 +648,14 @@ const cancelBooking = async (req, res) => {
 
 		booking.status = "cancelled";
 		await booking.save();
+
+		// Free up the service for future bookings
+		if (booking.serviceType === "tractor" && booking.serviceId) {
+			await TractorService.findByIdAndUpdate(booking.serviceId, {
+				availability: true,
+				isBooked: false,
+			});
+		}
 
 		// Notify other user
 		const otherUserId =
@@ -611,7 +719,7 @@ const completeBooking = async (req, res) => {
 		// Notify farmer
 		await Notification.create({
 			recipientId: booking.farmer,
-			type: "work_completed",
+			type: "booking_completed",
 			title: "🎊 Work Completed!",
 			message: `${req.user.name} has marked the work as completed. Please proceed with payment.`,
 			data: {

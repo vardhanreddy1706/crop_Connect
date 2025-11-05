@@ -4,7 +4,6 @@ import {
 	Phone,
 	Calendar,
 	MapPin,
-	DollarSign,
 	Clock,
 	CheckCircle,
 	XCircle,

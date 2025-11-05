@@ -7,7 +7,7 @@ import {
 	Briefcase,
 	MapPin,
 	Clock,
-	DollarSign,
+	IndianRupee,
 	ChevronDown,
 	User,
 } from "lucide-react";
@@ -365,7 +365,7 @@ function WorkerBooking() {
 							label="Wages Offered"
 							name="wagesOffered"
 							type="number"
-							icon={DollarSign}
+							icon={IndianRupee}
 							placeholder="500"
 							unit="₹ / Day"
 							min="0"

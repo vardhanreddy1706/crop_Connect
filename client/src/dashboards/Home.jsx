@@ -6,13 +6,15 @@ import Footer from "../pages/Footer.jsx";
 import FarmerCarousel from "../caurosel/Caurosel.jsx";
 import CropPriceSearch from "../pages/CropPriceSearch.jsx";
 import CropYieldPredictor from "../pages/CropYieldPredictor.jsx";
-
-
+import LanguageSelector from "../components/LanguageSelector.jsx";
+import { useLanguage } from "../context/LanguageContext";
+import Chatbot from "../components/ChatBot";
 
 export default function FarmerDashboard() {
 	const { user, logout } = useContext(AuthContext);
-	const nav = useNavigate();
+const nav = useNavigate();
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const { tr } = useLanguage();
 
 	const handleLogout = async () => {
 		try {
@@ -34,30 +36,24 @@ export default function FarmerDashboard() {
 		<>
 			<div className="w-full flex flex-col min-h-screen bg-white">
 				{/* ====== TOP BAR (Social + Welcome) ====== */}
-				<div className="mx-10 bg-gray-100 py-2 px-8 lg:px-12 xl:px-16 border-b border-gray-200">
-					<div className="max-w-[1440px] mx-auto flex items-center gap-8">
-						{/* Scrolling Text - Center/Right */}
-						<div className="flex-1 overflow-hidden">
-							<div className="animate-marquee flex whitespace-nowrap">
-								<span className="text-gray-600 text-sm mx-8">
-									🌾 Welcome to CropConnect
-								</span>
-								<span className="text-gray-600 text-sm mx-8">
-									Fresh Crops Direct from Farmers
-								</span>
-								<span className="text-gray-600 text-sm mx-8">
-									Quality Products at Best Prices
-								</span>
+				<div className="w-full bg-gray-100 py-2 px-4 md:px-8 border-b border-gray-200">
+					<div className="w-full flex items-center">
+						{/* Scrolling Text - Ticker */}
+						<div className="w-full overflow-hidden">
+<div className="animate-marquee flex whitespace-nowrap gap-12">
+								<span className="text-gray-600 text-sm">🌾 {tr("Welcome to CropConnect")}</span>
+								<span className="text-gray-600 text-sm">{tr("Fresh Crops Direct from Farmers")}</span>
+								<span className="text-gray-600 text-sm">{tr("Quality Products at Best Prices")}</span>
 							</div>
 						</div>
 					</div>
 				</div>
 
 				{/* ====== MAIN NAVBAR ====== */}
-				<nav className=" bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm mx-12">
-					<div className="max-w-[1920px] mx-auto flex items-center justify-evenly gap-12 sm:gap-4">
+				<nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm w-full">
+					<div className="max-w-[1920px] mx-auto px-4 md:px-8 flex items-center justify-between gap-4">
 						{/* Logo and Brand */}
-						<div className="flex items-center justify-center gap-1.5 sm:gap-2 md:gap-2.5 lg:gap-3 flex-shrink-0">
+						<div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
 							<div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 lg:w-10 lg:h-10 xl:w-11 xl:h-11 flex items-center justify-center">
 								<img
 									src="/logo1.png"
@@ -71,36 +67,42 @@ export default function FarmerDashboard() {
 						</div>
 
 						{/* Desktop Navigation - Hidden on mobile/tablet */}
-						<div className="hidden lg:flex items-center gap-10 xl:gap-6 2xl:gap-28 flex-grow justify-center">
+						<div className="hidden lg:flex items-center gap-8 xl:gap-10 flex-1 justify-center">
 							<Link
 								to="/"
 								className="text-gray-900 text-sm xl:text-base 2xl:text-lg font-medium border-b-2 border-green-600 pb-1 hover:text-green-700 transition-colors"
 							>
-								Home
+								{tr("Home")}
 							</Link>
 							<Link
 								to="/about"
 								className="text-gray-500 text-sm xl:text-base 2xl:text-lg font-medium hover:text-gray-900 hover:border-b-2 hover:border-green-600 pb-1 transition-all"
 							>
-								About
+								{tr("About")}
 							</Link>
 							<Link
 								to="/products"
 								className="text-gray-500 text-sm xl:text-base 2xl:text-lg font-medium hover:text-gray-900 hover:border-b-2 hover:border-green-600 pb-1 transition-all"
 							>
-								Products
+								{tr("Products")}
+							</Link>
+							<Link
+								to="/my-crops"
+								className="text-gray-500 text-sm xl:text-base 2xl:text-lg font-medium hover:text-gray-900 hover:border-b-2 hover:border-green-600 pb-1 transition-all"
+							>
+								{tr("Crop Listings")}
 							</Link>
 							<Link
 								to="/farmer-crop-status"
-								className="text-gray-500 text-base font-medium hover:text-gray-900 hover:border-b-2 hover:border-green-600 pb-1 transition-all"
+								className="text-gray-500 text-sm xl:text-base 2xl:text-lg font-medium hover:text-gray-900 hover:border-b-2 hover:border-green-600 pb-1 transition-all"
 							>
-								Crop status
+								{tr("Crop status")}
 							</Link>
 
 							{/* ===== BOOKINGS DROPDOWN WITH HOVER ===== */}
 							<div className="relative group">
-								<button className="text-gray-500 text-base font-medium hover:text-gray-900 pb-1 transition-all flex items-center gap-1">
-									Booking
+<button className="text-gray-500 text-base font-medium hover:text-gray-900 pb-1 transition-all flex items-center gap-1">
+									{tr("Booking")}
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
 										className="h-4 w-4 transition-transform group-hover:rotate-180 duration-300"
@@ -122,10 +124,10 @@ export default function FarmerDashboard() {
 									{/* Dropdown Header */}
 									<div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
 										<h3 className="text-white font-bold text-lg">
-											Booking Services
+											{tr("Booking Services")}
 										</h3>
 										<p className="text-green-100 text-xs mt-1">
-											Choose from our services
+											{tr("Choose from our services")}
 										</p>
 									</div>
 
@@ -140,10 +142,10 @@ export default function FarmerDashboard() {
 											</div>
 											<div className="flex-1">
 												<h4 className="font-semibold text-gray-800 group-hover/item:text-green-700 transition-colors">
-													Book Worker
+													{tr("Book Worker")}
 												</h4>
 												<p className="text-xs text-gray-500 mt-0.5">
-													Hire skilled farm workers
+													{tr("Hire skilled farm workers")}
 												</p>
 											</div>
 											<svg
@@ -173,10 +175,10 @@ export default function FarmerDashboard() {
 											</div>
 											<div className="flex-1">
 												<h4 className="font-semibold text-gray-800 group-hover/item:text-emerald-700 transition-colors">
-													Book Tractor
+													{tr("Book Tractor")}
 												</h4>
 												<p className="text-xs text-gray-500 mt-0.5">
-													Rent tractors & equipment
+													{tr("Rent tractors & equipment")}
 												</p>
 											</div>
 											<svg
@@ -208,10 +210,10 @@ export default function FarmerDashboard() {
 											</div>
 											<div className="flex-1">
 												<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
-													Booking History
+													{tr("Booking History")}
 												</h4>
 												<p className="text-xs text-gray-500 mt-0.5">
-													Past bookings & records
+													{tr("Past bookings & records")}
 												</p>
 											</div>
 											<svg
@@ -240,11 +242,11 @@ export default function FarmerDashboard() {
 												<span className="text-2xl">💰</span>
 											</div>
 											<div className="flex-1">
-												<h4 className="font-semibold text-gray-800 group-hover/item:text-yellow-700 transition-colors">
-													Transaction History
+<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
+													{tr("Transaction History")}
 												</h4>
-												<p className="text-xs text-gray-500 mt-0.5">
-													Payment & transaction logs
+<p className="text-xs text-gray-500 mt-0.5">
+													{tr("Payment & transaction logs")}
 												</p>
 											</div>
 											<svg
@@ -270,10 +272,10 @@ export default function FarmerDashboard() {
 												<span className="text-2xl">🕒</span>
 											</div>
 											<div className="flex-1">
-												<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
-													My Booking
+<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
+													{tr("My Booking")}
 												</h4>
-												<p className="text-xs text-gray-500 mt-0.5">Bookings</p>
+<p className="text-xs text-gray-500 mt-0.5">{tr("Bookings")}</p>
 											</div>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -296,7 +298,8 @@ export default function FarmerDashboard() {
 						</div>
 
 						{/* Right side - Icons & Buttons */}
-						<div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 lg:gap-3.5 xl:gap-14 flex-shrink-0">
+<div className="flex items-center gap-2 md:gap-3 xl:gap-6 flex-shrink-0">
+							<LanguageSelector />
 							{/* Search Icon - Hidden on small mobile */}
 							<button className="hidden sm:block w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-gray-500 hover:text-gray-700 transition-colors">
 								<svg
@@ -337,7 +340,7 @@ export default function FarmerDashboard() {
 									onClick={handleLogout}
 									className="hidden sm:block px-2.5 py-1.5 md:px-3 md:py-2 lg:px-4 lg:py-2 rounded-md text-white text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium bg-red-600 hover:bg-red-700 transition-colors whitespace-nowrap"
 								>
-									Logout
+									{tr("Logout")}
 								</button>
 							)}
 
@@ -381,69 +384,76 @@ export default function FarmerDashboard() {
 									className="text-gray-900 text-sm sm:text-base font-medium py-1 hover:bg-gray-50 rounded px-2 transition-colors"
 									onClick={() => setIsMobileMenuOpen(false)}
 								>
-									Home
+									{tr("Home")}
 								</Link>
 								<Link
 									to="/about"
 									className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-2 transition-colors"
 									onClick={() => setIsMobileMenuOpen(false)}
 								>
-									About
+									{tr("About")}
 								</Link>
 								<Link
 									to="/products"
 									className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-2 transition-colors"
 									onClick={() => setIsMobileMenuOpen(false)}
 								>
-									Products
+									{tr("Products")}
 								</Link>
 								<Link
-									to="/crops"
+									to="/my-crops"
 									className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-2 transition-colors"
 									onClick={() => setIsMobileMenuOpen(false)}
 								>
-									Crops
+									{tr("Crop Listings")}
+								</Link>
+								<Link
+									to="/farmer-crop-status"
+									className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-2 transition-colors"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("Crop status")}
 								</Link>
 
 								{/* Mobile Bookings Section */}
 								<div className="border-t border-gray-200 pt-2 mt-2">
-									<div className="text-gray-700 font-semibold text-sm mb-2 px-2">
-										Bookings
+<div className="text-gray-700 font-semibold text-sm mb-2 px-2">
+										{tr("Bookings")}
 									</div>
 									<Link
 										to="/book-worker"
 										className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-4 transition-colors flex items-center gap-2"
 										onClick={() => setIsMobileMenuOpen(false)}
 									>
-										<span>👷</span> Book Worker
+<span>👷</span> {tr("Book Worker")}
 									</Link>
 									<Link
 										to="/book-tractor"
 										className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-4 transition-colors flex items-center gap-2"
 										onClick={() => setIsMobileMenuOpen(false)}
 									>
-										<span>🚜</span> Book Tractor
+<span>🚜</span> {tr("Book Tractor")}
 									</Link>
 									<Link
 										to="/my-bookings"
 										className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-4 transition-colors flex items-center gap-2"
 										onClick={() => setIsMobileMenuOpen(false)}
 									>
-										<span>📋</span> My Bookings
+<span>📋</span> {tr("My Bookings")}
 									</Link>
 									<Link
 										to="/booking-history"
 										className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-4 transition-colors flex items-center gap-2"
 										onClick={() => setIsMobileMenuOpen(false)}
 									>
-										<span>🕒</span> Booking History
+										<span>🕒</span> {tr("Booking History")}
 									</Link>
 									<Link
 										to="/transaction-history"
 										className="text-gray-500 text-sm sm:text-base font-medium hover:text-gray-900 py-1 hover:bg-gray-50 rounded px-4 transition-colors flex items-center gap-2"
 										onClick={() => setIsMobileMenuOpen(false)}
 									>
-										<span>💰</span> Transaction History
+<span>💰</span> {tr("Transaction History")}
 									</Link>
 								</div>
 
@@ -457,7 +467,7 @@ export default function FarmerDashboard() {
 										onClick={handleLogout}
 										className="text-left px-3 py-2 rounded-md text-white text-sm sm:text-base font-medium bg-red-600 hover:bg-red-700 transition-colors"
 									>
-										Logout
+										{tr("Logout")}
 									</button>
 								)}
 							</div>
@@ -523,6 +533,7 @@ export default function FarmerDashboard() {
 			<CropPriceSearch />
 			<CropYieldPredictor />
 			<Footer />
+			<Chatbot />
 		</>
 	);
 }

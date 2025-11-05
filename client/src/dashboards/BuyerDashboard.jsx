@@ -5,7 +5,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
 	faShoppingBag,
-	faSignOutAlt,
 	faBoxOpen,
 	faTruckMoving,
 	faCreditCard,
@@ -22,6 +21,9 @@ import {
 	faTruck,
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../context/AuthContext";
+import { useLanguage } from "../context/LanguageContext";
+import DashboardNavbar from "../components/DashboardNavbar";
+import DashboardFooter from "../components/DashboardFooter";
 import api from "../config/api";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
@@ -54,6 +56,7 @@ console.log("🔑 Environment Check:", {
 
 function BuyerDashboard() {
 	const { user, logout } = useAuth();
+	const { tr } = useLanguage();
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 
@@ -414,901 +417,1040 @@ function BuyerDashboard() {
 						size="3x"
 						className="text-green-600 mb-4"
 					/>
-					<p>Loading user data...</p>
+					<p>{tr("Loading user data...")}</p>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50">
-			{/* Connection Status Banner */}
-			{!isConnected && (
-				<div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white py-3 px-4 text-center shadow-md">
-					<FontAwesomeIcon icon={faTimesCircle} className="mr-2" />
-					<span className="font-medium">
-						Real-time updates disconnected. Reconnecting...
-					</span>
-				</div>
-			)}
+		<div className="min-h-screen bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 flex flex-col">
+			<DashboardNavbar role="Buyer" userName={user?.name} onLogout={logout} />
+			<div className="pt-28 flex-1 pb-8">
+				{/* Connection Status Banner */}
+				{!isConnected && (
+					<div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white py-3 px-4 text-center shadow-md">
+						<FontAwesomeIcon icon={faTimesCircle} className="mr-2" />
+						<span className="font-medium">
+							{tr("Real-time updates disconnected. Reconnecting...")}
+						</span>
+					</div>
+				)}
 
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-				{/* Header Section */}
-				<div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
-					<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-						<div>
-							<h1 className="text-4xl font-bold text-gray-800 flex items-center gap-3">
-								<div className="bg-gradient-to-br from-green-500 to-emerald-600 p-3 rounded-xl shadow-md">
-									<FontAwesomeIcon
-										icon={faBoxOpen}
-										className="text-white"
-										size="lg"
-									/>
+				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+					{/* Header Section replaced by DashboardNavbar */}
+
+					{/* Stats Cards */}
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+						{/* Total Orders */}
+						<div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200">
+							<div className="flex items-center justify-between">
+								<div>
+									<p className="text-blue-100 text-sm font-medium mb-1">
+										{tr("Total Orders")} 📦
+									</p>
+									<p className="text-4xl font-bold">{orders.length}</p>
+									<p className="text-blue-100 text-xs mt-1">
+										{tr("All time orders")}
+									</p>
 								</div>
-								Buyer Dashboard
-							</h1>
-							<p className="text-gray-600 mt-2 ml-1">
-								Welcome back,{" "}
-								<span className="font-semibold text-green-700">
-									{user?.name}
-								</span>
-							</p>
-						</div>
-						<div className="flex items-center gap-3">
-							<button
-								onClick={() => navigate("/crops")}
-								className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-							>
-								<FontAwesomeIcon icon={faShoppingBag} />
-								Browse Crops
-							</button>
-							<button
-								onClick={logout}
-								className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-							>
-								<FontAwesomeIcon icon={faSignOutAlt} />
-								Logout
-							</button>
-						</div>
-					</div>
-				</div>
-
-				{/* Stats Cards */}
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-					{/* Total Orders */}
-					<div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200">
-						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-blue-100 text-sm font-medium mb-1">
-									Total Orders
-								</p>
-								<p className="text-4xl font-bold">{orders.length}</p>
-								<p className="text-blue-100 text-xs mt-1">All time orders</p>
-							</div>
-							<div className="bg-white bg-opacity-20 p-4 rounded-xl">
-								<FontAwesomeIcon icon={faBoxOpen} size="2x" />
-							</div>
-						</div>
-					</div>
-
-					{/* Active Orders */}
-					<div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200">
-						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-purple-100 text-sm font-medium mb-1">
-									Active Orders
-								</p>
-								<p className="text-4xl font-bold">
-									{
-										orders.filter((o) =>
-											["confirmed", "picked"].includes(o.status)
-										).length
-									}
-								</p>
-								<p className="text-purple-100 text-xs mt-1">In progress</p>
-							</div>
-							<div className="bg-white bg-opacity-20 p-4 rounded-xl">
-								<FontAwesomeIcon icon={faTruckMoving} size="2x" />
-							</div>
-						</div>
-					</div>
-
-					{/* Total Spent */}
-					<div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200 sm:col-span-2 lg:col-span-1">
-						<div className="flex items-center justify-between">
-							<div>
-								<p className="text-green-100 text-sm font-medium mb-1">
-									Total Spent
-								</p>
-								<p className="text-4xl font-bold">
-									₹
-									{orders
-										.filter((o) => o.status !== "cancelled")
-										.reduce((sum, o) => sum + o.totalAmount, 0)
-										.toLocaleString()}
-								</p>
-								<p className="text-green-100 text-xs mt-1">Successful orders</p>
-							</div>
-							<div className="bg-white bg-opacity-20 p-4 rounded-xl">
-								<FontAwesomeIcon icon={faCreditCard} size="2x" />
-							</div>
-						</div>
-					</div>
-				</div>
-
-				{/* Tabs */}
-				<div className="bg-white rounded-2xl shadow-lg mb-8 overflow-hidden">
-					<div className="flex border-b border-gray-200">
-						<button
-							onClick={() => setActiveTab("orders")}
-							className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 ${
-								activeTab === "orders"
-									? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
-									: "text-gray-600 hover:bg-gray-50"
-							}`}
-						>
-							<FontAwesomeIcon icon={faBoxOpen} className="mr-2" />
-							My Orders ({orders.length})
-						</button>
-						<button
-							onClick={() => setActiveTab("cart")}
-							className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 relative ${
-								activeTab === "cart"
-									? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
-									: "text-gray-600 hover:bg-gray-50"
-							}`}
-						>
-							<FontAwesomeIcon icon={faShoppingBag} className="mr-2" />
-							My Cart
-							{cart.length > 0 && (
-								<span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-									{cart.length}
-								</span>
-							)}
-						</button>
-					</div>
-				</div>
-
-				{/* Tab Content */}
-				{activeTab === "orders" ? (
-					<div className="space-y-6">
-						{orders.length === 0 ? (
-							<div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-								<div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4">
-									<FontAwesomeIcon
-										icon={faBoxOpen}
-										size="3x"
-										className="text-gray-400"
-									/>
-								</div>
-								<h3 className="text-xl font-semibold text-gray-800 mb-2">
-									No orders yet
-								</h3>
-								<p className="text-gray-600 mb-6">
-									Start shopping to see your orders here
-								</p>
-								<button
-									onClick={() => navigate("/crops")}
-									className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-								>
-									Browse Crops
-								</button>
-							</div>
-						) : (
-							orders.map((order) => (
 								<div
-									key={order._id}
-									className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-green-500"
+									className="bg-white/25 p-4 rounded-xl ring-1 ring-white/30 shadow-inner"
+									aria-hidden
 								>
-									{/* Order Header */}
-									<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-gray-200">
-										<div>
-											<h3 className="text-xl font-bold text-gray-800 mb-1">
-												Order #{order._id?.slice(-8).toUpperCase()}
-											</h3>
-											<p className="text-sm text-gray-500 flex items-center gap-2">
-												<FontAwesomeIcon
-													icon={faClock}
-													className="text-gray-400"
-												/>
-												{new Date(order.createdAt).toLocaleDateString("en-IN", {
-													dateStyle: "long",
-												})}
-											</p>
-											<p className="text-sm text-gray-600 mt-1">
-												<strong>Seller:</strong> {order.seller?.name} |{" "}
-												<a
-													href={`tel:${order.seller?.phone}`}
-													className="text-blue-600 hover:underline"
-												>
-													{order.seller?.phone}
-												</a>
-											</p>
-										</div>
-										<div className="flex items-center gap-3">
-											{order.status === "pending" && (
-												<div className="flex items-center gap-2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full">
-													<FontAwesomeIcon icon={faClock} />
-													<span className="font-semibold text-sm">PENDING</span>
-												</div>
-											)}
-											{order.status === "confirmed" && (
-												<div className="flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full">
-													<FontAwesomeIcon icon={faCheckCircle} />
-													<span className="font-semibold text-sm">
-														CONFIRMED
-													</span>
-												</div>
-											)}
-											{order.status === "picked" && (
-												<div className="flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full">
-													<FontAwesomeIcon icon={faTruckMoving} />
-													<span className="font-semibold text-sm">
-														IN TRANSIT
-													</span>
-												</div>
-											)}
-											{order.status === "completed" && (
-												<div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full">
-													<FontAwesomeIcon icon={faCheckCircle} />
-													<span className="font-semibold text-sm">
-														COMPLETED
-													</span>
-												</div>
-											)}
-											{order.status === "cancelled" && (
-												<div className="flex items-center gap-2 bg-red-100 text-red-800 px-4 py-2 rounded-full">
-													<FontAwesomeIcon icon={faTimesCircle} />
-													<span className="font-semibold text-sm">
-														CANCELLED
-													</span>
-												</div>
-											)}
-										</div>
-									</div>
+									<FontAwesomeIcon
+										icon={faBoxOpen}
+										size="2x"
+										className="drop-shadow"
+									/>
+								</div>
+							</div>
+						</div>
 
-									{/* Order Items */}
-									<div className="space-y-3 mb-6">
-										{order.items.map((item, i) => (
-											<div
-												key={i}
-												className="flex justify-between items-center bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-xl hover:shadow-md transition-shadow"
-											>
-												<div className="flex items-center gap-3">
-													{item.crop?.images?.[0] && (
-														<img
-															src={item.crop.images[0]}
-															alt={item.crop.cropName}
-															className="w-16 h-16 object-cover rounded-lg shadow-sm"
-														/>
-													)}
-													<div>
-														<p className="font-semibold text-gray-900 text-lg">
-															{item.crop?.cropName || "Crop"}
-														</p>
-														<p className="text-sm text-gray-600 mt-1">
-															{item.quantity} {item.crop?.unit || "quintal"} × ₹
-															{item.pricePerUnit.toLocaleString()}
-														</p>
-													</div>
-												</div>
-												<p className="text-xl font-bold text-green-600">
-													₹{item.total.toLocaleString()}
-												</p>
-											</div>
-										))}
-									</div>
+						{/* Active Orders */}
+						<div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200">
+							<div className="flex items-center justify-between">
+								<div>
+									<p className="text-purple-100 text-sm font-medium mb-1">
+										{tr("Active Orders")} 🚚
+									</p>
+									<p className="text-4xl font-bold">
+										{
+											orders.filter((o) =>
+												["confirmed", "picked"].includes(o.status)
+											).length
+										}
+									</p>
+									<p className="text-purple-100 text-xs mt-1">
+										{tr("In progress")}
+									</p>
+								</div>
+								<div
+									className="bg-white/25 p-4 rounded-xl ring-1 ring-white/30 shadow-inner"
+									aria-hidden
+								>
+									<FontAwesomeIcon
+										icon={faTruckMoving}
+										size="2x"
+										className="drop-shadow"
+									/>
+								</div>
+							</div>
+						</div>
 
-									{/* Vehicle & Pickup Details */}
-									{order.vehicleDetails && (
-										<div className="grid md:grid-cols-2 gap-4 mb-4 p-4 bg-blue-50 rounded-xl">
+						{/* Total Spent */}
+						<div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg p-6 text-white hover:shadow-xl transition-shadow duration-200 sm:col-span-2 lg:col-span-1">
+							<div className="flex items-center justify-between">
+								<div>
+									<p className="text-green-100 text-sm font-medium mb-1">
+										{tr("Total Spent")} 💳
+									</p>
+									<p className="text-4xl font-bold">
+										₹
+										{orders
+											.filter((o) => o.status !== "cancelled")
+											.reduce((sum, o) => sum + o.totalAmount, 0)
+											.toLocaleString()}
+									</p>
+									<p className="text-green-100 text-xs mt-1">
+										{tr("Successful orders")}
+									</p>
+								</div>
+								<div
+									className="bg-white/25 p-4 rounded-xl ring-1 ring-white/30 shadow-inner"
+									aria-hidden
+								>
+									<FontAwesomeIcon
+										icon={faCreditCard}
+										size="2x"
+										className="drop-shadow"
+									/>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					{/* Tabs */}
+					<div className="bg-white rounded-2xl shadow-lg mb-8 overflow-hidden">
+						<div className="flex border-b border-gray-200">
+							<button
+								onClick={() => setActiveTab("orders")}
+								className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 ${
+									activeTab === "orders"
+										? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
+										: "text-gray-600 hover:bg-gray-50"
+								}`}
+							>
+								<FontAwesomeIcon icon={faBoxOpen} className="mr-2" />
+								{tr("My Orders")} ({orders.length})
+							</button>
+							<button
+								onClick={() => setActiveTab("cart")}
+								className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 relative ${
+									activeTab === "cart"
+										? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
+										: "text-gray-600 hover:bg-gray-50"
+								}`}
+							>
+								<FontAwesomeIcon icon={faShoppingBag} className="mr-2" />
+								{tr("My Cart")}
+								{cart.length > 0 && (
+									<span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+										{cart.length}
+									</span>
+								)}
+							</button>
+							<button
+								onClick={() => setActiveTab("transactions")}
+								className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 ${
+									activeTab === "transactions"
+										? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
+										: "text-gray-600 hover:bg-gray-50"
+								}`}
+							>
+								<FontAwesomeIcon icon={faCreditCard} className="mr-2" />
+								{tr("Transaction History")}
+							</button>
+						</div>
+					</div>
+
+					{/* Tab Content */}
+					{activeTab === "orders" ? (
+						<div className="space-y-6">
+							{orders.length === 0 ? (
+								<div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+									<div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4">
+										<FontAwesomeIcon
+											icon={faBoxOpen}
+											size="3x"
+											className="text-gray-400"
+										/>
+									</div>
+									<h3 className="text-xl font-semibold text-gray-800 mb-2">
+										{tr("No orders yet")}
+									</h3>
+									<p className="text-gray-600 mb-6">
+										{tr("Start shopping to see your orders here")}
+									</p>
+									<button
+										onClick={() => navigate("/crops")}
+										className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+									>
+										{tr("Browse Crops")}
+									</button>
+								</div>
+							) : (
+								orders.map((order) => (
+									<div
+										key={order._id}
+										className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-green-500"
+									>
+										{/* Order Header */}
+										<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-gray-200">
 											<div>
-												<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+												<h3 className="text-xl font-bold text-gray-800 mb-1">
+													Order #{order._id?.slice(-8).toUpperCase()}
+												</h3>
+												<p className="text-sm text-gray-500 flex items-center gap-2">
 													<FontAwesomeIcon
-														icon={faTruck}
-														className="text-blue-600"
+														icon={faClock}
+														className="text-gray-400"
 													/>
-													Vehicle Details
-												</h4>
-												<p className="text-sm">
-													<strong>Type:</strong>{" "}
-													{order.vehicleDetails.vehicleType}
+													{new Date(order.createdAt).toLocaleDateString(
+														"en-IN",
+														{ dateStyle: "long" }
+													)}
 												</p>
-												<p className="text-sm">
-													<strong>Number:</strong>{" "}
-													{order.vehicleDetails.vehicleNumber}
-												</p>
-												<p className="text-sm">
-													<strong>Driver:</strong>{" "}
-													{order.vehicleDetails.driverName}
-												</p>
-												<p className="text-sm">
-													<strong>Phone:</strong>{" "}
+												<p className="text-sm text-gray-600 mt-1">
+													<strong>Seller:</strong> {order.seller?.name} |{" "}
 													<a
-														href={`tel:${order.vehicleDetails.driverPhone}`}
+														href={`tel:${order.seller?.phone}`}
 														className="text-blue-600 hover:underline"
 													>
-														{order.vehicleDetails.driverPhone}
+														{order.seller?.phone}
 													</a>
 												</p>
+												{order.seller?.address && (
+													<p className="text-xs text-gray-500 mt-1">
+														<strong>Seller Location:</strong>{" "}
+														{order.seller.address.village || ""}
+														{order.seller.address.village ? ", " : ""}
+														{order.seller.address.district || ""}
+														{order.seller.address.district ? ", " : ""}
+														{order.seller.address.state || ""}{" "}
+														{order.seller.address.pincode || ""}
+													</p>
+												)}
 											</div>
-											<div>
-												<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-													<FontAwesomeIcon
-														icon={faCalendar}
-														className="text-blue-600"
-													/>
-													Pickup Schedule
-												</h4>
-												<p className="text-sm">
-													<strong>Date:</strong>{" "}
-													{new Date(
-														order.pickupSchedule.date
-													).toLocaleDateString("en-IN")}
-												</p>
-												<p className="text-sm capitalize">
-													<strong>Time:</strong> {order.pickupSchedule.timeSlot}
-												</p>
-												<p className="text-sm mt-2">
-													<strong>Payment:</strong>{" "}
-													<span
-														className={`font-semibold ${
-															order.paymentStatus === "completed"
-																? "text-green-600"
-																: "text-orange-600"
-														}`}
-													>
-														{order.paymentMethod === "razorpay"
-															? "Paid Online"
-															: "Pay After Delivery"}{" "}
-														({order.paymentStatus})
-													</span>
-												</p>
+											<div className="flex items-center gap-3">
+												{order.status === "pending" && (
+													<div className="flex items-center gap-2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-full">
+														<FontAwesomeIcon icon={faClock} />
+														<span className="font-semibold text-sm">
+															PENDING
+														</span>
+													</div>
+												)}
+												{order.status === "confirmed" && (
+													<div className="flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full">
+														<FontAwesomeIcon icon={faCheckCircle} />
+														<span className="font-semibold text-sm">
+															CONFIRMED
+														</span>
+													</div>
+												)}
+												{order.status === "picked" && (
+													<div className="flex items-center gap-2 bg-purple-100 text-purple-800 px-4 py-2 rounded-full">
+														<FontAwesomeIcon icon={faTruckMoving} />
+														<span className="font-semibold text-sm">
+															IN TRANSIT
+														</span>
+													</div>
+												)}
+												{order.status === "completed" && (
+													<div className="flex items-center gap-2 bg-green-100 text-green-800 px-4 py-2 rounded-full">
+														<FontAwesomeIcon icon={faCheckCircle} />
+														<span className="font-semibold text-sm">
+															COMPLETED
+														</span>
+													</div>
+												)}
+												{order.status === "cancelled" && (
+													<div className="flex items-center gap-2 bg-red-100 text-red-800 px-4 py-2 rounded-full">
+														<FontAwesomeIcon icon={faTimesCircle} />
+														<span className="font-semibold text-sm">
+															CANCELLED
+														</span>
+													</div>
+												)}
 											</div>
 										</div>
-									)}
 
-									{/* Delivery Address */}
-									{order.deliveryAddress && (
+										{/* Order Items */}
+										<div className="space-y-3 mb-6">
+											{order.items.map((item, i) => (
+												<div
+													key={i}
+													className="flex justify-between items-center bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-xl hover:shadow-md transition-shadow"
+												>
+													<div className="flex items-center gap-3">
+														{item.crop?.images?.[0] && (
+															<img
+																src={item.crop.images[0]}
+																alt={item.crop.cropName}
+																className="w-16 h-16 object-cover rounded-lg shadow-sm"
+															/>
+														)}
+														<div>
+															<p className="font-semibold text-gray-900 text-lg">
+																{item.crop?.cropName || "Crop"}
+															</p>
+															<p className="text-sm text-gray-600 mt-1">
+																{item.quantity} {item.crop?.unit || "quintal"} ×
+																₹{item.pricePerUnit.toLocaleString()}
+															</p>
+														</div>
+													</div>
+													<p className="text-xl font-bold text-green-600">
+														₹{item.total.toLocaleString()}
+													</p>
+												</div>
+											))}
+										</div>
+
+										{/* Vehicle & Pickup Details */}
+										{order.vehicleDetails && (
+											<div className="grid md:grid-cols-2 gap-4 mb-4 p-4 bg-blue-50 rounded-xl">
+												<div>
+													<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+														<FontAwesomeIcon
+															icon={faTruck}
+															className="text-blue-600"
+														/>
+														{tr("Vehicle Details")}
+													</h4>
+													<p className="text-sm">
+														<strong>{tr("Type:")}</strong>{" "}
+														{order.vehicleDetails.vehicleType}
+													</p>
+													<p className="text-sm">
+														<strong>{tr("Number:")}</strong>{" "}
+														{order.vehicleDetails.vehicleNumber}
+													</p>
+													<p className="text-sm">
+														<strong>{tr("Driver:")}</strong>{" "}
+														{order.vehicleDetails.driverName}
+													</p>
+													<p className="text-sm">
+														<strong>{tr("Phone:")}</strong>{" "}
+														<a
+															href={`tel:${order.vehicleDetails.driverPhone}`}
+															className="text-blue-600 hover:underline"
+														>
+															{order.vehicleDetails.driverPhone}
+														</a>
+													</p>
+												</div>
+												<div>
+													<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+														<FontAwesomeIcon
+															icon={faCalendar}
+															className="text-blue-600"
+														/>
+														{tr("Pickup Schedule")}
+													</h4>
+													<p className="text-sm">
+														<strong>{tr("Date:")}</strong>{" "}
+														{new Date(
+															order.pickupSchedule.date
+														).toLocaleDateString("en-IN")}
+													</p>
+													<p className="text-sm capitalize">
+														<strong>{tr("Time:")}</strong>{" "}
+														{order.pickupSchedule.timeSlot}
+													</p>
+													<p className="text-sm mt-2">
+														<strong>{tr("Payment:")}</strong>{" "}
+														<span
+															className={`font-semibold ${
+																order.paymentStatus === "completed"
+																	? "text-green-600"
+																	: "text-orange-600"
+															}`}
+														>
+															{order.paymentMethod === "razorpay"
+																? "Paid Online"
+																: "Pay After Delivery"}{" "}
+															({order.paymentStatus})
+														</span>
+													</p>
+												</div>
+											</div>
+										)}
+
+										{/* Pick-up Address (Farmer/Seller) */}
 										<div className="mb-4 p-4 bg-green-50 rounded-xl">
 											<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
 												<FontAwesomeIcon
 													icon={faMapMarkerAlt}
 													className="text-green-600"
 												/>
-												Delivery Address
+												{tr("Pick-up Address (Farmer)")}
 											</h4>
-											<p className="text-sm">
-												{order.deliveryAddress.fullAddress}
-											</p>
+											{order.seller?.address ? (
+												<p className="text-sm">
+													{order.seller.address.village || ""}
+													{order.seller.address.village ? ", " : ""}
+													{order.seller.address.district || ""}
+													{order.seller.address.district ? ", " : ""}
+													{order.seller.address.state || ""}{" "}
+													{order.seller.address.pincode || ""}
+												</p>
+											) : (
+												<p className="text-sm text-gray-600">
+													{order.deliveryAddress?.fullAddress ||
+														tr("Address not available")}
+												</p>
+											)}
 										</div>
-									)}
 
-									{/* Order Total */}
-									<div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl mb-4">
-										<span className="text-lg font-semibold text-gray-800">
-											Order Total
-										</span>
-										<span className="text-2xl font-bold text-green-600">
-											₹{order.totalAmount.toLocaleString()}
-										</span>
+										{/* Order Total */}
+										<div className="flex justify-between items-center p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl mb-4">
+											<span className="text-lg font-semibold text-gray-800">
+												{tr("Order Total")}
+											</span>
+											<span className="text-2xl font-bold text-green-600">
+												₹{order.totalAmount.toLocaleString()}
+											</span>
+										</div>
+
+										{/* Actions */}
+										<div className="flex gap-3">
+											{(order.status === "pending" ||
+												order.status === "confirmed") && (
+												<button
+													onClick={() => handleCancelOrder(order._id)}
+													className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+												>
+													<FontAwesomeIcon icon={faTimesCircle} />
+													{tr("Cancel Order")}
+												</button>
+											)}
+											{order.status === "picked" && (
+												<button
+													onClick={() => handleCompleteOrder(order._id)}
+													className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+												>
+													<FontAwesomeIcon icon={faCheckCircle} />
+													{tr("Mark as Received")}
+												</button>
+											)}
+										</div>
 									</div>
-
-									{/* Actions */}
-									<div className="flex gap-3">
-										{(order.status === "pending" ||
-											order.status === "confirmed") && (
-											<button
-												onClick={() => handleCancelOrder(order._id)}
-												className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-											>
-												<FontAwesomeIcon icon={faTimesCircle} />
-												Cancel Order
-											</button>
-										)}
-										{order.status === "picked" && (
-											<button
-												onClick={() => handleCompleteOrder(order._id)}
-												className="flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-											>
-												<FontAwesomeIcon icon={faCheckCircle} />
-												Mark as Received
-											</button>
-										)}
-									</div>
-								</div>
-							))
-						)}
-					</div>
-				) : (
-					// Cart Tab
-					<div className="bg-white rounded-2xl shadow-lg p-8">
-						{cart.length === 0 ? (
-							<div className="text-center py-16">
-								<div className="bg-gray-100 w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6">
-									<FontAwesomeIcon
-										icon={faShoppingBag}
-										className="text-gray-400"
-										size="4x"
-									/>
-								</div>
-								<h3 className="text-2xl font-bold text-gray-800 mb-3">
-									Your cart is empty
-								</h3>
-								<p className="text-gray-600 mb-8">
-									Discover fresh crops from local farmers
-								</p>
-								<button
-									onClick={() => navigate("/crops")}
-									className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-10 py-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-semibold text-lg"
-								>
-									Start Shopping
-								</button>
-							</div>
-						) : (
-							<div>
-								<h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-3">
-									<FontAwesomeIcon
-										icon={faShoppingBag}
-										className="text-green-600"
-									/>
-									Shopping Cart
-									<span className="text-gray-500 text-lg">
-										({cart.length} items)
-									</span>
-								</h3>
-
-								<div className="space-y-4 mb-8">
-									{cart.map((item) => {
-										const itemId = getItemId(item);
-										const itemName = getItemName(item);
-										const unitPrice = getUnitPrice(item);
-										const quantity = getQuantity(item);
-										const unit = getItemUnit(item);
-										const availableQty = getAvailableQuantity(item);
-										const lineTotal = unitPrice * quantity;
-										const isAtMaxQuantity = quantity >= availableQty;
-										const isAtMinQuantity = quantity <= 1;
-
-										return (
+								))
+							)}
+						</div>
+					) : activeTab === "transactions" ? (
+						<div className="bg-white rounded-2xl shadow-lg p-6">
+							<h3 className="text-xl font-bold text-gray-800 mb-4">
+								Transaction History
+							</h3>
+							{orders.length === 0 ? (
+								<p className="text-gray-500">No transactions yet.</p>
+							) : (
+								<div className="space-y-3">
+									{orders
+										.filter(
+											(o) =>
+												(o.paymentMethod === "razorpay" &&
+													o.razorpayPaymentId) ||
+												(o.paymentMethod === "payAfterDelivery" &&
+													o.paymentStatus === "completed")
+										)
+										.sort(
+											(a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+										)
+										.map((o) => (
 											<div
-												key={itemId}
-												className="flex flex-col md:flex-row items-center justify-between border-2 border-gray-200 p-5 rounded-2xl hover:border-green-300 hover:shadow-lg transition-all duration-200 relative bg-gradient-to-r from-white to-gray-50"
+												key={o._id}
+												className="border border-gray-200 rounded-xl p-4 hover:shadow-sm"
 											>
-												<div className="flex-1 mb-4 md:mb-0">
-													<h4 className="font-bold text-gray-900 text-xl mb-2">
-														{itemName}
-													</h4>
-													<p className="text-lg text-gray-700 mb-2">
-														₹{unitPrice.toLocaleString()}
-														<span className="text-gray-500">/{unit}</span>
-													</p>
-													<div className="flex items-center gap-2">
-														<span
-															className={`inline-block w-3 h-3 rounded-full ${
-																availableQty > 5
-																	? "bg-green-500"
-																	: "bg-orange-500"
+												<div className="flex justify-between items-start">
+													<div>
+														<p className="font-semibold text-gray-800">
+															{o.paymentMethod === "razorpay"
+																? "Online (Razorpay)"
+																: "Pay After Delivery"}
+														</p>
+														<p className="text-xs text-gray-500">
+															Order #{o._id.slice(-8).toUpperCase()} •{" "}
+															{new Date(o.createdAt).toLocaleString("en-IN")}
+														</p>
+														<p className="text-xs text-gray-500">
+															Seller: {o.seller?.name || "Farmer"}
+														</p>
+													</div>
+													<div className="text-right">
+														<p className="text-lg font-bold text-green-600">
+															₹{o.totalAmount.toLocaleString()}
+														</p>
+														<p
+															className={`text-xs font-semibold ${
+																(o.paymentMethod === "razorpay" &&
+																	o.razorpayPaymentId) ||
+																o.paymentStatus === "completed"
+																	? "text-green-600"
+																	: "text-orange-600"
 															}`}
-														></span>
-														<p className="text-sm text-gray-600">
-															Available:{" "}
-															<span className="font-bold text-gray-800">
-																{availableQty} {unit}
-															</span>
+														>
+															{(o.paymentMethod === "razorpay" &&
+																o.razorpayPaymentId) ||
+															o.paymentStatus === "completed"
+																? "COMPLETED"
+																: "PENDING"}
 														</p>
 													</div>
 												</div>
-
-												<div className="flex items-center gap-6">
-													{/* Quantity Controls */}
-													<div className="flex flex-col items-center gap-2">
-														<div className="flex items-center gap-2 border-2 border-gray-300 rounded-xl bg-white shadow-sm">
-															<button
-																onClick={() =>
-																	handleUpdateQuantity(
-																		itemId,
-																		quantity - 1,
-																		availableQty
-																	)
-																}
-																disabled={isAtMinQuantity}
-																className="px-4 py-3 hover:bg-green-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-l-xl"
-																title={
-																	isAtMinQuantity
-																		? "Minimum quantity is 1"
-																		: "Decrease quantity"
-																}
+												{/* Items purchased */}
+												{Array.isArray(o.items) && o.items.length > 0 && (
+													<div className="mt-3 border-t border-gray-100 pt-3 space-y-2">
+														{o.items.map((it, idx) => (
+															<div
+																key={idx}
+																className="flex justify-between text-sm text-gray-700"
 															>
-																<FontAwesomeIcon
-																	icon={faMinus}
-																	className="text-gray-700"
-																/>
-															</button>
-
-															<span className="px-6 font-bold text-xl min-w-[50px] text-center text-gray-900">
-																{quantity}
-															</span>
-
-															<button
-																onClick={() =>
-																	handleUpdateQuantity(
-																		itemId,
-																		quantity + 1,
-																		availableQty
-																	)
-																}
-																disabled={isAtMaxQuantity}
-																className="px-4 py-3 hover:bg-green-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-r-xl"
-																title={
-																	isAtMaxQuantity
-																		? `Maximum ${availableQty} ${unit} available`
-																		: "Increase quantity"
-																}
-															>
-																<FontAwesomeIcon
-																	icon={faPlus}
-																	className="text-gray-700"
-																/>
-															</button>
-														</div>
-														{isAtMaxQuantity && (
-															<span className="text-xs text-orange-600 font-semibold bg-orange-100 px-3 py-1 rounded-full">
-																Max stock reached
-															</span>
-														)}
-													</div>
-
-													{/* Line Total */}
-													<div className="text-right min-w-[140px]">
-														<p className="text-sm text-gray-500 mb-1">Total</p>
-														<p className="font-bold text-gray-900 text-2xl">
-															₹{lineTotal.toLocaleString()}
-														</p>
-													</div>
-
-													{/* Remove Button */}
-													<button
-														onClick={() => handleRemoveFromCart(itemId)}
-														className="text-red-600 hover:bg-red-50 p-3 rounded-xl transition-colors ml-2"
-														title="Remove from cart"
-													>
-														<FontAwesomeIcon icon={faTrash} size="lg" />
-													</button>
-												</div>
-
-												{isAtMaxQuantity && (
-													<div className="absolute -top-3 -right-3">
-														<span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
-															MAX
-														</span>
+																<span>
+																	{it.crop?.cropName || "Crop"} • {it.quantity}{" "}
+																	{it.crop?.unit || "quintal"} × ₹
+																	{Number(
+																		it.pricePerUnit || 0
+																	).toLocaleString()}
+																</span>
+																<span className="font-semibold">
+																	₹{Number(it.total || 0).toLocaleString()}
+																</span>
+															</div>
+														))}
 													</div>
 												)}
 											</div>
-										);
-									})}
-								</div>
-
-								{/* Cart Summary */}
-								<div className="border-t-2 border-gray-300 pt-6 mb-8">
-									<div className="flex justify-between items-center bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl shadow-md">
-										<span className="text-2xl font-bold text-gray-800">
-											Cart Total:
-										</span>
-										<span className="text-4xl font-bold text-green-600">
-											₹{cartTotal.toLocaleString()}
-										</span>
-									</div>
-								</div>
-
-								{/* Checkout Button */}
-								<button
-									onClick={() => setShowCheckoutModal(true)}
-									className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-5 rounded-2xl transition-all duration-200 font-bold text-lg flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
-								>
-									<FontAwesomeIcon icon={faShoppingBag} size="lg" />
-									Proceed to Checkout
-								</button>
-							</div>
-						)}
-					</div>
-				)}
-
-				{/* Checkout Modal */}
-				{showCheckoutModal && (
-					<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-						<div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-							{/* Modal Header */}
-							<div className="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6 rounded-t-3xl flex justify-between items-center shadow-lg z-10">
-								<h2 className="text-3xl font-bold flex items-center gap-3">
-									<FontAwesomeIcon icon={faShoppingBag} />
-									Checkout
-								</h2>
-								<button
-									onClick={() => setShowCheckoutModal(false)}
-									className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition-all"
-								>
-									<FontAwesomeIcon icon={faTimes} size="lg" />
-								</button>
-							</div>
-
-							<div className="p-8">
-								{/* Vehicle Details Section */}
-								<div className="mb-8">
-									<h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-										<FontAwesomeIcon
-											icon={faTruckMoving}
-											className="text-green-600"
-										/>
-										Vehicle Details
-									</h3>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">
-												Vehicle Type *
-											</label>
-											<select
-												value={vehicleDetails.vehicleType}
-												onChange={(e) =>
-													setVehicleDetails({
-														...vehicleDetails,
-														vehicleType: e.target.value,
-													})
-												}
-												className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-											>
-												<option value="">Select Vehicle Type</option>
-												<option value="Truck">Truck</option>
-												<option value="Tempo">Tempo</option>
-												<option value="Tractor">Tractor</option>
-												<option value="Mini Truck">Mini Truck</option>
-											</select>
-										</div>
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">
-												Vehicle Number *
-											</label>
-											<input
-												type="text"
-												value={vehicleDetails.vehicleNumber}
-												onChange={(e) =>
-													setVehicleDetails({
-														...vehicleDetails,
-														vehicleNumber: e.target.value,
-													})
-												}
-												placeholder="e.g., MH12AB1234"
-												className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">
-												Driver Name *
-											</label>
-											<input
-												type="text"
-												value={vehicleDetails.driverName}
-												onChange={(e) =>
-													setVehicleDetails({
-														...vehicleDetails,
-														driverName: e.target.value,
-													})
-												}
-												placeholder="Driver's Full Name"
-												className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">
-												Driver Phone *
-											</label>
-											<input
-												type="tel"
-												value={vehicleDetails.driverPhone}
-												onChange={(e) =>
-													setVehicleDetails({
-														...vehicleDetails,
-														driverPhone: e.target.value,
-													})
-												}
-												placeholder="10-digit mobile number"
-												className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-											/>
-										</div>
-									</div>
-								</div>
-
-								{/* Pickup Schedule Section */}
-								<div className="mb-8">
-									<h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-										<FontAwesomeIcon
-											icon={faClock}
-											className="text-green-600"
-										/>
-										Pickup Schedule
-									</h3>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">
-												Pickup Date *
-											</label>
-											<input
-												type="date"
-												value={pickupSchedule.date}
-												onChange={(e) =>
-													setPickupSchedule({
-														...pickupSchedule,
-														date: e.target.value,
-													})
-												}
-												min={new Date().toISOString().split("T")[0]}
-												className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-											/>
-										</div>
-										<div>
-											<label className="block text-sm font-semibold mb-2 text-gray-700">
-												Time Slot *
-											</label>
-											<select
-												value={pickupSchedule.timeSlot}
-												onChange={(e) =>
-													setPickupSchedule({
-														...pickupSchedule,
-														timeSlot: e.target.value,
-													})
-												}
-												className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
-											>
-												<option value="morning">
-													🌅 Morning (6 AM - 12 PM)
-												</option>
-												<option value="afternoon">
-													☀️ Afternoon (12 PM - 6 PM)
-												</option>
-												<option value="evening">
-													🌆 Evening (6 PM - 9 PM)
-												</option>
-											</select>
-										</div>
-									</div>
-								</div>
-
-								{/* Payment Method Section */}
-								<div className="mb-8">
-									<h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
-										<FontAwesomeIcon
-											icon={faCreditCard}
-											className="text-green-600"
-										/>
-										Payment Method
-									</h3>
-									<div className="space-y-3">
-										<label className="flex items-center gap-3 p-5 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
-											<input
-												type="radio"
-												value="razorpay"
-												checked={paymentMethod === "razorpay"}
-												onChange={(e) => setPaymentMethod(e.target.value)}
-												className="w-5 h-5 text-green-600"
-											/>
-											<div className="flex-1">
-												<span className="font-semibold text-gray-800">
-													Pay Online (Razorpay)
-												</span>
-												<p className="text-sm text-gray-600 mt-1">
-													Secure payment via UPI, Cards, Net Banking
-												</p>
-											</div>
-											<div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
-												RECOMMENDED
-											</div>
-										</label>
-										<label className="flex items-center gap-3 p-5 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
-											<input
-												type="radio"
-												value="payAfterDelivery"
-												checked={paymentMethod === "payAfterDelivery"}
-												onChange={(e) => setPaymentMethod(e.target.value)}
-												className="w-5 h-5 text-green-600"
-											/>
-											<div className="flex-1">
-												<span className="font-semibold text-gray-800">
-													Pay After Delivery
-												</span>
-												<p className="text-sm text-gray-600 mt-1">
-													Pay when you receive your order
-												</p>
-											</div>
-										</label>
-									</div>
-								</div>
-
-								{/* Order Summary Section */}
-								<div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl border-2 border-green-200">
-									<h3 className="font-bold text-lg mb-4 text-gray-800">
-										Order Summary
-									</h3>
-									<div className="space-y-3">
-										{cart.map((item) => (
-											<div
-												key={getItemId(item)}
-												className="flex justify-between text-sm text-gray-700"
-											>
-												<span>
-													{getItemName(item)} × {getQuantity(item)}{" "}
-													{getItemUnit(item)}
-												</span>
-												<span className="font-semibold">
-													₹
-													{(
-														getUnitPrice(item) * getQuantity(item)
-													).toLocaleString()}
-												</span>
-											</div>
 										))}
-										<div className="flex justify-between text-gray-700 pt-2 border-t border-green-300">
-											<span className="font-medium">
-												Items ({cart.length}):
+								</div>
+							)}
+						</div>
+					) : (
+						<div className="bg-white rounded-2xl shadow-lg p-8">
+							{cart.length === 0 ? (
+								<div className="text-center py-16">
+									<div className="bg-gray-100 w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-6">
+										<FontAwesomeIcon
+											icon={faShoppingBag}
+											className="text-gray-400"
+											size="4x"
+										/>
+									</div>
+									<h3 className="text-2xl font-bold text-gray-800 mb-3">
+										{tr("Your cart is empty")}
+									</h3>
+									<p className="text-gray-600 mb-8">
+										{tr("Discover fresh crops from local farmers")}
+									</p>
+									<button
+										onClick={() => navigate("/crops")}
+										className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-10 py-4 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-semibold text-lg"
+									>
+										{tr("Start Shopping")}
+									</button>
+								</div>
+							) : (
+								<div>
+									<h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-3">
+										<FontAwesomeIcon
+											icon={faShoppingBag}
+											className="text-green-600"
+										/>
+										{tr("Shopping Cart")}
+										<span className="text-gray-500 text-lg">
+											({cart.length} {tr("items")})
+										</span>
+									</h3>
+
+									<div className="space-y-4 mb-8">
+										{cart.map((item) => {
+											const itemId = getItemId(item);
+											const itemName = getItemName(item);
+											const unitPrice = getUnitPrice(item);
+											const quantity = getQuantity(item);
+											const unit = getItemUnit(item);
+											const availableQty = getAvailableQuantity(item);
+											const lineTotal = unitPrice * quantity;
+											const isAtMaxQuantity = quantity >= availableQty;
+											const isAtMinQuantity = quantity <= 1;
+
+											return (
+												<div
+													key={itemId}
+													className="flex flex-col md:flex-row items-center justify-between border-2 border-gray-200 p-5 rounded-2xl hover:border-green-300 hover:shadow-lg transition-all duration-200 relative bg-gradient-to-r from-white to-gray-50"
+												>
+													<div className="flex-1 mb-4 md:mb-0">
+														<h4 className="font-bold text-gray-900 text-xl mb-2">
+															{itemName}
+														</h4>
+														<p className="text-lg text-gray-700 mb-2">
+															₹{unitPrice.toLocaleString()}
+															<span className="text-gray-500">/{unit}</span>
+														</p>
+														<div className="flex items-center gap-2">
+															<span
+																className={`inline-block w-3 h-3 rounded-full ${
+																	availableQty > 5
+																		? "bg-green-500"
+																		: "bg-orange-500"
+																}`}
+															></span>
+															<p className="text-sm text-gray-600">
+																{tr("Available:")}{" "}
+																<span className="font-bold text-gray-800">
+																	{availableQty} {unit}
+																</span>
+															</p>
+														</div>
+													</div>
+
+													<div className="flex items-center gap-6">
+														{/* Quantity Controls */}
+														<div className="flex flex-col items-center gap-2">
+															<div className="flex items-center gap-2 border-2 border-gray-300 rounded-xl bg-white shadow-sm">
+																<button
+																	onClick={() =>
+																		handleUpdateQuantity(
+																			itemId,
+																			quantity - 1,
+																			availableQty
+																		)
+																	}
+																	disabled={isAtMinQuantity}
+																	className="px-4 py-3 hover:bg-green-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-l-xl"
+																	title={
+																		isAtMinQuantity
+																			? "Minimum quantity is 1"
+																			: "Decrease quantity"
+																	}
+																>
+																	<FontAwesomeIcon
+																		icon={faMinus}
+																		className="text-gray-700"
+																	/>
+																</button>
+
+																<span className="px-6 font-bold text-xl min-w-[50px] text-center text-gray-900">
+																	{quantity}
+																</span>
+
+																<button
+																	onClick={() =>
+																		handleUpdateQuantity(
+																			itemId,
+																			quantity + 1,
+																			availableQty
+																		)
+																	}
+																	disabled={isAtMaxQuantity}
+																	className="px-4 py-3 hover:bg-green-50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-r-xl"
+																	title={
+																		isAtMaxQuantity
+																			? `Maximum ${availableQty} ${unit} available`
+																			: "Increase quantity"
+																	}
+																>
+																	<FontAwesomeIcon
+																		icon={faPlus}
+																		className="text-gray-700"
+																	/>
+																</button>
+															</div>
+															{isAtMaxQuantity && (
+																<span className="text-xs text-orange-600 font-semibold bg-orange-100 px-3 py-1 rounded-full">
+																	Max stock reached
+																</span>
+															)}
+														</div>
+
+														{/* Line Total */}
+														<div className="text-right min-w-[140px]">
+															<p className="text-sm text-gray-500 mb-1">
+																Total
+															</p>
+															<p className="font-bold text-gray-900 text-2xl">
+																₹{lineTotal.toLocaleString()}
+															</p>
+														</div>
+
+														{/* Remove Button */}
+														<button
+															onClick={() => handleRemoveFromCart(itemId)}
+															className="text-red-600 hover:bg-red-50 p-3 rounded-xl transition-colors ml-2"
+															title="Remove from cart"
+														>
+															<FontAwesomeIcon icon={faTrash} size="lg" />
+														</button>
+													</div>
+
+													{isAtMaxQuantity && (
+														<div className="absolute -top-3 -right-3">
+															<span className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
+																MAX
+															</span>
+														</div>
+													)}
+												</div>
+											);
+										})}
+									</div>
+
+									{/* Cart Summary */}
+									<div className="border-t-2 border-gray-300 pt-6 mb-8">
+										<div className="flex justify-between items-center bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl shadow-md">
+											<span className="text-2xl font-bold text-gray-800">
+												Cart Total:
 											</span>
-											<span className="font-semibold">
-												₹{cartTotal.toLocaleString()}
-											</span>
-										</div>
-										<div className="flex justify-between text-gray-700">
-											<span className="font-medium">Delivery Charges:</span>
-											<span className="font-semibold text-green-600">FREE</span>
-										</div>
-										<div className="border-t-2 border-green-300 pt-3 flex justify-between items-center">
-											<span className="text-xl font-bold text-gray-800">
-												Total Amount:
-											</span>
-											<span className="text-3xl font-bold text-green-600">
+											<span className="text-4xl font-bold text-green-600">
 												₹{cartTotal.toLocaleString()}
 											</span>
 										</div>
 									</div>
-								</div>
 
-								{/* Action Buttons */}
-								<div className="flex gap-4">
+									{/* Checkout Button */}
+									<button
+										onClick={() => setShowCheckoutModal(true)}
+										className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white px-8 py-5 rounded-2xl transition-all duration-200 font-bold text-lg flex items-center justify-center gap-3 shadow-lg hover:shadow-xl"
+									>
+										<FontAwesomeIcon icon={faShoppingBag} size="lg" />
+										Proceed to Checkout
+									</button>
+								</div>
+							)}
+						</div>
+					)}
+
+					{/* Checkout Modal */}
+					{showCheckoutModal && (
+						<div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+							<div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+								{/* Modal Header */}
+								<div className="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6 rounded-t-3xl flex justify-between items-center shadow-lg z-10">
+									<h2 className="text-3xl font-bold flex items-center gap-3">
+										<FontAwesomeIcon icon={faShoppingBag} />
+										Checkout
+									</h2>
 									<button
 										onClick={() => setShowCheckoutModal(false)}
-										className="flex-1 border-2 border-gray-300 text-gray-700 py-4 rounded-xl hover:bg-gray-50 transition-all font-semibold text-lg"
-										disabled={processing}
+										className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition-all"
 									>
-										Cancel
+										<FontAwesomeIcon icon={faTimes} size="lg" />
 									</button>
-									<button
-										onClick={
-											paymentMethod === "razorpay"
-												? handleRazorpayCheckout
-												: handlePayAfterDeliveryCheckout
-										}
-										disabled={processing}
-										className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-all font-bold text-lg"
-									>
-										{processing ? (
-											<>
-												<FontAwesomeIcon icon={faSpinner} spin />
-												Processing...
-											</>
-										) : paymentMethod === "razorpay" ? (
-											<>
-												<FontAwesomeIcon icon={faCreditCard} />
-												Pay ₹{cartTotal.toLocaleString()}
-											</>
-										) : (
-											<>
-												<FontAwesomeIcon icon={faCheckCircle} />
-												Place Order
-											</>
-										)}
-									</button>
+								</div>
+
+								<div className="p-8">
+									{/* Vehicle Details Section */}
+									<div className="mb-8">
+										<h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+											<FontAwesomeIcon
+												icon={faTruckMoving}
+												className="text-green-600"
+											/>
+											Vehicle Details
+										</h3>
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">
+													Vehicle Type *
+												</label>
+												<select
+													value={vehicleDetails.vehicleType}
+													onChange={(e) =>
+														setVehicleDetails({
+															...vehicleDetails,
+															vehicleType: e.target.value,
+														})
+													}
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+												>
+													<option value="">Select Vehicle Type</option>
+													<option value="Truck">Truck</option>
+													<option value="Tempo">Tempo</option>
+													<option value="Tractor">Tractor</option>
+													<option value="Mini Truck">Mini Truck</option>
+												</select>
+											</div>
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">
+													Vehicle Number *
+												</label>
+												<input
+													type="text"
+													value={vehicleDetails.vehicleNumber}
+													onChange={(e) =>
+														setVehicleDetails({
+															...vehicleDetails,
+															vehicleNumber: e.target.value,
+														})
+													}
+													placeholder="e.g., MH12AB1234"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+												/>
+											</div>
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">
+													Driver Name *
+												</label>
+												<input
+													type="text"
+													value={vehicleDetails.driverName}
+													onChange={(e) =>
+														setVehicleDetails({
+															...vehicleDetails,
+															driverName: e.target.value,
+														})
+													}
+													placeholder="Driver's Full Name"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+												/>
+											</div>
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">
+													Driver Phone *
+												</label>
+												<input
+													type="tel"
+													value={vehicleDetails.driverPhone}
+													onChange={(e) =>
+														setVehicleDetails({
+															...vehicleDetails,
+															driverPhone: e.target.value,
+														})
+													}
+													placeholder="10-digit mobile number"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+												/>
+											</div>
+										</div>
+									</div>
+
+									{/* Pickup Schedule Section */}
+									<div className="mb-8">
+										<h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+											<FontAwesomeIcon
+												icon={faClock}
+												className="text-green-600"
+											/>
+											Pickup Schedule
+										</h3>
+										<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">
+													Pickup Date *
+												</label>
+												<input
+													type="date"
+													value={pickupSchedule.date}
+													onChange={(e) =>
+														setPickupSchedule({
+															...pickupSchedule,
+															date: e.target.value,
+														})
+													}
+													min={new Date().toISOString().split("T")[0]}
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+												/>
+											</div>
+											<div>
+												<label className="block text-sm font-semibold mb-2 text-gray-700">
+													Time Slot *
+												</label>
+												<select
+													value={pickupSchedule.timeSlot}
+													onChange={(e) =>
+														setPickupSchedule({
+															...pickupSchedule,
+															timeSlot: e.target.value,
+														})
+													}
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+												>
+													<option value="morning">
+														🌅 Morning (6 AM - 12 PM)
+													</option>
+													<option value="afternoon">
+														☀️ Afternoon (12 PM - 6 PM)
+													</option>
+													<option value="evening">
+														🌆 Evening (6 PM - 9 PM)
+													</option>
+												</select>
+											</div>
+										</div>
+									</div>
+
+									{/* Payment Method Section */}
+									<div className="mb-8">
+										<h3 className="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
+											<FontAwesomeIcon
+												icon={faCreditCard}
+												className="text-green-600"
+											/>
+											Payment Method
+										</h3>
+										<div className="space-y-3">
+											<label className="flex items-center gap-3 p-5 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+												<input
+													type="radio"
+													value="razorpay"
+													checked={paymentMethod === "razorpay"}
+													onChange={(e) => setPaymentMethod(e.target.value)}
+													className="w-5 h-5 text-green-600"
+												/>
+												<div className="flex-1">
+													<span className="font-semibold text-gray-800">
+														Pay Online (Razorpay)
+													</span>
+													<p className="text-sm text-gray-600 mt-1">
+														Secure payment via UPI, Cards, Net Banking
+													</p>
+												</div>
+												<div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">
+													RECOMMENDED
+												</div>
+											</label>
+											<label className="flex items-center gap-3 p-5 border-2 border-gray-300 rounded-xl cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+												<input
+													type="radio"
+													value="payAfterDelivery"
+													checked={paymentMethod === "payAfterDelivery"}
+													onChange={(e) => setPaymentMethod(e.target.value)}
+													className="w-5 h-5 text-green-600"
+												/>
+												<div className="flex-1">
+													<span className="font-semibold text-gray-800">
+														Pay After Delivery
+													</span>
+													<p className="text-sm text-gray-600 mt-1">
+														Pay when you receive your order
+													</p>
+												</div>
+											</label>
+										</div>
+									</div>
+
+									{/* Order Summary Section */}
+									<div className="mb-8 bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl border-2 border-green-200">
+										<h3 className="font-bold text-lg mb-4 text-gray-800">
+											Order Summary
+										</h3>
+										<div className="space-y-3">
+											{cart.map((item) => (
+												<div
+													key={getItemId(item)}
+													className="flex justify-between text-sm text-gray-700"
+												>
+													<span>
+														{getItemName(item)} × {getQuantity(item)}{" "}
+														{getItemUnit(item)}
+													</span>
+													<span className="font-semibold">
+														₹
+														{(
+															getUnitPrice(item) * getQuantity(item)
+														).toLocaleString()}
+													</span>
+												</div>
+											))}
+											<div className="flex justify-between text-gray-700 pt-2 border-t border-green-300">
+												<span className="font-medium">
+													Items ({cart.length}):
+												</span>
+												<span className="font-semibold">
+													₹{cartTotal.toLocaleString()}
+												</span>
+											</div>
+											<div className="flex justify-between text-gray-700">
+												<span className="font-medium">Delivery Charges:</span>
+												<span className="font-semibold text-green-600">
+													FREE
+												</span>
+											</div>
+											<div className="border-t-2 border-green-300 pt-3 flex justify-between items-center">
+												<span className="text-xl font-bold text-gray-800">
+													Total Amount:
+												</span>
+												<span className="text-3xl font-bold text-green-600">
+													₹{cartTotal.toLocaleString()}
+												</span>
+											</div>
+										</div>
+									</div>
+
+									{/* Action Buttons */}
+									<div className="flex gap-4">
+										<button
+											onClick={() => setShowCheckoutModal(false)}
+											className="flex-1 border-2 border-gray-300 text-gray-700 py-4 rounded-xl hover:bg-gray-50 transition-all font-semibold text-lg"
+											disabled={processing}
+										>
+											Cancel
+										</button>
+										<button
+											onClick={
+												paymentMethod === "razorpay"
+													? handleRazorpayCheckout
+													: handlePayAfterDeliveryCheckout
+											}
+											disabled={processing}
+											className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transition-all font-bold text-lg"
+										>
+											{processing ? (
+												<>
+													<FontAwesomeIcon icon={faSpinner} spin />
+													Processing...
+												</>
+											) : paymentMethod === "razorpay" ? (
+												<>
+													<FontAwesomeIcon icon={faCreditCard} />
+													Pay ₹{cartTotal.toLocaleString()}
+												</>
+											) : (
+												<>
+													<FontAwesomeIcon icon={faCheckCircle} />
+													Place Order
+												</>
+											)}
+										</button>
+									</div>
 								</div>
 							</div>
 						</div>
-					</div>
-				)}
+					)}
+				</div>
+
+				<DashboardFooter
+					actions={
+						activeTab === "transactions"
+							? []
+							: [
+									{
+										label: tr("Browse Crops"),
+										onClick: () => navigate("/crops"),
+									},
+									{ label: tr("My Cart"), onClick: () => setActiveTab("cart") },
+									{
+										label: tr("My Orders"),
+										onClick: () => setActiveTab("orders"),
+									},
+							  ]
+					}
+					role="Buyer"
+					fullWidth
+				/>
 			</div>
 		</div>
 	);

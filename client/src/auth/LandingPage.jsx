@@ -4,6 +4,8 @@ import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import Chatbot from "../components/ChatBot";
+import LanguageSelector from "../components/LanguageSelector";
+import { useLanguage } from "../context/LanguageContext";
 
 import {
 	ShoppingCart,
@@ -27,6 +29,7 @@ import logo from "/logo1.png";
 
 function CropConnectLanding() {
 	const navigate = useNavigate();
+	const { tr } = useLanguage();
 	const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const dropdownRef = useRef(null);
@@ -134,7 +137,7 @@ function CropConnectLanding() {
 									Crop Connect
 								</h1>
 								<p className="text-xs text-gray-600">
-									Connecting Farms to Future
+									{tr("Connecting Farms to Future")}
 								</p>
 							</div>
 						</div>
@@ -145,12 +148,12 @@ function CropConnectLanding() {
 							<ul className="flex space-x-6 text-green-700 font-semibold">
 								<li>
 									<a href="#home" className="hover:text-green-900 transition">
-										Home
+										{tr("Home")}
 									</a>
 								</li>
 								<li>
 									<a href="#about" className="hover:text-green-900 transition">
-										About
+										{tr("About")}
 									</a>
 								</li>
 								<li>
@@ -158,7 +161,7 @@ function CropConnectLanding() {
 										href="#moments"
 										className="hover:text-green-900 transition"
 									>
-										Moments
+										{tr("Moments")}
 									</a>
 								</li>
 								<li>
@@ -166,7 +169,7 @@ function CropConnectLanding() {
 										href="#milestones"
 										className="hover:text-green-900 transition"
 									>
-										Milestones
+										{tr("Milestones")}
 									</a>
 								</li>
 								<li>
@@ -174,30 +177,31 @@ function CropConnectLanding() {
 										href="#features"
 										className="hover:text-green-900 transition"
 									>
-										Features
+										{tr("Features")}
 									</a>
 								</li>
 								<li>
 									<a href="#cta" className="hover:text-green-900 transition">
-										Get Started
+										{tr("Get Started")}
 									</a>
 								</li>
 							</ul>
 
-							{/* Auth Buttons */}
+{/* Language + Auth Buttons */}
 							<div className="flex items-center space-x-4 relative">
+								<LanguageSelector />
 								<button
 									onClick={() => navigate("/login")}
 									className="px-6 py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								>
-									Login
+									{tr("Login")}
 								</button>
 								<div ref={dropdownRef} className="relative">
 									<button
 										onClick={() => setDropdownOpen(!dropdownOpen)}
 										className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md"
 									>
-										Register
+										{tr("Register")}
 									</button>
 									{dropdownOpen && (
 										<div className="absolute right-0 top-full mt-2 bg-white rounded-lg border shadow-xl z-40 min-w-[260px]">
@@ -208,7 +212,7 @@ function CropConnectLanding() {
 													navigate("/register-fb");
 												}}
 											>
-												Register as Farmer or Buyer
+												{tr("Register as Farmer or Buyer")}
 											</button>
 											<button
 												className="block w-full text-left px-6 py-3 hover:bg-green-50 focus:bg-green-100 text-gray-700 font-semibold"
@@ -217,7 +221,7 @@ function CropConnectLanding() {
 													navigate("/register-wt");
 												}}
 											>
-												Register as Worker or Tractor Owner
+												{tr("Register as Worker or Tractor Owner")}
 											</button>
 										</div>
 									)}
@@ -246,42 +250,42 @@ function CropConnectLanding() {
 								className="block py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								onClick={() => setMobileMenuOpen(false)}
 							>
-								Home
+								{tr("Home")}
 							</a>
 							<a
 								href="#about"
 								className="block py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								onClick={() => setMobileMenuOpen(false)}
 							>
-								About
+								{tr("About")}
 							</a>
 							<a
 								href="#moments"
 								className="block py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								onClick={() => setMobileMenuOpen(false)}
 							>
-								Moments
+								{tr("Moments")}
 							</a>
 							<a
 								href="#milestones"
 								className="block py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								onClick={() => setMobileMenuOpen(false)}
 							>
-								Milestones
+								{tr("Milestones")}
 							</a>
 							<a
 								href="#features"
 								className="block py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								onClick={() => setMobileMenuOpen(false)}
 							>
-								Features
+								{tr("Features")}
 							</a>
 							<a
 								href="#cta"
 								className="block py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all"
 								onClick={() => setMobileMenuOpen(false)}
 							>
-								Get Started
+								{tr("Get Started")}
 							</a>
 
 							<button
@@ -289,9 +293,9 @@ function CropConnectLanding() {
 									navigate("/login");
 									setMobileMenuOpen(false);
 								}}
-								className="w-full px-6 py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all mt-4"
-							>
-								Login
+							className="w-full px-6 py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all mt-4"
+						>
+							{tr("Login")}
 							</button>
 							<button
 								onClick={() => {
@@ -300,7 +304,7 @@ function CropConnectLanding() {
 								}}
 								className="w-full px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all shadow-md"
 							>
-								Register
+								{tr("Register")}
 							</button>
 						</div>
 					)}
@@ -320,12 +324,10 @@ function CropConnectLanding() {
 			>
 				<div className="max-w-7xl mx-auto text-center text-white">
 					<h2 className="text-5xl md:text-6xl font-bold mb-6">
-						Revolutionizing Agriculture
+						{tr("Revolutionizing Agriculture")}
 					</h2>
 					<p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
-						Connect farmers, merchants, and buyers on one powerful platform.
-						Experience seamless crop trading, equipment booking, and real-time
-						market prices.
+						{tr("Connect farmers, merchants, and buyers on one powerful platform. Experience seamless crop trading, equipment booking, and real-time market prices.")}
 					</p>
 
 					{/* CTA Buttons */}
@@ -335,24 +337,24 @@ function CropConnectLanding() {
 							className="px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all shadow-2xl text-lg flex items-center gap-3 transform hover:scale-105"
 						>
 							<UserPlus className="w-6 h-6" />
-							Register as Farmer/Buyer
+							{tr("Register as Farmer/Buyer")}
 						</button>
 						<button
 							onClick={() => navigate("/register-wt")}
 							className="px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-2xl text-lg flex items-center gap-3 transform hover:scale-105"
 						>
 							<Tractor className="w-6 h-6" />
-							Register as Worker/Tractor Owner
+							{tr("Register as Worker/Tractor Owner")}
 						</button>
 					</div>
-					<p className="text-green-100 text-lg">
-						Already have an account?{" "}
-						<button
-							onClick={() => navigate("/login")}
-							className="text-white font-bold underline hover:text-green-200 transition-colors"
-						>
-							Login here
-						</button>
+						<p className="text-green-100 text-lg">
+							{tr("Already have an account?")}{" "}
+							<button
+								onClick={() => navigate("/login")}
+								className="text-white font-bold underline hover:text-green-200 transition-colors"
+							>
+								{tr("Login here")}
+							</button>
 					</p>
 				</div>
 			</section>
@@ -364,9 +366,9 @@ function CropConnectLanding() {
 			>
 				<div className="max-w-7xl mx-auto">
 					<div className="text-center mb-12">
-						<h2 className="text-4xl font-bold text-gray-800 mb-4">
-							About Crop Connect
-						</h2>
+							<h2 className="text-4xl font-bold text-gray-800 mb-4">
+								{tr("About Crop Connect")}
+							</h2>
 						<div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-600 mx-auto rounded-full"></div>
 					</div>
 					<div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
@@ -395,7 +397,7 @@ function CropConnectLanding() {
 			<section id="moments" className="py-16 px-4 bg-white">
 				<div className="max-w-7xl mx-auto">
 					<h2 className="text-4xl font-bold text-center text-gray-800 mb-12">
-						Moments From The Field
+						{tr("Moments From The Field")}
 					</h2>
 					<Slider {...sliderSettings}>
 						{farmerImages.map((img, idx) => (
@@ -417,9 +419,9 @@ function CropConnectLanding() {
 				className="py-16 px-4 bg-gradient-to-r from-green-600 to-emerald-600"
 			>
 				<div className="max-w-7xl mx-auto">
-					<h2 className="text-4xl font-bold text-center text-white mb-12">
-						Our Milestones
-					</h2>
+						<h2 className="text-4xl font-bold text-center text-white mb-12">
+							{tr("Our Milestones")}
+						</h2>
 					<div className="grid grid-cols-2 md:grid-cols-4 gap-8">
 						{milestones.map((milestone, index) => (
 							<div
@@ -443,11 +445,10 @@ function CropConnectLanding() {
 				<div className="max-w-7xl mx-auto">
 					<div className="text-center mb-12">
 						<h2 className="text-4xl font-bold text-gray-800 mb-4">
-							Our Features
+							{tr("Our Features")}
 						</h2>
 						<p className="text-xl text-gray-600 max-w-2xl mx-auto">
-							Everything you need for modern agriculture in one powerful
-							platform
+							{tr("Everything you need for modern agriculture in one powerful platform")}
 						</p>
 						<div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-600 mx-auto rounded-full mt-4"></div>
 					</div>
@@ -480,10 +481,10 @@ function CropConnectLanding() {
 			>
 				<div className="max-w-4xl mx-auto text-center text-white">
 					<h2 className="text-4xl font-bold mb-6">
-						Ready to Transform Your Farming Experience?
+						{tr("Ready to Transform Your Farming Experience?")}
 					</h2>
 					<p className="text-xl mb-8">
-						Join thousands of farmers and merchants already using Crop Connect
+						{tr("Join thousands of farmers and merchants already using Crop Connect")}
 					</p>
 					<div className="flex flex-col sm:flex-row gap-4 justify-center">
 						<button
@@ -491,14 +492,14 @@ function CropConnectLanding() {
 							className="px-8 py-4 bg-white text-green-700 font-bold rounded-xl hover:bg-gray-100 transition-all shadow-xl flex items-center justify-center gap-2"
 						>
 							<UserPlus className="w-5 h-5" />
-							Register as Farmer/Buyer
+							{tr("Register as Farmer/Buyer")}
 						</button>
 						<button
 							onClick={() => navigate("/register-wt")}
 							className="px-8 py-4 bg-green-800 text-white font-bold rounded-xl hover:bg-green-900 transition-all shadow-xl flex items-center justify-center gap-2"
 						>
 							<Tractor className="w-5 h-5" />
-							Register as Worker/Tractor Owner
+							{tr("Register as Worker/Tractor Owner")}
 						</button>
 					</div>
 				</div>
@@ -528,7 +529,7 @@ function CropConnectLanding() {
 						<div>
 							<h3 className="text-xl font-bold mb-4 flex items-center gap-2">
 								<Phone className="w-5 h-5" />
-								Contact Us
+								{tr("Contact Us")}
 							</h3>
 							<div className="space-y-3 text-gray-400">
 								<div className="flex items-center gap-3">
@@ -549,9 +550,9 @@ function CropConnectLanding() {
 						<Chatbot />
 						{/* Social Media Column */}
 						<div>
-							<h3 className="text-xl font-bold mb-4">Follow Us</h3>
+							<h3 className="text-xl font-bold mb-4">{tr("Follow Us")}</h3>
 							<p className="text-gray-400 mb-4">
-								Stay connected on social media
+								{tr("Stay connected on social media")}
 							</p>
 							<div className="flex gap-4">
 								<a
@@ -592,10 +593,10 @@ function CropConnectLanding() {
 						<p className="text-gray-400">
 							2025{" "}
 							<span className="text-green-500 font-semibold">Crop Connect</span>
-							. All rights reserved.
+							. {tr("All rights reserved.")}
 						</p>
 						<p className="text-gray-500 text-sm mt-2">
-							Made with love for Indian Farmers
+							{tr("Made with love for Indian Farmers")}
 						</p>
 					</div>
 				</div>

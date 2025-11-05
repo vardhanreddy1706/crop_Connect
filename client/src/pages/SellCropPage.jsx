@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import api from "../config/api";
 import { useAuth } from "../context/AuthContext"; // ✅ ADDED
 import {
-	DollarSign,
+	IndianRupee,
 	Scale,
 	Tag,
 	Landmark,
@@ -200,8 +200,8 @@ function SellCropPage() {
 			const response = await api.post("/crops", payload);
 
 			if (response.data.success) {
-				toast.success("🎉 Crop listed successfully!");
-				navigate("/crops");
+				toast.success("Successfully listed crop");
+				navigate("/farmer-dashboard");
 			}
 		} catch (error) {
 			console.error("Submit error:", error);
@@ -311,7 +311,7 @@ function SellCropPage() {
 									name="pricePerUnit"
 									type="number"
 									placeholder="2000"
-									icon={DollarSign}
+									icon={IndianRupee}
 									required
 									unit="₹"
 									value={cropData.pricePerUnit}

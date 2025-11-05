@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import api from "../config/api";
 import {
 	CreditCard,
@@ -16,21 +17,28 @@ import {
 	Clock,
 	XCircle,
 	FileText,
+	ArrowLeft,
 } from "lucide-react";
 
 function TransactionHistory() {
 	const { user } = useAuth();
+	const navigate = useNavigate();
 	const [transactions, setTransactions] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 	const [filterType, setFilterType] = useState("all"); // all, debit, credit
 	const [searchQuery, setSearchQuery] = useState("");
 	const [dateFilter, setDateFilter] = useState("all"); // all, today, week, month
+	const [searchCategory, setSearchCategory] = useState("all"); // all, tractor, worker, market
+	// pagination
+	const [page, setPage] = useState(0);
+	const pageSize = 5;
 
 	useEffect(() => {
-		if (user) {
-			fetchTransactions();
-		}
+		if (!user) return;
+		fetchTransactions();
+		const id = setInterval(fetchTransactions, 30000);
+		return () => clearInterval(id);
 	}, [user]);
 
 	const fetchTransactions = async () => {
@@ -38,77 +46,148 @@ function TransactionHistory() {
 			setLoading(true);
 			setError(null);
 
-			// Fetch all bookings and requirements
+			// Fetch bookings/requirements + unified transactions + market orders
+			const requests = [
+				api.get("/bookings/farmer/tractors"),
+				api.get("/bookings/farmer/workers"),
+				api.get("/bookings/farmer/tractor-requirements"),
+				api.get("/bookings/farmer/worker-requirements"),
+				api.get("/transactions"),
+				api.get("/orders/seller").catch(() => ({ data: { orders: [] } })),
+				api.get("/orders/buyer").catch(() => ({ data: { orders: [] } })),
+			];
 			const [
 				tractorBookingsRes,
 				workerBookingsRes,
 				tractorRequirementsRes,
 				workerRequirementsRes,
-			] = await Promise.all([
-				api.get("/bookings/farmer/tractors"),
-				api.get("/bookings/farmer/workers"),
-				api.get("/bookings/farmer/tractor-requirements"),
-				api.get("/bookings/farmer/worker-requirements"),
-			]);
+				transactionsRes,
+				sellerOrdersRes,
+				buyerOrdersRes,
+			] = await Promise.allSettled(requests);
+
+			// Safely extract data from settled promises
+			const safe = (res, accessor) =>
+				res?.status === "fulfilled" ? accessor(res.value) : [];
+
+			const tractorBookings = safe(tractorBookingsRes, (r) => r.data.bookings || []);
+			const workerBookings = safe(workerBookingsRes, (r) => r.data.bookings || []);
+			const tractorRequirements = safe(
+				tractorRequirementsRes,
+				(r) => r.data.requirements || []
+			);
+			const workerRequirements = safe(
+				workerRequirementsRes,
+				(r) => r.data.requirements || []
+			);
 
 			// Format transactions
-			const tractorTransactions =
-				tractorBookingsRes.data.bookings?.map((booking) => ({
-					id: booking._id,
+			const tractorTransactions = tractorBookings.map((booking) => ({
+				id: booking._id,
+				type: "debit",
+				category: "tractor",
+				description: `${booking.workType || "Tractor Service"} - ${
+					booking.serviceProvider?.name || booking.tractorOwnerId?.name || "N/A"
+				}`,
+				amount: booking.totalCost || 0,
+				status: booking.status,
+				date: booking.bookingDate,
+				createdAt: booking.createdAt,
+				icon: "tractor",
+			}));
+
+			const workerTransactions = workerBookings.map((booking) => ({
+				id: booking._id,
+				type: "debit",
+				category: "worker",
+				description: `Worker Service - ${
+					booking.serviceProvider?.name || booking.tractorOwnerId?.name || "N/A"
+				}`,
+				amount: booking.totalCost || 0,
+				status: booking.status,
+				date: booking.bookingDate,
+				createdAt: booking.createdAt,
+				icon: "worker",
+			}));
+
+			const tractorRequirementTxns = tractorRequirements.map((req) => ({
+				id: req._id,
+				type: "pending",
+				category: "tractor",
+				description: `${req.workType} - Posted Requirement`,
+				amount: req.maxBudget || 0,
+				status: req.status,
+				date: req.expectedDate,
+				createdAt: req.createdAt,
+				icon: "tractor",
+				responses: req.responses || 0,
+			}));
+
+			const workerRequirementTxns = workerRequirements.map((req) => ({
+				id: req._id,
+				type: "pending",
+				category: "worker",
+				description: `${req.workType} - Posted Requirement`,
+				amount: req.wagesOffered || 0,
+				status: req.status,
+				date: req.startDate,
+				createdAt: req.createdAt,
+				icon: "worker",
+				applicants: req.applicants || 0,
+			}));
+
+			// Map unified Transaction documents (payments between users)
+			const userId = user?._id || user?.id;
+			let paymentTxns = [];
+			if (transactionsRes.status === "fulfilled") {
+				const txns = transactionsRes.value?.data?.transactions || [];
+				paymentTxns = txns.map((t) => {
+					const isCredit =
+						(t.tractorOwnerId && t.tractorOwnerId?._id === userId) ||
+						(t.workerId && t.workerId?._id === userId);
+					const category = t.bookingId?.serviceType || (t.workerId ? "worker" : "tractor");
+					return {
+						id: t._id,
+						type: isCredit ? "credit" : "debit",
+						category,
+						description: `${category === "worker" ? "Worker" : "Tractor"} Service - ${t.bookingId?.workType || "Payment"}`,
+						amount: t.amount,
+						status: t.status === "completed" ? "completed" : "pending",
+						date: t.paidAt || t.createdAt,
+						createdAt: t.createdAt,
+						icon: isCredit ? "credit" : "debit",
+					};
+				});
+			}
+
+			// Map marketplace orders for buyer/seller
+			let marketTxns = [];
+			const sellerOrders = sellerOrdersRes.status === "fulfilled" ? (sellerOrdersRes.value?.data?.orders || []) : [];
+			const buyerOrders = buyerOrdersRes.status === "fulfilled" ? (buyerOrdersRes.value?.data?.orders || []) : [];
+			marketTxns = [
+				...sellerOrders.map((o) => ({
+					id: o._id,
+					type: "credit",
+					category: "market",
+					description: `${o.items?.[0]?.crop?.cropName || "Crop"} - Order Received`,
+					amount: o.totalAmount || 0,
+					status: o.paymentStatus === "completed" ? "completed" : "pending",
+					date: o.createdAt,
+					createdAt: o.createdAt,
+					icon: "credit",
+				})),
+				...buyerOrders.map((o) => ({
+					id: o._id,
 					type: "debit",
-					category: "Tractor Rental",
-					description: `${booking.workType || "Tractor Service"} - ${
-						booking.serviceProvider?.name || "N/A"
-					}`,
-					amount: booking.totalCost || 0,
-					status: booking.status,
-					date: booking.bookingDate,
-					createdAt: booking.createdAt,
-					icon: "tractor",
-				})) || [];
-
-			const workerTransactions =
-				workerBookingsRes.data.bookings?.map((booking) => ({
-					id: booking._id,
-					type: "debit",
-					category: "Worker Service",
-					description: `Worker Service - ${
-						booking.serviceProvider?.name || "N/A"
-					}`,
-					amount: booking.totalCost || 0,
-					status: booking.status,
-					date: booking.bookingDate,
-					createdAt: booking.createdAt,
-					icon: "worker",
-				})) || [];
-
-			const tractorRequirementTxns =
-				tractorRequirementsRes.data.requirements?.map((req) => ({
-					id: req._id,
-					type: "pending",
-					category: "Tractor Request",
-					description: `${req.workType} - Posted Requirement`,
-					amount: req.maxBudget || 0,
-					status: req.status,
-					date: req.expectedDate,
-					createdAt: req.createdAt,
-					icon: "tractor",
-					responses: req.responses || 0,
-				})) || [];
-
-			const workerRequirementTxns =
-				workerRequirementsRes.data.requirements?.map((req) => ({
-					id: req._id,
-					type: "pending",
-					category: "Worker Request",
-					description: `${req.workType} - Posted Requirement`,
-					amount: req.wagesOffered || 0,
-					status: req.status,
-					date: req.startDate,
-					createdAt: req.createdAt,
-					icon: "worker",
-					applicants: req.applicants || 0,
-				})) || [];
+					category: "market",
+					description: `${o.items?.[0]?.crop?.cropName || "Crop"} - Purchase`,
+					amount: o.totalAmount || 0,
+					status: o.paymentStatus === "completed" ? "completed" : "pending",
+					date: o.createdAt,
+					createdAt: o.createdAt,
+					icon: "debit",
+				})),
+			];
 
 			// Combine and sort by date
 			const allTransactions = [
@@ -116,6 +195,8 @@ function TransactionHistory() {
 				...workerTransactions,
 				...tractorRequirementTxns,
 				...workerRequirementTxns,
+				...paymentTxns,
+				...marketTxns,
 			].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
 			setTransactions(allTransactions);
@@ -132,6 +213,11 @@ function TransactionHistory() {
 		// Type filter
 		if (filterType !== "all") {
 			filtered = filtered.filter((txn) => txn.type === filterType);
+		}
+
+		// Category filter
+		if (searchCategory !== "all") {
+			filtered = filtered.filter((txn) => txn.category === searchCategory);
 		}
 
 		// Search filter
@@ -165,6 +251,7 @@ function TransactionHistory() {
 	};
 
 	const filteredTransactions = filterTransactions(transactions);
+	const pagedTransactions = filteredTransactions.slice(page * pageSize, page * pageSize + pageSize);
 
 	// Calculate stats
 	const totalSpent = transactions
@@ -218,8 +305,11 @@ function TransactionHistory() {
 		<div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 py-8 px-4 sm:px-6 lg:px-8">
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
-				<div className="mb-8">
-					<h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+				<div className="mb-8 flex items-center gap-3">
+					<button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-200">
+						<ArrowLeft className="w-6 h-6" />
+					</button>
+					<h1 className="text-4xl font-bold text-gray-900 flex items-center gap-3">
 						<CreditCard className="w-10 h-10 text-green-600" />
 						Transaction History
 					</h1>
@@ -228,7 +318,7 @@ function TransactionHistory() {
 					</p>
 				</div>
 
-				{/* Stats Cards */}
+			{/* Stats Cards */}
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 					<div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
 						<div className="flex items-center justify-between">
@@ -313,6 +403,27 @@ function TransactionHistory() {
 							))}
 						</div>
 
+						{/* Category Filter */}
+						<div className="flex gap-2">
+							<span className="flex items-center gap-2 text-gray-600 font-medium">
+								<Filter className="w-4 h-4" />
+								Category:
+							</span>
+							{["all", "tractor", "worker", "market"].map((cat) => (
+								<button
+									key={cat}
+									onClick={() => setSearchCategory(cat)}
+									className={`px-4 py-2 rounded-lg font-medium transition-all ${
+										searchCategory === cat
+											? "bg-emerald-600 text-white shadow-md"
+											: "bg-gray-100 text-gray-700 hover:bg-gray-200"
+									}`}
+								>
+									{cat.charAt(0).toUpperCase() + cat.slice(1)}
+								</button>
+							))}
+						</div>
+
 						{/* Date Filter */}
 						<div className="flex gap-2">
 							<span className="flex items-center gap-2 text-gray-600 font-medium">
@@ -388,7 +499,7 @@ function TransactionHistory() {
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-gray-200">
-									{filteredTransactions.map((transaction) => (
+									{pagedTransactions.map((transaction) => (
 										<tr
 											key={transaction.id}
 											className="hover:bg-gray-50 transition-colors"
@@ -412,16 +523,16 @@ function TransactionHistory() {
 																: "bg-purple-100"
 														}`}
 													>
-														{transaction.type === "debit" ? (
-															<ArrowUpRight
+															{transaction.type === "debit" ? (
+																<ArrowUpRight
 																className={`w-4 h-4 ${
 																	transaction.type === "debit"
 																		? "text-red-600"
 																		: "text-purple-600"
 																}`}
 															/>
-														) : (
-															<FileText
+															) : (
+																<ArrowDownLeft
 																className={`w-4 h-4 ${
 																	transaction.type === "debit"
 																		? "text-red-600"
@@ -478,6 +589,17 @@ function TransactionHistory() {
 								</tbody>
 							</table>
 						</div>
+					</div>
+				)}
+
+				{/* Pagination */}
+				{filteredTransactions.length > pageSize && (
+					<div className="mt-6 flex justify-end items-center gap-2">
+						<button onClick={() => setPage(Math.max(0, page - 1))} className="px-3 py-1 bg-white border rounded hover:bg-gray-50">Prev</button>
+						<span className="text-sm text-gray-600">
+							Page {page + 1} of {Math.ceil(filteredTransactions.length / pageSize)}
+						</span>
+						<button onClick={() => setPage((page + 1) % Math.max(1, Math.ceil(filteredTransactions.length / pageSize)))} className="px-3 py-1 bg-white border rounded hover:bg-gray-50">Next</button>
 					</div>
 				)}
 			</div>

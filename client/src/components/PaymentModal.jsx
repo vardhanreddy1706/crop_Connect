@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, DollarSign, Zap } from "lucide-react";
+import { X, IndianRupee, Zap } from "lucide-react";
 import { useTransactions } from "../hooks/useTransactions";
 
 const RAZORPAY_KEY_ID = import.meta.env.VITE_RAZORPAY_KEY_ID;
@@ -79,8 +79,8 @@ export const PaymentModal = ({ booking, isOpen, onClose, onSuccess }) => {
 								checked={paymentMethod === "cash"}
 								onChange={() => setPaymentMethod("cash")}
 							/>
-							<span className="flex items-center text-sm">
-								<DollarSign className="h-4 w-4 text-green-600 mr-2" /> Pay After
+						<span className="flex items-center text-sm">
+							<IndianRupee className="h-4 w-4 text-green-600 mr-2" /> Pay After
 								Work (Cash)
 							</span>
 						</label>

@@ -198,12 +198,15 @@ function CropDetails() {
 	};
 
 	// ✅ FIX 3: Updated createOrder to use pricePerUnit
-	const createOrder = async (paymentDetails) => {
-		try {
-			setProcessing(true);
+			const createOrder = async (paymentDetails) => {
+				try {
+					setProcessing(true);
 
-			const orderData = {
-				items: [
+					const addr = user.address || {};
+					const fullAddress = `${addr.village || ""}, ${addr.district || ""}, ${addr.state || ""} ${addr.pincode || ""}`.trim();
+
+					const orderData = {
+						items: [
 					{
 						crop: crop._id,
 						quantity,
@@ -215,12 +218,13 @@ function CropDetails() {
 				paymentMethod,
 				vehicleDetails,
 				pickupSchedule,
-				deliveryAddress: {
-					district: user.district,
-					state: user.state,
-					pincode: user.pincode,
-					fullAddress: user.address,
-				},
+						deliveryAddress: {
+							village: addr.village || "",
+							district: addr.district || "",
+							state: addr.state || "",
+							pincode: addr.pincode || "",
+							fullAddress,
+						},
 				...paymentDetails,
 			};
 
@@ -250,24 +254,34 @@ function CropDetails() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gray-50 py-8">
+		<div className="min-h-screen bg-fixed bg-gradient-to-br from-emerald-100 via-green-100 to-sky-100 py-8">
 			<div className="max-w-6xl mx-auto px-4">
 				{/* Back Button */}
 				<button
-					onClick={() => navigate(-1)}
+					onClick={() => navigate("/buyer-dashboard")}
 					className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6"
 				>
 					<ArrowLeft size={20} />
-					Back to Crops
+					Back to Buyer Dashboard
 				</button>
 
-				<div className="bg-white rounded-lg shadow-lg overflow-hidden">
+				<div className="bg-white/95 backdrop-blur-sm rounded-lg shadow-lg overflow-hidden">
 					<div className="grid md:grid-cols-2 gap-8 p-8">
 						{/* Crop Image */}
-						<div className="bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center h-96">
-							<div className="text-white text-9xl font-bold uppercase">
-								{crop.cropName.substring(0, 2)}
-							</div>
+						<div className="rounded-lg h-96 overflow-hidden bg-gray-100">
+							{Array.isArray(crop.images) && crop.images.length > 0 ? (
+								<img
+									src={crop.images[0]}
+									alt={crop.cropName}
+									className="w-full h-full object-cover"
+								/>
+							) : (
+								<div className="bg-gradient-to-br from-green-500 to-emerald-600 w-full h-full flex items-center justify-center">
+									<div className="text-white text-9xl font-bold uppercase">
+										{crop.cropName.substring(0, 2)}
+									</div>
+								</div>
+							)}
 						</div>
 
 						{/* Crop Details */}
@@ -561,8 +575,8 @@ function CropDetails() {
 										<input
 											type="radio"
 											name="paymentMethod"
-											value="pay_after_delivery"
-											checked={paymentMethod === "pay_after_delivery"}
+											value="payAfterDelivery"
+											checked={paymentMethod === "payAfterDelivery"}
 											onChange={(e) => setPaymentMethod(e.target.value)}
 											className="w-4 h-4"
 										/>

@@ -16,6 +16,7 @@ const notificationSchema = new mongoose.Schema(
 				// Requirements
 				"new_requirement",
 				"requirement_posted",
+				"requirement_accepted", // added to support acceptance flow
 				// Bids
 				"bid_placed",
 				"bid_accepted",
@@ -23,8 +24,10 @@ const notificationSchema = new mongoose.Schema(
 				// Bookings
 				"booking_confirmed",
 				"booking_created",
+				"booking_received",
 				"booking_cancelled",
 				"booking_completed",
+				"work_completed", // added alias used by some controllers
 				// Payments
 				"payment_received",
 				"payment_sent",
@@ -41,6 +44,10 @@ const notificationSchema = new mongoose.Schema(
 				"hire_request",
 				// ✅ NEW: Orders
 				"new_order",
+				"order_placed",
+				"order_confirmed",
+				"order_picked",
+				"order_completed",
 				"order_status_update",
 				"order_cancelled",
 				// General
@@ -68,10 +75,14 @@ const notificationSchema = new mongoose.Schema(
 			type: mongoose.Schema.Types.ObjectId,
 			ref: "Booking",
 		},
-		relatedServiceId: {
-			type: mongoose.Schema.Types.ObjectId,
-			ref: "TractorService",
-		},
+	relatedServiceId: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "TractorService",
+	},
+	relatedOrderId: {
+		type: mongoose.Schema.Types.ObjectId,
+		ref: "Order",
+	},
 		read: {
 			type: Boolean,
 			default: false,

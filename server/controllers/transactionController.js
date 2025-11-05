@@ -94,9 +94,9 @@ exports.getTransactionDashboard = async (req, res) => {
 exports.payAfterWorkCompletion = async (req, res) => {
 	try {
 		const { bookingId, paymentMethod = "cash" } = req.body;
-		const booking = await Booking.findById(bookingId)
-			.populate("serviceId", "name phone")
-			.populate("farmer", "name phone");
+const booking = await Booking.findById(bookingId)
+			.populate("serviceId", "name phone email")
+			.populate("farmer", "name phone email");
 
 		if (!booking)
 			return res
@@ -161,6 +161,22 @@ exports.payAfterWorkCompletion = async (req, res) => {
 				workType: booking.workType,
 			},
 		});
+
+// Email both parties (best-effort)
+		try {
+			await NotificationService.notifyPaymentReceived(
+				{ _id: booking.serviceId._id, email: booking.serviceId.email, name: booking.serviceId.name },
+				{ amount: booking.totalCost, method: paymentMethod, bookingId },
+				req.emailTransporter
+			);
+			await NotificationService.notifyPaymentSent(
+				{ _id: booking.farmer._id, email: booking.farmer.email, name: booking.farmer.name },
+				{ amount: booking.totalCost, method: paymentMethod, bookingId },
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (payAfterWorkCompletion) error:", e.message);
+		}
 
 		if (req.io) {
 			req.io.to(booking.serviceId._id.toString()).emit("notification", {
@@ -375,10 +391,21 @@ exports.verifyRazorpayPayment = async (req, res) => {
 			.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
 			.update(body)
 			.digest("hex");
-		if (expectedSignature !== signature)
+if (expectedSignature !== signature) {
+			// Email failure notifications (best-effort)
+			try {
+				await NotificationService.notifyPaymentFailed(
+					req.user,
+					{ amount: 0, bookingId },
+					req.emailTransporter
+				);
+			} catch (e) {
+				console.error("Email notify (verifyRazorpayPayment failed) error:", e.message);
+			}
 			return res
 				.status(400)
 				.json({ success: false, message: "Payment verification failed" });
+		}
 
 		const transaction = await Transaction.findOneAndUpdate(
 			{ razorpayOrderId: orderId },

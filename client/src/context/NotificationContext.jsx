@@ -1,8 +1,9 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext";
 import toast from "react-hot-toast";
+import { notificationService } from "../services/notificationService";
 
 const NotificationContext = createContext(null);
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:8000";
@@ -12,6 +13,23 @@ export const NotificationProvider = ({ children }) => {
 	const [notifications, setNotifications] = useState([]);
 	const [unreadCount, setUnreadCount] = useState(0);
 	const [socket, setSocket] = useState(null);
+
+	// Initial fetch from API when user logs in
+	useEffect(() => {
+		if (!user?._id) return;
+		(async () => {
+			try {
+				const [listRes, countRes] = await Promise.all([
+					notificationService.getNotifications(),
+					notificationService.getUnreadCount(),
+				]);
+				setNotifications(listRes.notifications || []);
+				setUnreadCount(countRes.unreadCount || 0);
+			} catch (e) {
+				console.error("Failed to load notifications:", e);
+			}
+		})();
+	}, [user?._id]);
 
 	useEffect(() => {
 		if (!user?._id) return;
@@ -28,13 +46,11 @@ export const NotificationProvider = ({ children }) => {
 		newSocket.on("connect", () => {
 			console.log("✅ Socket connected:", newSocket.id);
 			newSocket.emit("join", user._id);
-			// REMOVED THE TOAST - No need to show "Connected to notifications"
 		});
 
 		newSocket.on("notification", (payload) => {
 			console.log("📬 Notification:", payload);
 
-			// Add to notifications - handle different payload structures
 			const notification = {
 				_id: payload._id || Date.now().toString(),
 				title: payload.title || "Notification",
@@ -48,7 +64,6 @@ export const NotificationProvider = ({ children }) => {
 			setNotifications((prev) => [notification, ...prev]);
 			setUnreadCount((c) => c + 1);
 
-			// Show toast with 2 second duration
 			const icon =
 				payload.type === "payment_received"
 					? "💰"
@@ -61,9 +76,9 @@ export const NotificationProvider = ({ children }) => {
 					: "🔔";
 
 			toast.success(notification.message, {
-				duration: 1000, // 2 seconds!
+				duration: 1000,
 				icon: icon,
-				id: `notif-${notification._id}`, // Prevent duplicates
+				id: `notif-${notification._id}`,
 			});
 		});
 
@@ -87,12 +102,36 @@ export const NotificationProvider = ({ children }) => {
 		};
 	}, [user?._id]);
 
-	const markAsRead = (id) => {
-		setNotifications((prev) =>
-			prev.map((n) => (n._id === id ? { ...n, read: true } : n))
-		);
-		setUnreadCount((c) => Math.max(0, c - 1));
-	};
+	const markAsRead = useCallback(async (id) => {
+		try {
+			await notificationService.markAsRead(id);
+			setNotifications((prev) =>
+				prev.map((n) => (n._id === id ? { ...n, read: true } : n))
+			);
+			setUnreadCount((c) => Math.max(0, c - 1));
+		} catch (e) {
+			console.error("Mark as read failed:", e);
+		}
+	}, []);
+
+	const markAllAsRead = useCallback(async () => {
+		try {
+			await notificationService.markAllAsRead();
+			setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+			setUnreadCount(0);
+		} catch (e) {
+			console.error("Mark all as read failed:", e);
+		}
+	}, []);
+
+	const deleteNotif = useCallback(async (id) => {
+		try {
+			await notificationService.deleteNotification(id);
+			setNotifications((prev) => prev.filter((n) => n._id !== id));
+		} catch (e) {
+			console.error("Delete notification failed:", e);
+		}
+	}, []);
 
 	const clearAll = () => {
 		setNotifications([]);
@@ -105,6 +144,8 @@ export const NotificationProvider = ({ children }) => {
 				notifications,
 				unreadCount,
 				markAsRead,
+				markAllAsRead,
+				deleteNotif,
 				clearAll,
 				socket,
 			}}

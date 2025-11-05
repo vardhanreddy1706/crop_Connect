@@ -82,12 +82,24 @@ try {
 app.use(helmet());
 
 app.get("/api/crop-prices", async (req, res) => {
-	const apiRes = await fetch(
-		"https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=…&format=json&limit=all"
-	);
-	const data = await apiRes.json();
-	res.header("Access-Control-Allow-Origin", "*");
-	res.json(data);
+	try {
+		const apiKey = process.env.DATA_GOV_API_KEY;
+		if (!apiKey) {
+			return res.status(500).json({ success: false, message: "DATA_GOV_API_KEY missing" });
+		}
+		const limit = Number(req.query.limit) || 100;
+		const url = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=${apiKey}&format=json&limit=${limit}`;
+		const apiRes = await fetch(url);
+		if (!apiRes.ok) {
+			return res.status(apiRes.status).json({ success: false, message: "Failed to fetch crop prices" });
+		}
+		const data = await apiRes.json();
+		res.header("Access-Control-Allow-Origin", "*");
+		res.json(data);
+	} catch (e) {
+		console.error("Crop prices API error:", e);
+		res.status(500).json({ success: false, message: "Internal error fetching crop prices" });
+	}
 });
 
 
@@ -183,9 +195,6 @@ io.on("connection", (socket) => {
 });
 
 
-
-// Load environment variables FIRST
-dotenv.config();
 
 // Initialize Gemini AI
 let genAI = null;
@@ -315,6 +324,7 @@ const bidRoutes = require("./routes/bidRoutes");
 const workerHireRoutes = require("./routes/workHireRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const cartRoutes = require("./routes/cartRoutes");
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
 
 // ========================
 // API ROUTES
@@ -335,6 +345,7 @@ app.use("/api/bids", bidRoutes);
 app.use("/api/worker-hires", workerHireRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
 
 // ========================
 // WELCOME ROUTE
@@ -359,6 +370,7 @@ app.get("/", (req, res) => {
 			transactions: "/api/transactions",
 			bids: "/api/bids",
 			debug: "/api/debug",
+			subscriptions: "/api/subscriptions",
 		},
 	});
 });

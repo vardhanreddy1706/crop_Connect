@@ -1,12 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect } from "react";
 
+import en from "../locales/en.json";
 import hi from "../locales/hi.json";
 import te from "../locales/te.json";
 
 const LanguageContext = createContext();
 
-const translations = {  hi, te };
+const translations = { en, hi, te };
 
 export const LanguageProvider = ({ children }) => {
 	const [language, setLanguage] = useState(() => {
@@ -32,6 +33,12 @@ export const LanguageProvider = ({ children }) => {
 		return translation || key;
 	};
 
+	// Phrase-based translation for existing UI strings without key rewrites
+	const tr = (phrase) => {
+		const dict = translations[language]?.phrases || {};
+		return dict[phrase] || phrase;
+	};
+
 	const changeLanguage = (lang) => {
 		if (translations[lang]) {
 			setLanguage(lang);
@@ -39,7 +46,7 @@ export const LanguageProvider = ({ children }) => {
 	};
 
 	return (
-		<LanguageContext.Provider value={{ language, changeLanguage, t }}>
+		<LanguageContext.Provider value={{ language, changeLanguage, t, tr }}>
 			{children}
 		</LanguageContext.Provider>
 	);

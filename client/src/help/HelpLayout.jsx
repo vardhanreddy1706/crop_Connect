@@ -30,7 +30,7 @@ const HelpLayout = ({ title, children }) => {
 							Home
 						</Link>
 						<span>/</span>
-						<Link to="/help" className="hover:text-white transition-colors">
+						<Link to="/help/faq" className="hover:text-white transition-colors">
 							Help Center
 						</Link>
 						<span>/</span>
@@ -53,43 +53,23 @@ const HelpLayout = ({ title, children }) => {
 					</h3>
 					<ul className="space-y-2 text-sm">
 						<li>
-							<Link
-								to="/help/faq"
-								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
-							>
-								General FAQs
+							<Link to="/help/contact" className="text-gray-600 hover:text-green-600 hover:underline transition-colors">
+								Contact
 							</Link>
 						</li>
 						<li>
-							<Link
-								to="/help/faq-prices"
-								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
-							>
-								Crop Prices FAQs
+							<Link to="/help/faq" className="text-gray-600 hover:text-green-600 hover:underline transition-colors">
+								FAQs
 							</Link>
 						</li>
 						<li>
-							<Link
-								to="/help/faq-bookings"
-								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
-							>
-								Bookings FAQs
+							<Link to="/help/terms" className="text-gray-600 hover:text-green-600 hover:underline transition-colors">
+								Terms & Conditions
 							</Link>
 						</li>
 						<li>
-							<Link
-								to="/help/faq-payments"
-								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
-							>
-								Payment FAQs
-							</Link>
-						</li>
-						<li>
-							<Link
-								to="/help/contact"
-								className="text-gray-600 hover:text-green-600 hover:underline transition-colors"
-							>
-								Contact Support
+							<Link to="/help/privacy" className="text-gray-600 hover:text-green-600 hover:underline transition-colors">
+								Privacy Policy
 							</Link>
 						</li>
 					</ul>

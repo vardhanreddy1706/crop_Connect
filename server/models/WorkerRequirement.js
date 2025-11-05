@@ -14,11 +14,26 @@ const workerRequirementSchema = new mongoose.Schema(
 		workDescription: {
 			type: String,
 		},
+		preferredGender: {
+			type: String,
+			enum: ["male", "female", "other", "any"],
+			default: "any",
+		},
+		requiredAge: {
+			min: { type: Number },
+			max: { type: Number },
+		},
+		minExperience: { type: Number },
+		workDuration: { type: String },
+		foodProvided: { type: Boolean, default: false },
+		transportationProvided: { type: Boolean, default: false },
+		notes: { type: String },
 		location: {
 			village: String,
 			district: String,
 			state: String,
 			pincode: String,
+			fullAddress: String,
 		},
 		startDate: {
 			type: Date,
@@ -59,6 +74,7 @@ const workerRequirementSchema = new mongoose.Schema(
 					type: Date,
 					default: Date.now,
 				},
+				hireRequestId: { type: mongoose.Schema.Types.ObjectId, ref: "WorkerHireRequest" },
 			},
 		],
 		acceptedBy: {

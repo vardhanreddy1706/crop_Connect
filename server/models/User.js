@@ -53,12 +53,15 @@ const userSchema = new mongoose.Schema(
 
 		// Worker-specific
 		workerExperience: { type: Number },
-		aadhaarNumber: { type: String },
+
+		// Secure Aadhaar storage (for workers and tractor owners)
+		aadhaarEncrypted: { type: String, select: false },
+		aadhaarHash: { type: String, unique: true, sparse: true, select: false },
+		aadhaarLast4: { type: String },
 
 		// Tractor owner-specific
 		drivingExperience: { type: Number },
 		tractorRegistrationNumber: { type: String },
-		ownerAadhaarNumber: { type: String },
 		licenseFile: { type: String }, // Store file path or URL
 		vehicleType: { type: String },
 
@@ -94,5 +97,8 @@ userSchema.pre("save", async function (next) {
 userSchema.methods.matchPassword = async function (enteredPassword) {
 	return await bcrypt.compare(enteredPassword, this.password);
 };
+
+// Ensure unique index on aadhaarHash exists even when nulls present (sparse)
+userSchema.index({ aadhaarHash: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("User", userSchema);

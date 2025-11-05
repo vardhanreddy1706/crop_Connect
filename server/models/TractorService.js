@@ -48,10 +48,22 @@ const tractorServiceSchema = new mongoose.Schema(
 			state: String,
 			pincode: String,
 		},
+		// Core availability flags
 		availability: {
 			type: Boolean,
 			default: true,
 		},
+		isBooked: { type: Boolean, default: false },
+		// Scheduling: enforce date and time
+		availableDate: {
+			type: Date,
+			required: [true, "Please select an available date"],
+		},
+		availableTime: {
+			type: String, // HH:mm (24h)
+			required: [true, "Please select an available time"],
+		},
+		// Backward-compatibility with existing UI checks
 		availableDates: [
 			{
 				type: Date,

@@ -1,4 +1,5 @@
 const WorkerService = require("../models/WorkerService");
+const NotificationService = require("../services/notificationService");
 
 // @desc Worker posts their availability
 // @route POST /api/workers
@@ -55,7 +56,18 @@ const postWorkerAvailability = async (req, res) => {
 		});
 
 		// Populate worker details
-		await workerService.populate("worker", "name email phone");
+await workerService.populate("worker", "name email phone");
+
+		// Email worker about service posting (best-effort)
+		try {
+			await NotificationService.notifyWorkerServicePosted(
+				req.user,
+				workerService,
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (worker service posted) error:", e.message);
+		}
 
 		res.status(201).json({
 			success: true,

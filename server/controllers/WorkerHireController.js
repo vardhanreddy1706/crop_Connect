@@ -4,14 +4,23 @@ const Booking = require("../models/Booking");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const WorkerRequirement = require("../models/WorkerRequirement");
+const NotificationService = require("../services/notificationService");
+
+async function hasActiveWorkerBooking(userId) {
+  return await Booking.findOne({
+    tractorOwnerId: userId,
+    serviceType: "worker",
+    status: { $in: ["pending", "confirmed", "in_progress"] },
+  }).lean();
+}
 
 // @desc Farmer accepts worker application - Creates BOOKING
 // @route POST /api/worker-hires/:id/farmer-accept
 // @access Private (Farmer)
 exports.acceptWorkerApplication = async (req, res) => {
   try {
-    const hireRequest = await WorkerHireRequest.findById(req.params.id)
-      .populate("worker", "name phone email")
+const hireRequest = await WorkerHireRequest.findById(req.params.id)
+      .populate("worker", "name phone email gender")
       .populate("requirementId");
 
     if (!hireRequest) {
@@ -43,6 +52,17 @@ exports.acceptWorkerApplication = async (req, res) => {
     const durationMatch = hireRequest.workDetails.duration?.match(/(\d+)/);
     const durationDays = durationMatch ? parseInt(durationMatch[1]) : 1;
     const totalCost = hireRequest.agreedAmount * durationDays;
+
+// Enforce: female worker only booked once
+    if (hireRequest.worker?.gender === "female") {
+      const existing = await hasActiveWorkerBooking(hireRequest.worker._id);
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          message: "This female worker already has an active booking",
+        });
+      }
+    }
 
     // ✅ CREATE BOOKING (serviceId is optional now)
     const booking = await Booking.create({
@@ -100,6 +120,24 @@ exports.acceptWorkerApplication = async (req, res) => {
         totalCost,
       },
     });
+
+// Email notifications
+    try {
+      await NotificationService.notifyNewBookingForProvider(
+        hireRequest.worker,
+        booking,
+        "worker",
+        req.emailTransporter
+      );
+      await NotificationService.notifyBookingCreated(
+        req.user,
+        booking,
+        "worker",
+        req.emailTransporter
+      );
+    } catch (e) {
+      console.error("Email notify (farmer accept worker) error:", e.message);
+    }
 
     res.status(200).json({
       success: true,
@@ -208,7 +246,7 @@ exports.createHireRequest = async (req, res) => {
 		}
 
 		const workerService = await WorkerService.findById(workerServiceId);
-		if (!workerService) {
+if (!workerService) {
 			return res.status(404).json({
 				success: false,
 				message: "Worker service not found",
@@ -220,6 +258,17 @@ exports.createHireRequest = async (req, res) => {
 				success: false,
 				message: "This worker is not available on this date",
 			});
+		}
+
+		// Enforce: female worker only booked once
+		if (worker.gender === "female") {
+			const existing = await hasActiveWorkerBooking(worker._id);
+			if (existing) {
+				return res.status(400).json({
+					success: false,
+					message: "This female worker already has an active booking",
+				});
+			}
 		}
 
 		const hireRequest = await WorkerHireRequest.create({
@@ -254,8 +303,20 @@ exports.createHireRequest = async (req, res) => {
 			},
 		});
 
-		res.status(201).json({
-			success: true,
+// Email notification to worker
+    try {
+      await NotificationService.notifyNewBookingForProvider(
+        hireRequest.worker,
+        { _id: hireRequest._id },
+        "worker",
+        req.emailTransporter
+      );
+    } catch (e) {
+      console.error("Email notify (createHireRequest) error:", e.message);
+    }
+
+    res.status(201).json({
+        success: true,
 			message: "Hire request sent successfully",
 			hireRequest,
 		});
@@ -305,6 +366,17 @@ exports.workerAcceptHireRequest = async (req, res) => {
 		const durationDays = durationMatch ? parseInt(durationMatch[1]) : 1;
 		const totalCost = hireRequest.agreedAmount * durationDays;
 
+// Enforce: female worker only booked once
+		if (req.user.gender === "female") {
+			const existing = await hasActiveWorkerBooking(req.user._id);
+			if (existing) {
+				return res.status(400).json({
+					success: false,
+					message: "You already have an active booking",
+				});
+			}
+		}
+
 		// ✅ CREATE BOOKING
 		const booking = await Booking.create({
 			farmer: hireRequest.farmer._id,
@@ -326,12 +398,17 @@ exports.workerAcceptHireRequest = async (req, res) => {
 		hireRequest.bookingId = booking._id;
 		await hireRequest.save();
 
-		// Update worker service availability
+		// Update worker service availability and booking status
 		if (hireRequest.workerService) {
-			await WorkerService.findByIdAndUpdate(hireRequest.workerService._id, {
-				availability: false,
-				isBooked: true,
-			});
+			await WorkerService.findByIdAndUpdate(
+				hireRequest.workerService._id,
+				{
+					availability: false,
+					bookingStatus: "booked",
+					currentBookingId: booking._id,
+				},
+				{ new: true }
+			);
 		}
 
 		// Notify farmer
@@ -349,8 +426,26 @@ exports.workerAcceptHireRequest = async (req, res) => {
 			},
 		});
 
-		res.status(200).json({
-			success: true,
+// Email notifications
+    try {
+      await NotificationService.notifyNewBookingForProvider(
+        req.user,
+        booking,
+        "worker",
+        req.emailTransporter
+      );
+      await NotificationService.notifyBookingCreated(
+        hireRequest.farmer,
+        booking,
+        "worker",
+        req.emailTransporter
+      );
+    } catch (e) {
+      console.error("Email notify (worker accept hire) error:", e.message);
+    }
+
+    res.status(200).json({
+        success: true,
 			message: "Hire request accepted and booking created",
 			hireRequest,
 			booking,

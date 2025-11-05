@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Crop = require("../models/Crop");
+const Order = require("../models/Order");
 
 // @desc    Create new crop listing
 // @route   POST /api/crops
@@ -176,19 +177,40 @@ exports.deleteCrop = async (req, res) => {
 // @access  Private (Farmer)
 exports.getMyCrops = async (req, res) => {
 	try {
-		const crops = await Crop.find({ seller: req.user._id }).sort({
-			createdAt: -1,
+		const crops = await Crop.find({ seller: req.user._id }).sort({ createdAt: -1 });
+
+		if (!crops.length) {
+			return res.status(200).json({ success: true, count: 0, crops: [] });
+		}
+
+		// Build map of sold quantities per crop from orders (exclude cancelled)
+		const cropIds = crops.map((c) => c._id);
+		const soldAgg = await Order.aggregate([
+			{ $match: { seller: req.user._id, status: { $ne: "cancelled" } } },
+			{ $unwind: "$items" },
+			{ $match: { "items.crop": { $in: cropIds } } },
+			{ $group: { _id: "$items.crop", soldQuantity: { $sum: "$items.quantity" } } },
+		]);
+		const soldMap = new Map(soldAgg.map((d) => [String(d._id), d.soldQuantity]));
+
+		const enriched = crops.map((c) => {
+			const soldQuantity = soldMap.get(String(c._id)) || 0;
+			const remainingQuantity = c.quantity;
+			const initialQuantity = remainingQuantity + soldQuantity;
+			return {
+				...c.toObject(),
+				soldQuantity,
+				initialQuantity,
+				remainingQuantity,
+			};
 		});
 
 		res.status(200).json({
 			success: true,
-			count: crops.length,
-			crops,
+			count: enriched.length,
+			crops: enriched,
 		});
 	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: error.message,
-		});
+		res.status(500).json({ success: false, message: error.message });
 	}
 };

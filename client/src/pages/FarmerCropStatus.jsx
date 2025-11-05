@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-// import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../config/api";
 import { toast } from "react-hot-toast";
 import {
@@ -12,13 +12,14 @@ import {
 	Calendar,
 	Phone,
 	MapPin,
-	DollarSign,
+	IndianRupee,
 	User,
 	Clock,
+	ArrowLeft,
 } from "lucide-react";
 
 const FarmerCropStatus = () => {
-	// const navigate = useNavigate();
+	const navigate = useNavigate();
 	// const [activeTab, setActiveTab] = useState("orders");
 	const [orders, setOrders] = useState([]);
 	const [stats, setStats] = useState({
@@ -68,17 +69,36 @@ const FarmerCropStatus = () => {
 		});
 	};
 
+	// Local optimistic update helper
+	const patchOrderLocal = (orderId, patch) => {
+		setOrders((prev) => {
+			const updated = prev.map((o) => (o._id === orderId ? { ...o, ...patch } : o));
+			// Also update stats quickly with updated list
+			setTimeout(() => calculateStats(updated), 0);
+			return updated;
+		});
+	};
+
+	const [updatingId, setUpdatingId] = useState(null);
+
 	// ✅ Confirm order (farmer accepts)
 	const handleConfirmOrder = async (orderId) => {
 		if (!window.confirm("Confirm this order? Buyer will be notified.")) return;
 
 		try {
+			setUpdatingId(orderId);
+			// optimistic
+			patchOrderLocal(orderId, { status: "confirmed" });
 			await api.put(`/orders/${orderId}/confirm`);
 			toast.success("✅ Order confirmed!");
-			fetchSellerOrders();
+			fetchSellerOrders(); // silent refresh
 		} catch (error) {
 			console.error("Confirm order error:", error);
 			toast.error(error.response?.data?.message || "Failed to confirm");
+			// revert if backend rejected (e.g., cancelled)
+			fetchSellerOrders();
+		} finally {
+			setUpdatingId(null);
 		}
 	};
 
@@ -87,12 +107,37 @@ const FarmerCropStatus = () => {
 		if (!window.confirm("Mark this order as picked up from your farm?")) return;
 
 		try {
+			setUpdatingId(orderId);
+			// Attempt to pick
 			await api.put(`/orders/${orderId}/picked`);
+			// optimistic
+			patchOrderLocal(orderId, { status: "picked", pickedUpAt: new Date().toISOString() });
 			toast.success("✅ Marked as picked up!");
 			fetchSellerOrders();
 		} catch (error) {
-			console.error("Mark as picked error:", error);
-			toast.error(error.response?.data?.message || "Failed to update");
+			// If not confirmed, auto-confirm then retry once
+			const msg = error?.message || error.response?.data?.message || "";
+			if (error.status === 400 && msg.toLowerCase().includes("confirm")) {
+				try {
+					await api.put(`/orders/${orderId}/confirm`);
+					// optimistic confirm
+					patchOrderLocal(orderId, { status: "confirmed" });
+					await api.put(`/orders/${orderId}/picked`);
+					patchOrderLocal(orderId, { status: "picked", pickedUpAt: new Date().toISOString() });
+					toast.success("✅ Order confirmed and marked as picked!");
+					fetchSellerOrders();
+					return;
+				} catch (retryErr) {
+					console.error("Chained confirm→pick failed:", retryErr);
+					toast.error(retryErr.response?.data?.message || "Failed to update order");
+					fetchSellerOrders();
+				}
+			} else {
+				console.error("Mark as picked error:", error);
+				toast.error(error.response?.data?.message || "Failed to update");
+			}
+		} finally {
+			setUpdatingId(null);
 		}
 	};
 
@@ -147,13 +192,18 @@ const FarmerCropStatus = () => {
 		<div className="min-h-screen bg-gray-50 py-8">
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 				{/* Header */}
-				<div className="mb-8">
-					<h1 className="text-3xl font-bold text-gray-900">
-						Farmer Dashboard - Sales Management
-					</h1>
-					<p className="text-gray-600 mt-2">
-						Manage your crop sales and orders
-					</p>
+				<div className="mb-8 flex items-center gap-3">
+					<button onClick={() => navigate("/farmer-dashboard")} className="p-2 rounded-lg hover:bg-gray-200">
+						<ArrowLeft className="w-6 h-6" />
+					</button>
+					<div>
+						<h1 className="text-3xl font-bold text-gray-900">
+							Farmer Dashboard - Sales Management
+						</h1>
+						<p className="text-gray-600 mt-2">
+							Manage your crop sales and orders
+						</p>
+					</div>
 				</div>
 
 				{/* Stats Cards */}
@@ -202,7 +252,7 @@ const FarmerCropStatus = () => {
 									₹{stats.totalRevenue.toLocaleString()}
 								</p>
 							</div>
-							<DollarSign className="text-green-600" size={32} />
+							<IndianRupee className="text-green-600" size={32} />
 						</div>
 					</div>
 				</div>
@@ -426,34 +476,44 @@ const FarmerCropStatus = () => {
 
 										{/* Action Buttons */}
 										<div className="mt-6 flex gap-3 border-t border-gray-200 pt-4">
-											{order.status === "pending" && (
-												<>
-													<button
-														onClick={() => handleConfirmOrder(order._id)}
-														className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center gap-2 font-semibold"
-													>
-														<CheckCircle size={20} />
-														Confirm Order
-													</button>
-													<button
-														onClick={() => handleCancelOrder(order._id)}
-														className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 font-semibold"
-													>
-														<XCircle size={20} />
-														Reject Order
-													</button>
-												</>
-											)}
-
-											{order.status === "confirmed" && (
+										{order.status === "pending" && (
+											<>
 												<button
-													onClick={() => handleMarkAsPicked(order._id)}
-													className="flex-1 bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center gap-2 font-semibold"
+													onClick={() => handleConfirmOrder(order._id)}
+													disabled={updatingId === order._id}
+													className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold text-white ${
+														updatingId === order._id
+															? "bg-green-400 cursor-not-allowed"
+															: "bg-green-600 hover:bg-green-700"
+													}`}
 												>
-													<Truck size={20} />
-													Mark as Picked Up
+													<CheckCircle size={20} />
+													{updatingId === order._id ? "Updating..." : "Confirm Order"}
 												</button>
-											)}
+												<button
+													onClick={() => handleCancelOrder(order._id)}
+													className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 font-semibold"
+												>
+													<XCircle size={20} />
+													Reject Order
+												</button>
+											</>
+										)}
+
+										{order.status === "confirmed" && (
+											<button
+												onClick={() => handleMarkAsPicked(order._id)}
+												disabled={updatingId === order._id}
+												className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold text-white ${
+													updatingId === order._id
+														? "bg-purple-400 cursor-not-allowed"
+														: "bg-purple-600 hover:bg-purple-700"
+												}`}
+											>
+												<Truck size={20} />
+												{updatingId === order._id ? "Updating..." : "Mark as Picked Up"}
+											</button>
+										)}
 
 											{order.status === "picked" && (
 												<div className="flex-1 bg-blue-100 text-blue-800 px-4 py-3 rounded-lg text-center font-semibold">

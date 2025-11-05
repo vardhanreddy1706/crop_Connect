@@ -19,6 +19,10 @@ const CropPriceSearch = () => {
 		markets: [],
 	});
 
+	// pagination
+	const [currentPage, setCurrentPage] = useState(1);
+	const [rowsPerPage, setRowsPerPage] = useState(15); // 15 default as requested
+
 	const API_KEY = "579b464db66ec23bdd000001c1cf9a43e05746694f244a7f25d954f9";
 	const API_URL = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=${API_KEY}&format=json&limit=all`;
 
@@ -123,6 +127,7 @@ const CropPriceSearch = () => {
 		}
 
 		setFilteredData(filtered);
+		setCurrentPage(1); // reset page on filter change
 	}, [searchFilters, priceData]);
 
 	// Calculate price trend
@@ -142,6 +147,41 @@ const CropPriceSearch = () => {
 			market: "",
 		});
 		setFilteredData(priceData);
+		setCurrentPage(1);
+	};
+
+	// pagination helpers
+	const totalPages = Math.max(1, Math.ceil(filteredData.length / rowsPerPage));
+	const startIndex = (currentPage - 1) * rowsPerPage;
+	const endIndex = Math.min(filteredData.length, startIndex + rowsPerPage);
+	const currentRows = filteredData.slice(startIndex, endIndex);
+
+	const handleRowsChange = (e) => {
+		const value = parseInt(e.target.value, 10);
+		setRowsPerPage(value);
+		setCurrentPage(1);
+	};
+
+	const goToPage = (page) => {
+		const p = Math.min(Math.max(1, page), totalPages);
+		setCurrentPage(p);
+	};
+
+	const getPageNumbers = () => {
+		const pages = [];
+		const windowSize = 5; // show up to 5 pages around current
+		if (totalPages <= 7) {
+			for (let i = 1; i <= totalPages; i++) pages.push(i);
+			return pages;
+		}
+		const start = Math.max(2, currentPage - Math.floor(windowSize / 2));
+		const end = Math.min(totalPages - 1, start + windowSize - 1);
+		pages.push(1);
+		if (start > 2) pages.push("...");
+		for (let i = start; i <= end; i++) pages.push(i);
+		if (end < totalPages - 1) pages.push("...");
+		pages.push(totalPages);
+		return pages;
 	};
 
 	return (
@@ -287,11 +327,18 @@ const CropPriceSearch = () => {
 
 				{/* Results Summary */}
 				{!loading && !error && priceData.length > 0 && (
-					<div className="text-sm text-gray-700 bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+					<div className="text-sm text-gray-700 bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
 						<p>
-							<strong>Showing:</strong> {filteredData.length} results out of{" "}
-							{priceData.length} total
+							<strong>Showing:</strong> {startIndex + 1}-{endIndex} of {filteredData.length} results (total dataset: {priceData.length})
 						</p>
+						<div className="flex items-center gap-2">
+							<label className="text-gray-700">Rows per page:</label>
+							<select value={rowsPerPage} onChange={handleRowsChange} className="px-2 py-1 border rounded">
+								<option value={15}>15</option>
+								<option value={50}>50</option>
+								<option value={100}>100</option>
+							</select>
+						</div>
 					</div>
 				)}
 
@@ -334,11 +381,11 @@ const CropPriceSearch = () => {
 							</table>
 						</div>
 
-						{/* Scrollable Body Container */}
-						<div className="overflow-y-auto" style={{ height: "560px" }}>
+						{/* Table Body */}
+						<div className="">
 							<table className="w-full">
 								<tbody>
-									{filteredData.slice(0, 15).map((item, idx) => {
+									{currentRows.map((item, idx) => {
 										const trend = calculateTrend(
 											item.min_price,
 											item.modal_price
@@ -396,11 +443,49 @@ const CropPriceSearch = () => {
 							</table>
 						</div>
 
-						{/* Info Footer */}
-						{filteredData.length > 15 && (
-							<div className="bg-gray-50 px-4 py-3 text-sm text-gray-600 border-t border-gray-200">
-								Showing 15 of {filteredData.length} results (Use scrollbar to
-								view)
+						{/* Pagination Controls */}
+						{filteredData.length > 0 && (
+							<div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-gray-50">
+								<div className="text-sm text-gray-600">
+									Page {currentPage} of {totalPages}
+								</div>
+								<div className="flex items-center gap-2">
+									<button
+										onClick={() => goToPage(currentPage - 1)}
+										disabled={currentPage === 1}
+										className={`px-3 py-1 rounded border ${currentPage === 1 ? "text-gray-400 border-gray-200" : "text-gray-700 hover:bg-gray-100 border-gray-300"}`}
+									>
+										Previous
+									</button>
+									<div className="flex items-center gap-1">
+										{getPageNumbers().map((p, i) =>
+											typeof p === "number" ? (
+												<button
+													key={`${p}-${i}`}
+													onClick={() => goToPage(p)}
+													className={`px-3 py-1 rounded border ${
+														currentPage === p
+															? "bg-green-600 text-white border-green-600"
+															: "text-gray-700 hover:bg-gray-100 border-gray-300"
+													}`}
+												>
+													{p}
+												</button>
+											) : (
+												<span key={`dots-${i}`} className="px-2 text-gray-500">
+													...
+												</span>
+											)
+										)}
+									</div>
+									<button
+										onClick={() => goToPage(currentPage + 1)}
+										disabled={currentPage === totalPages}
+										className={`px-3 py-1 rounded border ${currentPage === totalPages ? "text-gray-400 border-gray-200" : "text-gray-700 hover:bg-gray-100 border-gray-300"}`}
+									>
+										Next
+									</button>
+								</div>
 							</div>
 						)}
 					</div>

@@ -3,6 +3,7 @@ import {
 	Routes,
 	Route,
 	Navigate,
+	useLocation,
 } from "react-router-dom";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -29,6 +30,7 @@ import FarmerMyBookings from "./pages/FarmerBookings";
 import { LanguageProvider } from "./context/LanguageContext";
 import FarmerOrders from "./pages/FarmerOrders";
 import FarmerCropStatus from "./pages/FarmerCropStatus";
+import CropListings from "./pages/CropListings";
 // Dashboards
 import BuyerDashboard from "./dashboards/BuyerDashboard";
 import TractorDashboard from "./dashboards/TractorDashboard";
@@ -42,6 +44,7 @@ import PrivacyPolicy from "./help/PrivacyAndPolicy";
 import TermsAndConditions from "./help/TermsAndConditions";
 
 import "./App.css";
+import Chatbot from "./components/ChatBot";
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -214,6 +217,16 @@ function AppRoutes() {
 				}
 			/>
 
+			{/* Crop Listings (farmer) */}
+			<Route
+				path="/my-crops"
+				element={
+					<ProtectedRoute allowedRoles={["farmer"]}>
+						<CropListings />
+					</ProtectedRoute>
+				}
+			/>
+
 			{/* Tractor & Worker Booking */}
 			<Route
 				path="/tractor-booking"
@@ -295,13 +308,38 @@ function AppRoutes() {
 			<Route path="/farmer-crop-status" element={<FarmerCropStatus />} />
 
 			{/* Help Routes - Protected */}
-
-			<Route path="/help" element={<HelpLayout />}>
-				<Route path="/help/contact" element={<Contact />} />
-				<Route path="/help/faq" element={<HelpFaqPrices />} />
-				<Route path="/help/privacy" element={<PrivacyPolicy />} />
-				<Route path="/help/terms" element={<TermsAndConditions />} />
-			</Route>
+			<Route
+				path="/help/contact"
+				element={
+					<ProtectedRoute>
+						<Contact />
+					</ProtectedRoute>
+				}
+			/>
+			<Route
+				path="/help/faq"
+				element={
+					<ProtectedRoute>
+						<HelpFaqPrices />
+					</ProtectedRoute>
+				}
+			/>
+			<Route
+				path="/help/privacy"
+				element={
+					<ProtectedRoute>
+						<PrivacyPolicy />
+					</ProtectedRoute>
+				}
+			/>
+			<Route
+				path="/help/terms"
+				element={
+					<ProtectedRoute>
+						<TermsAndConditions />
+					</ProtectedRoute>
+				}
+			/>
 
 			{/* Catch all - Redirect based on auth status */}
 			<Route
@@ -318,6 +356,18 @@ function AppRoutes() {
 	);
 }
 
+function ChatbotOverlay() {
+	const location = useLocation();
+	const paths = new Set([
+		"/farmer-dashboard",
+		"/buyer-dashboard",
+		"/tractor-dashboard",
+		"/worker-dashboard",
+	]);
+	if (!paths.has(location.pathname)) return null;
+	return <Chatbot />;
+}
+
 function App() {
 	return (
 		<LanguageProvider>
@@ -325,6 +375,7 @@ function App() {
 				<Router>
 					<AuthProvider>
 						<AppRoutes />
+						<ChatbotOverlay />
 					</AuthProvider>
 				</Router>
 			</NotificationProvider>

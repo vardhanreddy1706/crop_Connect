@@ -4,7 +4,7 @@ import {
 	Tractor,
 	Calendar,
 	MapPin,
-	DollarSign,
+	IndianRupee,
 	Clock,
 	User,
 	Bell,
@@ -30,10 +30,15 @@ import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useNotificationContext } from "../context/NotificationContext";
 import api from "../config/api";
+import LanguageSelector from "../components/LanguageSelector";
+import DashboardNavbar from "../components/DashboardNavbar";
+import DashboardFooter from "../components/DashboardFooter";
+import { useLanguage } from "../context/LanguageContext";
 
 const TractorDashboard = () => {
 	const { user, logout } = useAuth();
 	const { notifications, unreadCount } = useNotificationContext();
+	const { tr } = useLanguage();
 
 	useEffect(() => {
 		toast.dismiss();
@@ -73,18 +78,20 @@ const TractorDashboard = () => {
 		status: "",
 	});
 
-	// New service form
-	const [newService, setNewService] = useState({
-		brand: "",
-		model: "",
-		vehicleNumber: "",
-		typeOfPlowing: "",
-		landType: "",
-		chargePerAcre: "",
-		location: { district: "", state: "", village: "", pincode: "" },
-		contactNumber: user?.phone || "",
-		availability: true,
-	});
+// New service form
+const [newService, setNewService] = useState({
+	brand: "",
+	model: "",
+	vehicleNumber: "",
+	typeOfPlowing: "",
+	landType: "",
+	chargePerAcre: "",
+	location: { district: "", state: "", village: "", pincode: "" },
+	contactNumber: user?.phone || "",
+	availability: true,
+	availableDate: "",
+	availableTime: "",
+});
 
 	// Bid form
 	const [bidForm, setBidForm] = useState({
@@ -99,7 +106,7 @@ const TractorDashboard = () => {
 			setRefreshing(true);
 			const results = await Promise.allSettled([
 				api.get("/tractors/my-services"),
-				api.get("/tractor-requirements"),
+api.get("/tractor-requirements", { params: { district: user?.address?.district, state: user?.address?.state } }),
 				api.get("/transactions/dashboard"),
 				api.get("/bids/tractor-owner"), // NEW: Fetch my bids
 				api.get("/bookings/tractor-owner"), // NEW: Fetch my work/bookings
@@ -155,11 +162,19 @@ const TractorDashboard = () => {
 		fetchAllData();
 	}, [fetchAllData]);
 
-	// ==================== SERVICE POSTING ====================
-	const handleCreateService = async (e) => {
-		e.preventDefault();
-		try {
-			const response = await api.post("/tractors", newService);
+// ==================== SERVICE POSTING ====================
+const handleCreateService = async (e) => {
+	e.preventDefault();
+	try {
+		// Build payload with explicit date and time and a combined ISO for backward-compat
+		const combinedISO = newService.availableDate
+			? new Date(`${newService.availableDate}T${newService.availableTime || "00:00"}`).toISOString()
+			: null;
+		const payload = {
+			...newService,
+			availableDates: combinedISO ? [combinedISO] : [],
+		};
+		const response = await api.post("/tractors", payload);
 			toast.success(
 				`✅ Service posted!${
 					response.data.notifiedFarmers > 0
@@ -167,18 +182,20 @@ const TractorDashboard = () => {
 						: ""
 				}`
 			);
-			setShowServiceForm(false);
-			setNewService({
-				brand: "",
-				model: "",
-				vehicleNumber: "",
-				typeOfPlowing: "",
-				landType: "",
-				chargePerAcre: "",
-				location: { district: "", state: "", village: "", pincode: "" },
-				contactNumber: user?.phone || "",
-				availability: true,
-			});
+setShowServiceForm(false);
+				setNewService({
+					brand: "",
+					model: "",
+					vehicleNumber: "",
+					typeOfPlowing: "",
+					landType: "",
+					chargePerAcre: "",
+					location: { district: "", state: "", village: "", pincode: "" },
+					contactNumber: user?.phone || "",
+					availability: true,
+					availableDate: "",
+					availableTime: "",
+				});
 			fetchAllData();
 		} catch (error) {
 			toast.error(error.message || "Failed to post service");
@@ -193,7 +210,7 @@ const TractorDashboard = () => {
 			await api.post("/bids", {
 				requirementId,
 				proposedAmount: parseFloat(bidForm.proposedAmount),
-				proposedDuration: `${bidForm.proposedDuration} days`,
+				proposedDuration: `${bidForm.proposedDuration} hours`,
 				proposedDate: requirement?.expectedDate,
 				message: bidForm.message,
 			});
@@ -251,129 +268,36 @@ const TractorDashboard = () => {
 		return (
 			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
 				<div className="text-center">
-					<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
-					<p className="text-gray-600 text-lg">Loading your dashboard...</p>
+								<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
+								<p className="text-gray-600 text-lg">{tr("Loading your dashboard...")}</p>
 				</div>
 			</div>
 		);
 	}
 
 	return (
-		<div className="min-h-screen bg-gray-50">
+		<div className="min-h-screen bg-gray-50 flex flex-col">
 			<Toaster position="top-right" />
 
-			{/* HEADER */}
-			<header className="bg-white shadow-sm border-b sticky top-0 z-40">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					<div className="flex justify-between items-center py-4">
-						<div className="flex items-center space-x-4">
-							<div className="bg-gradient-to-br from-green-500 to-green-700 p-3 rounded-xl shadow-lg">
-								<Tractor className="h-8 w-8 text-white" />
-							</div>
-							<div>
-								<h1 className="text-2xl font-bold text-gray-900">
-									Tractor Owner Dashboard
-								</h1>
-								<p className="text-sm text-gray-600">
-									Welcome back,{" "}
-									<span className="font-semibold">{user?.name}</span>
-								</p>
-							</div>
-						</div>
+			{/* HEADER + NAVIGATION via shared DashboardNavbar */}
+			<DashboardNavbar
+				role={tr("Tractor Owner")}
+				userName={user?.name}
+				onLogout={logout}
+				tabs={[
+					{ id: "overview", label: tr("Overview"), icon: TrendingUp },
+					{ id: "requirements", label: tr("Available Work"), icon: Search, badge: stats.activeRequests },
+					{ id: "mywork", label: tr("My Work"), icon: Briefcase, badge: stats.acceptedWork },
+					{ id: "services", label: tr("My Services"), icon: Settings, badge: stats.totalServices },
+					{ id: "payments", label: tr("Payments"), icon: IndianRupee },
+				]}
+				activeTab={activeTab}
+				onTabChange={setActiveTab}
+			/>
 
-						<div className="flex items-center space-x-4">
-							<button
-								onClick={fetchAllData}
-								disabled={refreshing}
-								className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-								title="Refresh data"
-							>
-								<Activity
-									className={`h-5 w-5 text-gray-600 ${
-										refreshing ? "animate-spin" : ""
-									}`}
-								/>
-							</button>
-
-							<button
-								onClick={() => setShowServiceForm(true)}
-								className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-4 py-2 rounded-lg flex items-center space-x-2 shadow-md transition-all"
-							>
-								<Plus className="h-5 w-5" />
-								<span className="hidden sm:inline">Post Service</span>
-							</button>
-
-							<div className="relative">
-								<Bell className="h-6 w-6 text-gray-600 cursor-pointer hover:text-green-600" />
-								{unreadCount > 0 && (
-									<span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
-										{unreadCount}
-									</span>
-								)}
-							</div>
-
-							<button
-								onClick={logout}
-								className="p-2 hover:bg-red-50 rounded-lg text-red-600 transition-colors"
-								title="Logout"
-							>
-								<LogOut className="h-5 w-5" />
-							</button>
-						</div>
-					</div>
-				</div>
-			</header>
-
-			{/* NAVIGATION TABS */}
-			<nav className="bg-white border-b sticky top-[73px] z-30">
-				<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-					<div className="flex space-x-8 overflow-x-auto">
-						{[
-							{ id: "overview", label: "Overview", icon: TrendingUp },
-							{
-								id: "requirements",
-								label: "Available Work",
-								icon: Search,
-								badge: stats.activeRequests,
-							},
-							{
-								id: "mywork",
-								label: "My Work",
-								icon: Briefcase,
-								badge: stats.acceptedWork,
-							},
-							{
-								id: "services",
-								label: "My Services",
-								icon: Settings,
-								badge: stats.totalServices,
-							},
-							{ id: "payments", label: "Payments", icon: DollarSign },
-						].map((tab) => (
-							<button
-								key={tab.id}
-								onClick={() => setActiveTab(tab.id)}
-								className={`py-4 px-2 border-b-2 font-medium text-sm flex items-center space-x-2 whitespace-nowrap transition-colors ${
-									activeTab === tab.id
-										? "border-green-500 text-green-600"
-										: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-								}`}
-							>
-								<tab.icon className="h-4 w-4" />
-								<span>{tab.label}</span>
-								{tab.badge > 0 && (
-									<span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">
-										{tab.badge}
-									</span>
-								)}
-							</button>
-						))}
-					</div>
-				</div>
-			</nav>
-
-			{/* MAIN CONTENT */}
-			<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+			<div className="pt-32 flex-1">
+				{/* MAIN CONTENT */}
+				<main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 				{activeTab === "overview" && (
 					<OverviewTab
 						stats={stats}
@@ -417,6 +341,16 @@ const TractorDashboard = () => {
 				)}
 			</main>
 
+			{/* Dashboard Footer */}
+			<DashboardFooter
+				role="Tractor Owner"
+				actions={[
+					{ label: tr("Post Service"), onClick: () => setShowServiceForm(true), icon: Plus },
+					{ label: tr("Available Work"), onClick: () => setActiveTab("requirements"), icon: Search },
+					{ label: tr("Payments"), onClick: () => setActiveTab("payments"), icon: IndianRupee },
+				]}
+			/>
+
 			{/* MODALS */}
 			{showServiceForm && (
 				<ServiceFormModal
@@ -436,6 +370,7 @@ const TractorDashboard = () => {
 					onClose={() => setShowBidModal(null)}
 				/>
 			)}
+			</div>
 		</div>
 	);
 };
@@ -443,6 +378,8 @@ const TractorDashboard = () => {
 // Continue with Part 2...
 // ==================== MY WORK TAB (NEW) ====================
 const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) => {
+    const { tr } = useLanguage();
+
     const filteredWork = myWork.filter((work) => {
         if (activeSubTab === "accepted") return work.status === "confirmed";
         if (activeSubTab === "completed") return work.status === "completed";
@@ -450,18 +387,32 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
         return false;
     });
 
+    // Helper to format location gracefully
+    const formatLocation = (loc) => {
+        if (!loc) return "—";
+        if (typeof loc === "string") return loc;
+        if (loc.fullAddress && loc.fullAddress.trim()) return loc.fullAddress;
+        const parts = [loc.village, loc.mandal, loc.district, loc.state, loc.pincode].filter(Boolean);
+        return parts.length ? parts.join(", ") : "—";
+    };
+
+    const formatLandSize = (val) => {
+        const num = parseFloat(val);
+        return Number.isFinite(num) && num > 0 ? num : "—";
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-900">My Work</h2>
+<h2 className="text-2xl font-bold text-gray-900">{tr("My Work")}</h2>
             </div>
 
             {/* Sub Tabs */}
             <div className="flex gap-4 border-b">
                 {[
-                    { id: "accepted", label: "Accepted Work", icon: CheckCircle },
-                    { id: "completed", label: "Completed", icon: Package },
-                    { id: "cancelled", label: "Cancelled", icon: XCircle },
+                    { id: "accepted", label: tr("Accepted Work"), icon: CheckCircle },
+                    { id: "completed", label: tr("Completed"), icon: Package },
+                    { id: "cancelled", label: tr("Cancelled"), icon: XCircle },
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -544,7 +495,7 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                                 </div>
                                 <div className="flex items-center text-gray-600 text-sm">
                                     <MapPin className="h-4 w-4 mr-2" />
-                                    {work.location?.district}, {work.location?.state}
+                                    {formatLocation(work.location)}
                                 </div>
                                 <div className="flex items-center text-gray-600 text-sm">
                                     <User className="h-4 w-4 mr-2" />
@@ -552,7 +503,7 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                                 </div>
                                 <div className="flex items-center text-gray-600 text-sm">
                                     <Package className="h-4 w-4 mr-2" />
-                                    Land Size: {work.landSize} acres
+                                    Land Size: {formatLandSize(work.landSize)} acres
                                 </div>
                             </div>
 
@@ -565,7 +516,7 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                                             : "bg-orange-100 text-orange-800"
                                     }`}
                                 >
-                                    Payment: {work.paymentStatus}
+                                    {tr("Payment:")} {work.paymentStatus}
                                 </span>
                             </div>
 
@@ -578,7 +529,7 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                                             className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
                                         >
                                             <Phone className="h-4 w-4" />
-                                            <span>Call Farmer</span>
+                                            <span>{tr("Call Farmer")}</span>
                                         </a>
                                         {new Date(work.bookingDate) <= new Date() && (
                                             <button
@@ -586,26 +537,26 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                                                 className="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
                                             >
                                                 <CheckCircle className="h-4 w-4" />
-                                                <span>Mark Complete</span>
+                                                <span>{tr("Mark Complete")}</span>
                                             </button>
                                         )}
                                     </>
                                 )}
                                 {work.status === "completed" && work.paymentStatus === "pending" && (
                                     <div className="flex-1 bg-orange-50 border-2 border-orange-200 text-orange-800 px-4 py-2 rounded-lg text-center text-sm font-medium">
-                                        ⏳ Awaiting Payment
+                                        ⏳ {tr("Awaiting Payment")}
                                     </div>
                                 )}
                                 {work.status === "completed" && work.paymentStatus === "paid" && (
                                     <div className="flex-1 bg-green-50 border-2 border-green-200 text-green-800 px-4 py-2 rounded-lg text-center text-sm font-medium">
-                                        ✅ Payment Received
+                                        ✅ {tr("Payment Received")}
                                     </div>
                                 )}
                             </div>
 
                             {/* Booking ID */}
                             <div className="mt-3 pt-3 border-t text-xs text-gray-500">
-                                Booking ID: {work._id.slice(-8).toUpperCase()}
+                                {tr("Booking ID:")} {work._id.slice(-8).toUpperCase()}
                             </div>
                         </div>
                     ))}
@@ -617,6 +568,7 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
 
 // ==================== REQUIREMENTS TAB (UPDATED) ====================
 const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, setFilters, onPlaceBid, myBids }) => {
+    const { tr } = useLanguage();
     const hasBidOnRequirement = (reqId) => {
         return myBids.some((bid) => bid.requirementId?._id === reqId);
     };
@@ -626,9 +578,9 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
             {/* Header */}
             <div className="flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Available Work</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">{tr("Available Work")}</h2>
                     <p className="text-gray-600 text-sm">
-                        {requirements.length} requirements available
+                        {requirements.length} {tr("requirements available")}
                     </p>
                 </div>
             </div>
@@ -641,7 +593,7 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search by work type or district..."
+                                placeholder={tr("Search by work type or district...")}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -653,7 +605,7 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                         onChange={(e) => setFilters({ ...filters, workType: e.target.value })}
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
-                        <option value="">All Work Types</option>
+                        <option value="">{tr("All Work Types")}</option>
                         <option value="Plowing">Plowing</option>
                         <option value="Harvesting">Harvesting</option>
                         <option value="Spraying">Spraying</option>
@@ -665,10 +617,10 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                         onChange={(e) => setFilters({ ...filters, urgency: e.target.value })}
                         className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
-                        <option value="">All Urgency</option>
-                        <option value="normal">Normal</option>
-                        <option value="urgent">Urgent</option>
-                        <option value="very_urgent">Very Urgent</option>
+                        <option value="">{tr("All Urgency")}</option>
+                        <option value="normal">{tr("Normal")}</option>
+                        <option value="urgent">{tr("Urgent")}</option>
+                        <option value="very_urgent">{tr("Very Urgent")}</option>
                     </select>
                     <button
                         onClick={() => {
@@ -677,7 +629,7 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                         }}
                         className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                     >
-                        Clear Filters
+                        {tr("Clear Filters")}
                     </button>
                 </div>
             </div>
@@ -686,8 +638,8 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
             {requirements.length === 0 ? (
                 <div className="bg-white rounded-xl shadow-sm p-12 text-center">
                     <Search className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No requirements found</h3>
-                    <p className="text-gray-600">Check back later for new work opportunities</p>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{tr("No requirements found")}</h3>
+                    <p className="text-gray-600">{tr("Check back later for new work opportunities")}</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -695,6 +647,8 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                         const bidPlaced = hasBidOnRequirement(req._id);
                         const bid = myBids.find((b) => b.requirementId?._id === req._id);
 
+                        const isExpired = new Date(req.expectedDate).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+                        const isClosed = req.status && req.status !== "open";
                         return (
                             <div
                                 key={req._id}
@@ -722,7 +676,7 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-sm text-gray-500">Budget</p>
+								<p className="text-sm text-gray-500">{tr("Budget")}</p>
                                         <p className="text-2xl font-bold text-green-600">
                                             ₹{req.maxBudget}
                                         </p>
@@ -741,19 +695,19 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                                     <div className="flex items-center text-gray-700">
                                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
                                         <span className="text-sm">
-                                            Expected:{" "}
+                                            {tr("Expected:")}{" "}
                                             {new Date(req.expectedDate).toLocaleDateString("en-IN")}
                                         </span>
                                     </div>
                                     <div className="flex items-center text-gray-700">
                                         <Package className="h-4 w-4 mr-2 text-gray-400" />
                                         <span className="text-sm">
-                                            {req.landSize} acres • {req.landType} land
+                                            {req.landSize} {tr("acres")} • {req.landType} {tr("land")}
                                         </span>
                                     </div>
                                     <div className="flex items-center text-gray-700">
                                         <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                                        <span className="text-sm">Duration: {req.duration}</span>
+                                        <span className="text-sm">{tr("Duration")}: {req.duration}</span>
                                     </div>
                                     {req.additionalNotes && (
                                         <div className="mt-3 p-3 bg-gray-50 rounded-lg">
@@ -765,7 +719,8 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                                 {/* Farmer Info */}
                                 <div className="bg-blue-50 rounded-lg p-3 mb-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center">
+<div className="flex items-center gap-2">
+					<LanguageSelector />
                                             <User className="h-4 w-4 mr-2 text-blue-600" />
                                             <span className="text-sm font-medium text-gray-900">
                                                 {req.farmer?.name}
@@ -791,17 +746,21 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                                                 : "bg-yellow-100 text-yellow-800 border-2 border-yellow-300"
                                         }`}
                                     >
-                                        {bid?.status === "accepted" && "✅ Bid Accepted"}
+                                        {bid?.status === "accepted" && `✅ Bid Accepted — ₹${bid?.proposedAmount ?? bid?.bidAmount}`}
                                         {bid?.status === "rejected" && "❌ Bid Rejected"}
-                                        {bid?.status === "pending" && "⏳ Bid Placed - Pending"}
+                                        {bid?.status === "pending" && `⏳ Bid Placed - Pending — ₹${bid?.proposedAmount ?? bid?.bidAmount}`}
+                                    </div>
+                                ) : isExpired || isClosed ? (
+                                    <div className="w-full px-4 py-3 rounded-lg text-center font-medium text-sm bg-gray-100 text-gray-600 border-2 border-gray-200">
+                                        {isClosed ? "Closed" : "Expired"}
                                     </div>
                                 ) : (
                                     <button
                                         onClick={() => onPlaceBid(req)}
                                         className="w-full bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-medium flex items-center justify-center space-x-2 shadow-lg transition-all"
                                     >
-                                        <DollarSign className="h-5 w-5" />
-                                        <span>Place Bid</span>
+                                        <IndianRupee className="h-5 w-5" />
+                                        <span>{tr("Place Bid")}</span>
                                     </button>
                                 )}
                             </div>
@@ -814,33 +773,35 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
 };
 
 // ==================== OTHER TABS (Keep your existing ones) ====================
-const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => (
+const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => {
+    const { tr } = useLanguage();
+    return (
     <div className="space-y-6">
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <StatCard
-                title="Total Services"
+                title={tr("Total Services")}
                 value={stats.totalServices}
                 icon={Tractor}
                 color="blue"
                 onClick={() => setActiveTab("services")}
             />
             <StatCard
-                title="Active Requests"
+                title={tr("Active Requests")}
                 value={stats.activeRequests}
                 icon={TrendingUp}
                 color="green"
                 onClick={() => setActiveTab("requirements")}
             />
             <StatCard
-                title="Total Earnings"
+                title={tr("Total Earnings")}
                 value={`₹${stats.totalEarnings.toLocaleString()}`}
-                icon={DollarSign}
+                icon={IndianRupee}
                 color="green"
                 onClick={() => setActiveTab("payments")}
             />
             <StatCard
-                title="Accepted Work"
+                title={tr("Accepted Work")}
                 value={stats.acceptedWork}
                 icon={CheckCircle}
                 color="purple"
@@ -853,7 +814,7 @@ const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => (
             <div className="bg-white rounded-xl shadow-sm p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <Bell className="h-5 w-5 mr-2 text-green-600" />
-                    Recent Notifications
+                    {tr("Recent Notifications")}
                 </h3>
                 <div className="space-y-3">
                     {notifications.slice(0, 5).map((notif) => (
@@ -871,14 +832,14 @@ const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => (
             </div>
 
             <div className="bg-white rounded-xl shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">{tr("Quick Actions")}</h3>
                 <div className="space-y-3">
                     <button
                         onClick={() => setActiveTab("requirements")}
                         className="w-full bg-green-50 hover:bg-green-100 text-green-700 px-4 py-3 rounded-lg text-left flex items-center space-x-3 transition-colors"
                     >
                         <Search className="h-5 w-5" />
-                        <span className="font-medium">Browse Available Work</span>
+                        <span className="font-medium">{tr("Browse Available Work")}</span>
                         <ChevronRight className="h-4 w-4 ml-auto" />
                     </button>
                     <button
@@ -886,22 +847,23 @@ const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => (
                         className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-3 rounded-lg text-left flex items-center space-x-3 transition-colors"
                     >
                         <Briefcase className="h-5 w-5" />
-                        <span className="font-medium">View My Work</span>
+                        <span className="font-medium">{tr("View My Work")}</span>
                         <ChevronRight className="h-4 w-4 ml-auto" />
                     </button>
                     <button
                         onClick={() => setActiveTab("payments")}
                         className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 px-4 py-3 rounded-lg text-left flex items-center space-x-3 transition-colors"
                     >
-                        <DollarSign className="h-5 w-5" />
-                        <span className="font-medium">Check Earnings</span>
+<IndianRupee className="h-5 w-5" />
+                        <span className="font-medium">{tr("Check Earnings")}</span>
                         <ChevronRight className="h-4 w-4 ml-auto" />
                     </button>
-                </div>
-            </div>
-        </div>
-    </div>
-);
+				</div>
+				</div>
+			</div>
+		</div>
+	);
+};
 
 const StatCard = ({ title, value, icon: Icon, color, onClick }) => {
     const colorClasses = {
@@ -1005,7 +967,7 @@ const BidModal = ({ requirement, bidForm, setBidForm, onSubmit, onClose }) => {
                                 Your Bid Amount (₹) *
                             </label>
                             <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+<IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                                 <input
                                     type="number"
                                     required
@@ -1026,23 +988,23 @@ const BidModal = ({ requirement, bidForm, setBidForm, onSubmit, onClose }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 mb-2">
-                                Estimated Duration (days) *
-                            </label>
-                            <div className="relative">
-                                <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                                <input
-                                    type="number"
-                                    required
-                                    min="1"
-                                    max="30"
-                                    value={bidForm.proposedDuration}
-                                    onChange={(e) =>
-                                        setBidForm({ ...bidForm, proposedDuration: e.target.value })
-                                    }
-                                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                />
-                            </div>
+						<label className="block text-sm font-semibold text-gray-700 mb-2">
+							Estimated Duration (hours) *
+						</label>
+						<div className="relative">
+							<Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+							<input
+								type="number"
+								required
+								min="1"
+								max="72"
+								value={bidForm.proposedDuration}
+								onChange={(e) =>
+									setBidForm({ ...bidForm, proposedDuration: e.target.value })
+								}
+								className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+							/>
+						</div>
                         </div>
 
                         <div>
@@ -1071,7 +1033,7 @@ const BidModal = ({ requirement, bidForm, setBidForm, onSubmit, onClose }) => {
                                 type="submit"
                                 className="flex-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition-all flex items-center justify-center space-x-2"
                             >
-                                <DollarSign className="h-5 w-5" />
+<IndianRupee className="h-5 w-5" />
                                 <span>Submit Bid</span>
                             </button>
                         </div>
@@ -1308,6 +1270,33 @@ const ServiceFormModal = ({ newService, setNewService, onSubmit, onClose }) => {
                                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                             />
                         </div>
+
+{/* Availability */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Available Date *
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={newService.availableDate}
+                                min={new Date().toISOString().split("T")[0]}
+                                onChange={(e) => setNewService({ ...newService, availableDate: e.target.value })}
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Available Time *
+                            </label>
+                            <input
+                                type="time"
+                                required
+                                value={newService.availableTime}
+                                onChange={(e) => setNewService({ ...newService, availableTime: e.target.value })}
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
                     </div>
 
                     {/* Submit Button */}
@@ -1334,35 +1323,56 @@ const ServiceFormModal = ({ newService, setNewService, onSubmit, onClose }) => {
 };
 
 // ==================== SERVICES TAB (Keep your existing or use this) ====================
-const ServicesTab = ({ services, onCancel, onPostNew }) => (
+// helper to mark service expired based on scheduled date/time
+const isSvcExpired = (svc) => {
+    try {
+        if (!svc) return false;
+        if (svc.availability === false) return false; // engaged/unavailable handled separately
+        const now = new Date();
+        if (svc.availableDate) {
+            const when = new Date(`${new Date(svc.availableDate).toISOString().slice(0,10)}T${(svc.availableTime||"00:00").padStart(5,"0")}`);
+            if (!isNaN(when.getTime())) {
+                return when < now;
+            }
+        }
+        if (Array.isArray(svc.availableDates) && svc.availableDates.length > 0) {
+            return svc.availableDates.every((d) => new Date(d) < now);
+        }
+        return false;
+    } catch { return false; }
+};
+
+const ServicesTab = ({ services, onCancel, onPostNew }) => {
+    const { tr } = useLanguage();
+    return (
     <div className="space-y-6">
         <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-gray-900">My Services</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{tr("My Services")}</h2>
             <button
                 onClick={onPostNew}
                 className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
             >
                 <Plus className="h-5 w-5" />
-                <span>Add New Service</span>
+                <span>{tr("Add New Service")}</span>
             </button>
         </div>
 
         {services.length === 0 ? (
             <div className="bg-white rounded-xl shadow-sm p-12 text-center">
                 <Tractor className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">No services posted yet</h3>
-                <p className="text-gray-600 mb-6">Post your first tractor service to get started</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">{tr("No services posted yet")}</h3>
+                <p className="text-gray-600 mb-6">{tr("Post your first tractor service to get started")}</p>
                 <button
                     onClick={onPostNew}
                     className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg inline-flex items-center space-x-2"
                 >
                     <Plus className="h-5 w-5" />
-                    <span>Post Service</span>
+                    <span>{tr("Post Service")}</span>
                 </button>
             </div>
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {services.map((service) => (
+                {services.filter((s)=>!isSvcExpired(s)).map((service) => (
                     <div
                         key={service._id}
                         className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6"
@@ -1374,29 +1384,31 @@ const ServicesTab = ({ services, onCancel, onPostNew }) => (
                                 </h3>
                                 <p className="text-gray-600">{service.vehicleNumber}</p>
                             </div>
-                            <span
-                                className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                    service.availability
-                                        ? "bg-green-100 text-green-800"
-                                        : "bg-red-100 text-red-800"
-                                }`}
-                            >
-                                {service.availability ? "Available" : "Unavailable"}
-                            </span>
+									<span
+										className={`px-3 py-1 rounded-full text-xs font-semibold ${
+											(!service.availability || service.isBooked)
+												? "bg-blue-100 text-blue-800"
+												: isSvcExpired(service)
+												? "bg-gray-200 text-gray-700"
+												: "bg-green-100 text-green-800"
+										}`}
+									>
+										{(!service.availability || service.isBooked) ? tr("Engaged") : isSvcExpired(service) ? tr("Expired") : tr("Available")}
+									</span>
                         </div>
 
                         <div className="space-y-2 text-sm text-gray-700">
                             <p>
-                                <strong>Service:</strong> {service.typeOfPlowing}
+                                <strong>{tr("Service:")}</strong> {service.typeOfPlowing}
                             </p>
                             <p>
-                                <strong>Land Type:</strong> {service.landType}
+                                <strong>{tr("Land Type:")}</strong> {service.landType}
                             </p>
                             <p>
-                                <strong>Charge:</strong> ₹{service.chargePerAcre}/acre
+                                <strong>{tr("Charge:")}</strong> ₹{service.chargePerAcre}/acre
                             </p>
                             <p>
-                                <strong>Location:</strong> {service.location.district},{" "}
+                                <strong>{tr("Location:")}</strong> {service.location.district},{" "}
                                 {service.location.state}
                             </p>
                         </div>
@@ -1406,32 +1418,36 @@ const ServicesTab = ({ services, onCancel, onPostNew }) => (
         )}
     </div>
 );
+};
 
 // ==================== PAYMENTS TAB (Keep your existing) ====================
-const PaymentsTab = ({ dashboardData }) => (
+const PaymentsTab = ({ dashboardData }) => { const { tr } = useLanguage(); return (
     <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900">Payments & Earnings</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{tr("Payments & Earnings")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl shadow-sm p-6">
-                <p className="text-gray-600 text-sm mb-2">Total Earnings</p>
+                <p className="text-gray-600 text-sm mb-2">{tr("Total Earnings")}</p>
                 <p className="text-3xl font-bold text-green-600">
                     ₹{dashboardData?.stats?.totalAmount?.toLocaleString() || 0}
                 </p>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6">
-                <p className="text-gray-600 text-sm mb-2">Pending Payments</p>
+                <p className="text-gray-600 text-sm mb-2">{tr("Pending Payments")}</p>
                 <p className="text-3xl font-bold text-orange-600">
                     ₹{dashboardData?.stats?.pendingAmount?.toLocaleString() || 0}
                 </p>
+                <p className="text-sm text-gray-600 mt-1">
+                    {dashboardData?.stats?.pendingTransactions || 0} {tr("pending")}
+                </p>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6">
-                <p className="text-gray-600 text-sm mb-2">Completed Payments</p>
+                <p className="text-gray-600 text-sm mb-2">{tr("Completed Payments")}</p>
                 <p className="text-3xl font-bold text-gray-900">
-                    {dashboardData?.transactions?.filter((t) => t.status === "success").length || 0}
+                    {dashboardData?.stats?.completedTransactions ?? (dashboardData?.transactions?.filter((t) => t.status === "completed").length || 0)}
                 </p>
             </div>
         </div>
     </div>
-);
+)};
 
 export default TractorDashboard;

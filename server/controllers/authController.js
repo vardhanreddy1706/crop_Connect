@@ -3,6 +3,7 @@
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const NotificationService = require("../services/notificationService");
+const { encryptAadhaar, hashAadhaar, validateAadhaar } = require("../utils/aadhaar");
 
 // @desc Register user
 // @route POST /api/auth/register
@@ -53,7 +54,23 @@ exports.register = async (req, res) => {
 			});
 		}
 
-		// Create user with all fields
+		// Aadhaar handling (only for worker / tractor_owner)
+		let aadhaarEncrypted, aadhaarHash, aadhaarLast4;
+		let providedAadhaar = aadhaarNumber || ownerAadhaarNumber;
+		if ((role === "worker" || role === "tractor_owner") && providedAadhaar) {
+			if (!validateAadhaar(providedAadhaar)) {
+				return res.status(400).json({ success: false, message: "Aadhaar must be a 12-digit number" });
+			}
+			aadhaarHash = hashAadhaar(providedAadhaar);
+			const exists = await User.findOne({ aadhaarHash }).lean();
+			if (exists) {
+				return res.status(400).json({ success: false, message: "Aadhaar already registered" });
+			}
+			aadhaarEncrypted = encryptAadhaar(providedAadhaar);
+			aadhaarLast4 = String(providedAadhaar).slice(-4);
+		}
+
+		// Create user with all fields (exclude plaintext Aadhaar)
 		const user = await User.create({
 			name,
 			email,
@@ -70,12 +87,13 @@ exports.register = async (req, res) => {
 			businessExperience,
 			companyName,
 			workerExperience,
-			aadhaarNumber,
 			drivingExperience,
 			tractorRegistrationNumber,
-			ownerAadhaarNumber,
 			licenseFile,
 			vehicleType,
+			...(aadhaarEncrypted
+				? { aadhaarEncrypted, aadhaarHash, aadhaarLast4 }
+				: {}),
 		});
 
 		// Respond with user info and token
@@ -106,10 +124,10 @@ exports.register = async (req, res) => {
 					businessExperience: user.businessExperience,
 					companyName: user.companyName,
 					workerExperience: user.workerExperience,
-					aadhaarNumber: user.aadhaarNumber,
+					// Do not return Aadhaar; return last 4 digits only if present
+					aadhaarLast4: user.aadhaarLast4,
 					drivingExperience: user.drivingExperience,
 					tractorRegistrationNumber: user.tractorRegistrationNumber,
-					ownerAadhaarNumber: user.ownerAadhaarNumber,
 					licenseFile: user.licenseFile,
 					vehicleType: user.vehicleType,
 				},
@@ -227,6 +245,22 @@ exports.updateProfile = async (req, res) => {
 			user.phone = req.body.phone || user.phone;
 			user.address = req.body.address || user.address;
 
+			// Optional Aadhaar update
+			const newAadhaar = req.body.aadhaarNumber || req.body.ownerAadhaarNumber;
+			if (newAadhaar) {
+				if (!validateAadhaar(newAadhaar)) {
+					return res.status(400).json({ success: false, message: "Aadhaar must be a 12-digit number" });
+				}
+				const h = hashAadhaar(newAadhaar);
+				const exists = await User.findOne({ aadhaarHash: h, _id: { $ne: user._id } }).lean();
+				if (exists) {
+					return res.status(400).json({ success: false, message: "Aadhaar already registered" });
+				}
+				user.aadhaarEncrypted = encryptAadhaar(newAadhaar);
+				user.aadhaarHash = h;
+				user.aadhaarLast4 = String(newAadhaar).slice(-4);
+			}
+
 			if (req.body.password) {
 				user.password = req.body.password;
 			}
@@ -243,6 +277,7 @@ exports.updateProfile = async (req, res) => {
 					phone: updatedUser.phone,
 					role: updatedUser.role,
 					address: updatedUser.address,
+					aadhaarLast4: updatedUser.aadhaarLast4,
 				},
 				token: generateToken(updatedUser._id),
 			});

@@ -43,8 +43,10 @@ const BookingSchema = new mongoose.Schema(
 			district: String,
 			state: String,
 			pincode: String,
+			fullAddress: String,
 		},
 		workType: String,
+		landSize: { type: Number, default: 1 },
 		status: {
 			type: String,
 			enum: ["pending", "confirmed", "in_progress", "completed", "cancelled"],

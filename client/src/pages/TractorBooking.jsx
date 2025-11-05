@@ -7,7 +7,7 @@ import {
 	Tractor,
 	MapPin,
 	Clock,
-	DollarSign,
+	IndianRupee,
 	Search,
 	Calendar,
 	Phone,
@@ -16,6 +16,28 @@ import {
 	FileText,
 } from "lucide-react";
 
+// Helper to determine if a service is expired (date + time aware)
+const isServiceExpired = (svc) => {
+	try {
+		if (!svc) return false;
+		// If explicitly unavailable or non-active, treat as expired/unavailable
+		if (svc.availability === false || (svc.status && svc.status !== "active")) return true;
+		const now = new Date();
+		// Check explicit availableDate/availableTime
+		if (svc.availableDate) {
+			const when = new Date(`${new Date(svc.availableDate).toISOString().slice(0,10)}T${(svc.availableTime||"00:00").padStart(5,"0")}`);
+			if (!isNaN(when.getTime())) return when < now;
+		}
+		// Back-compat: if availableDates array exists
+		if (Array.isArray(svc.availableDates) && svc.availableDates.length > 0) {
+			return svc.availableDates.every((d) => new Date(d) < now);
+		}
+		return false;
+	} catch {
+		return false;
+	}
+};
+
 const TractorBooking = () => {
 	const navigate = useNavigate();
 	const { user } = useAuth();
@@ -23,16 +45,21 @@ const TractorBooking = () => {
 	// Tab State - 'requirement' or 'search'
 	const [activeTab, setActiveTab] = useState("search");
 
-	// Search State
-	const [searchLocation, setSearchLocation] = useState({
+// Search State
+const [searchLocation, setSearchLocation] = useState({
 		village: "",
+		mandal: "", // optional, if provided by service
 		district: "",
 		state: "",
-	});
+});
 	const [tractors, setTractors] = useState([]);
 	const [filteredTractors, setFilteredTractors] = useState([]);
 	const [loading, setLoading] = useState(false);
 	const [searchPerformed, setSearchPerformed] = useState(false);
+
+	// Pagination for tractors (search results)
+	const [page, setPage] = useState(0);
+	const itemsPerPage = 6;
 
 	// Booking State
 	const [selectedTractor, setSelectedTractor] = useState(null);
@@ -71,11 +98,12 @@ const TractorBooking = () => {
 		}
 	}, [activeTab]);
 
-	const fetchAllTractors = async () => {
+const fetchAllTractors = async () => {
 		try {
 			setLoading(true);
 			const token = localStorage.getItem("token");
 			const response = await api.get("/tractors", {
+				params: { location: user?.address?.district },
 				headers: {
 					Authorization: `Bearer ${token}`,
 				},
@@ -83,7 +111,7 @@ const TractorBooking = () => {
 
 			if (response.data.success) {
 				const availableTractors = response.data.tractorServices.filter(
-					(t) => t.availability
+					(t) => t.availability && !t.isBooked
 				);
 				setTractors(availableTractors);
 				setFilteredTractors(availableTractors);
@@ -99,7 +127,8 @@ const TractorBooking = () => {
 		}
 	};
 
-	const handleSearch = () => {
+
+const handleSearch = () => {
 		setSearchPerformed(true);
 
 		if (!searchLocation.district && !searchLocation.state) {
@@ -114,19 +143,25 @@ const TractorBooking = () => {
 					?.toLowerCase()
 					.includes(searchLocation.district.toLowerCase());
 
-			const matchesState =
-				!searchLocation.state ||
-				tractor.location?.state
-					?.toLowerCase()
-					.includes(searchLocation.state.toLowerCase());
+		const matchesState =
+			!searchLocation.state ||
+			tractor.location?.state
+				?.toLowerCase()
+				.includes(searchLocation.state.toLowerCase());
 
-			const matchesVillage =
-				!searchLocation.village ||
-				tractor.location?.village
-					?.toLowerCase()
-					.includes(searchLocation.village.toLowerCase());
+		const matchesVillage =
+			!searchLocation.village ||
+			tractor.location?.village
+				?.toLowerCase()
+				.includes(searchLocation.village.toLowerCase());
 
-			return matchesDistrict && matchesState && matchesVillage;
+		const matchesMandal =
+			!searchLocation.mandal ||
+			(tractor.location?.mandal || "")
+				.toLowerCase()
+				.includes(searchLocation.mandal.toLowerCase());
+
+		return matchesDistrict && matchesState && matchesVillage && matchesMandal;
 		});
 
 		setFilteredTractors(filtered);
@@ -146,7 +181,12 @@ const TractorBooking = () => {
 				tractorServiceId: selectedTractor._id,
 				bookingDate: bookingData.bookingDate,
 				duration: bookingData.duration,
-				location: bookingData.location,
+				location: {
+					fullAddress: bookingData.location,
+					district: user?.address?.district || "",
+					state: user?.address?.state || "",
+					pincode: user?.address?.pincode || "",
+				},
 				workType: bookingData.workType,
 				landSize: bookingData.landSize,
 				notes: bookingData.notes,
@@ -207,7 +247,7 @@ const TractorBooking = () => {
 				landType: requirementData.landType,
 				landSize: parseFloat(requirementData.landSize),
 				expectedDate: new Date(requirementData.expectedDate).toISOString(),
-				duration: requirementData.duration,
+					duration: `${requirementData.duration} hours`,
 				location: {
 					village: requirementData.village,
 					district: requirementData.district,
@@ -343,7 +383,7 @@ const TractorBooking = () => {
 								<Search className="w-5 h-5 mr-2 text-green-600" />
 								Search by Location
 							</h2>
-							<div className="grid md:grid-cols-4 gap-4">
+<div className="grid md:grid-cols-5 gap-4">
 								<input
 									type="text"
 									placeholder="Village (optional)"
@@ -356,6 +396,12 @@ const TractorBooking = () => {
 									}
 									className="px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
 								/>
+<input
+									type="text"
+									placeholder="Mandal (optional)"
+									value={searchLocation.mandal}
+									onChange={(e) => setSearchLocation({ ...searchLocation, mandal: e.target.value })}
+									className="px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500" />
 								<input
 									type="text"
 									placeholder="District"
@@ -408,15 +454,26 @@ const TractorBooking = () => {
 									</p>
 								</div>
 							) : (
-								<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{filteredTractors.map((tractor) => (
-										<TractorCard
-											key={tractor._id}
-											tractor={tractor}
-											onBook={handleBookNow}
-										/>
-									))}
-								</div>
+								<>
+									<div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+										{filteredTractors
+												.filter((t) => !isServiceExpired(t))
+												.slice(page * itemsPerPage, page * itemsPerPage + itemsPerPage)
+												.map((tractor) => (
+													<TractorCard
+														key={tractor._id}
+														tractor={tractor}
+														onBook={handleBookNow}
+													/>
+												))}
+										</div>
+										{filteredTractors.filter((t)=>!isServiceExpired(t)).length > itemsPerPage && (
+											<div className="flex justify-end items-center gap-2 mt-4">
+												<button onClick={() => setPage(Math.max(0, page - 1))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Prev</button>
+												<button onClick={() => setPage((page + 1) % Math.max(1, Math.ceil(filteredTractors.filter((t)=>!isServiceExpired(t)).length/itemsPerPage)))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Next</button>
+											</div>
+										)}
+								</>
 							)}
 						</div>
 					</>
@@ -448,9 +505,13 @@ const TractorCard = ({ tractor, onBook }) => (
 				</h3>
 				<p className="text-sm text-gray-500">{tractor.typeOfPlowing}</p>
 			</div>
-			<div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-				Available
-			</div>
+			{(!tractor.availability || tractor.isBooked) ? (
+				<div className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm font-semibold">Engaged</div>
+			) : isServiceExpired(tractor) ? (
+				<div className="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-sm font-semibold">Expired</div>
+			) : (
+				<div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">Available</div>
+			)}
 		</div>
 
 		<div className="space-y-3 mb-4">
@@ -459,7 +520,7 @@ const TractorCard = ({ tractor, onBook }) => (
 				<span className="text-sm">{tractor.vehicleNumber}</span>
 			</div>
 			<div className="flex items-center text-gray-600">
-				<DollarSign className="w-4 h-4 mr-2" />
+				<IndianRupee className="w-4 h-4 mr-2" />
 				<span className="text-sm font-semibold text-green-700">
 					₹{tractor.chargePerAcre}/acre
 				</span>
@@ -467,8 +528,10 @@ const TractorCard = ({ tractor, onBook }) => (
 			<div className="flex items-center text-gray-600">
 				<MapPin className="w-4 h-4 mr-2" />
 				<span className="text-sm">
-					{tractor.location?.village}, {tractor.location?.district},{" "}
-					{tractor.location?.state}
+					{tractor.location?.village}
+					{tractor.location?.mandal ? `, ${tractor.location.mandal}` : ""}
+					{tractor.location?.district ? `, ${tractor.location.district}` : ""}
+					{tractor.location?.state ? `, ${tractor.location.state}` : ""}
 				</span>
 			</div>
 			<div className="flex items-center text-gray-600">
@@ -479,7 +542,8 @@ const TractorCard = ({ tractor, onBook }) => (
 
 		<button
 			onClick={() => onBook(tractor)}
-			className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center"
+			disabled={isServiceExpired(tractor) || !tractor.availability || tractor.isBooked}
+			className="w-full bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center"
 		>
 			<CheckCircle className="w-5 h-5 mr-2" />
 			Book Now
@@ -497,7 +561,7 @@ const TractorRequirementForm = ({ formData, onChange, onSubmit, loading }) => (
 
 		<form onSubmit={onSubmit} className="space-y-6">
 			{/* Work Details */}
-			<div className="grid md:grid-cols-2 gap-4">
+		<div className="grid md:grid-cols-3 gap-4">
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
 						Type of Work *
@@ -571,15 +635,16 @@ const TractorRequirementForm = ({ formData, onChange, onSubmit, loading }) => (
 			<div className="grid md:grid-cols-2 gap-4">
 				<div>
 					<label className="block text-sm font-medium text-gray-700 mb-2">
-						Duration *
+						Duration (hours) *
 					</label>
 					<input
-						type="text"
+						type="number"
 						name="duration"
 						value={formData.duration}
 						onChange={onChange}
 						required
-						placeholder="e.g., 2 days, 5 hours"
+						min="1"
+						placeholder="e.g., 5"
 						className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-green-500"
 					/>
 				</div>
@@ -723,7 +788,9 @@ const BookingModal = ({
 	onSubmit,
 	onClose,
 	loading,
-}) => (
+}) => {
+	if (!tractor) return null;
+	return (
 	<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
 		<div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
 			<h2 className="text-2xl font-bold text-gray-900 mb-6">
@@ -878,6 +945,7 @@ const BookingModal = ({
 			</form>
 		</div>
 	</div>
-);
+	);
+};
 
 export default TractorBooking;

@@ -4,6 +4,7 @@ import api from "../config/api";
 import toast from "react-hot-toast";
 
 
+import { useNavigate } from "react-router-dom";
 import {
   Calendar,
   Clock,
@@ -18,7 +19,6 @@ import {
   CreditCard,
   Wallet,
   Ban,
-  DollarSign,
   Users,
   Briefcase,
   Star,
@@ -28,10 +28,12 @@ import {
   Loader,
   ChevronDown,
   ChevronUp,
+  ArrowLeft,
 } from "lucide-react";
 
 function FarmerMyBookings() {
 	const { user } = useAuth();
+	const navigate = useNavigate();
 
 	// State management
 	const [bookings, setBookings] = useState([]);
@@ -53,8 +55,15 @@ function FarmerMyBookings() {
 		minExperience: "",
 	});
 
-	// Fetch all data on mount
-	useEffect(() => {
+	// Simple pagination for bookings
+	const [pageBookings, setPageBookings] = useState(0);
+	const [pageBids, setPageBids] = useState(0);
+	const [pageHire, setPageHire] = useState(0);
+	const [pageApps, setPageApps] = useState(0);
+	const itemsPerPage = 3;
+
+// ✅ Fetch all data on mount
+useEffect(() => {
 		if (user) {
 			fetchBookings();
 			fetchBids();
@@ -63,7 +72,18 @@ function FarmerMyBookings() {
 				fetchAvailableWorkers();
 			}
 		}
-	}, [user, activeTab]);
+}, [user, activeTab]);
+
+// 🔄 Light polling for real-time-like updates on requests/apps
+useEffect(() => {
+	if (!user) return;
+	if (activeTab !== "hire-requests" && activeTab !== "applications") return;
+	const id = setInterval(() => {
+		fetchHireRequests();
+		fetchWorkerApplications();
+	}, 15000);
+	return () => clearInterval(id);
+}, [user, activeTab]);
 
 	// ✅ Fetch bookings
 	const fetchBookings = async () => {
@@ -522,13 +542,15 @@ function FarmerMyBookings() {
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
 				<div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-					<h1 className="text-3xl font-bold text-gray-900 mb-2">
-						My Bookings & Services
-					</h1>
-					<p className="text-gray-600">
-						Manage your bookings, worker hires, applications, and browse
-						available workers
-					</p>
+					<div className="flex items-center gap-3">
+						<button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-200">
+							<ArrowLeft className="w-6 h-6" />
+						</button>
+						<div>
+							<h1 className="text-3xl font-bold text-gray-900 mb-1">My Bookings & Services</h1>
+							<p className="text-gray-600">Manage your bookings, worker hires, applications, and browse available workers</p>
+						</div>
+					</div>
 				</div>
 
 				{/* Stats Cards */}
@@ -637,7 +659,7 @@ function FarmerMyBookings() {
 									: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 							}`}
 						>
-							<DollarSign className="mr-2" size={18} />
+							<IndianRupee className="mr-2" size={18} />
 							Bids ({bids.length})
 						</button>
 
@@ -661,7 +683,8 @@ function FarmerMyBookings() {
 				{/* Content based on active tab */}
 				{activeTab === "bookings" && (
 					<div className="space-y-6">
-						{bookings.length === 0 ? (
+{/* Simple pagination for bookings */}
+{bookings.length === 0 ? (
 							<div className="bg-white rounded-xl shadow-lg p-12 text-center">
 								<Tractor className="mx-auto mb-4 text-gray-400" size={64} />
 								<h3 className="text-xl font-semibold text-gray-700 mb-2">
@@ -678,7 +701,9 @@ function FarmerMyBookings() {
 								</button>
 							</div>
 						) : (
-							bookings.map((booking) => (
+bookings
+	.slice(pageBookings * itemsPerPage, pageBookings * itemsPerPage + itemsPerPage)
+	.map((booking) => (
 								<div
 									key={booking._id}
 									className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300"
@@ -758,7 +783,9 @@ function FarmerMyBookings() {
 											<div className="flex items-center text-gray-700">
 												<Clock className="mr-2 text-green-600" size={18} />
 												<span className="font-semibold">Duration:</span>
-												<span className="ml-2">{booking.duration} day(s)</span>
+												<span className="ml-2">
+													{booking.serviceType === "tractor" ? `${booking.duration} hour(s)` : `${booking.duration} day(s)`}
+												</span>
 											</div>
 										</div>
 										{/* Payment Actions - COMPLETE WITH PAY AFTER WORK */}
@@ -855,9 +882,13 @@ function FarmerMyBookings() {
 													<p className="text-sm text-blue-600">
 														You'll pay ₹{booking.totalCost} after the work is
 														completed
-													</p>
+												</p>
+												<div className="mt-3 flex gap-2">
+													<button onClick={() => handleMakePayment(booking._id, booking.totalCost)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold">Pay Online</button>
+													<button onClick={() => handleCancelBooking(booking._id)} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold">Cancel Booking</button>
 												</div>
-											)}
+											</div>
+										)}
 
 										{/* Payment Completed - Check both fields */}
 										{(booking.paymentStatus === "paid" ||
@@ -886,6 +917,12 @@ function FarmerMyBookings() {
 								</div>
 							))
 						)}
+					{bookings.length > itemsPerPage && (
+						<div className="flex justify-end items-center gap-2 mt-4">
+							<button onClick={() => setPageBookings(Math.max(0, pageBookings - 1))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Prev</button>
+							<button onClick={() => setPageBookings((pageBookings + 1) % Math.max(1, Math.ceil(bookings.length/itemsPerPage)))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Next</button>
+						</div>
+					)}
 					</div>
 				)}
 
@@ -909,7 +946,9 @@ function FarmerMyBookings() {
 								</button>
 							</div>
 						) : (
-							hireRequests.map((request) => (
+							hireRequests
+								.slice(pageHire * itemsPerPage, pageHire * itemsPerPage + itemsPerPage)
+								.map((request) => (
 								<div
 									key={request._id}
 									className="bg-white rounded-xl shadow-lg overflow-hidden p-6"
@@ -999,6 +1038,12 @@ function FarmerMyBookings() {
 								</div>
 							))
 						)}
+						{hireRequests.length > itemsPerPage && (
+							<div className="flex justify-end items-center gap-2 mt-4">
+								<button onClick={() => setPageHire(Math.max(0, pageHire - 1))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Prev</button>
+								<button onClick={() => setPageHire((pageHire + 1) % Math.max(1, Math.ceil(hireRequests.length/itemsPerPage)))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Next</button>
+							</div>
+						)}
 					</div>
 				)}
 
@@ -1016,7 +1061,9 @@ function FarmerMyBookings() {
 								</p>
 							</div>
 						) : (
-							workerApplications.map((application) => (
+							workerApplications
+								.slice(pageApps * itemsPerPage, pageApps * itemsPerPage + itemsPerPage)
+								.map((application) => (
 								<div
 									key={application._id}
 									className="bg-white rounded-xl shadow-lg overflow-hidden p-6"
@@ -1128,6 +1175,12 @@ function FarmerMyBookings() {
 								</div>
 							))
 						)}
+						{workerApplications.length > itemsPerPage && (
+							<div className="flex justify-end items-center gap-2 mt-4">
+								<button onClick={() => setPageApps(Math.max(0, pageApps - 1))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Prev</button>
+								<button onClick={() => setPageApps((pageApps + 1) % Math.max(1, Math.ceil(workerApplications.length/itemsPerPage)))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Next</button>
+							</div>
+						)}
 					</div>
 				)}
 
@@ -1136,7 +1189,7 @@ function FarmerMyBookings() {
 					<div className="space-y-6">
 						{bids.length === 0 ? (
 							<div className="bg-white rounded-xl shadow-lg p-12 text-center">
-								<DollarSign className="mx-auto mb-4 text-gray-400" size={64} />
+								<IndianRupee className="mx-auto mb-4 text-gray-400" size={64} />
 								<h3 className="text-xl font-semibold text-gray-700 mb-2">
 									No Bids Yet
 								</h3>
@@ -1145,7 +1198,9 @@ function FarmerMyBookings() {
 								</p>
 							</div>
 						) : (
-							bids.map((bid) => (
+							bids
+								.slice(pageBids * itemsPerPage, pageBids * itemsPerPage + itemsPerPage)
+								.map((bid) => (
 								<div
 									key={bid._id}
 									className="bg-white rounded-xl shadow-lg overflow-hidden p-6"
@@ -1174,7 +1229,7 @@ function FarmerMyBookings() {
 											<IndianRupee className="mr-2 text-green-600" size={18} />
 											<span className="font-semibold">Bid Amount:</span>
 											<span className="ml-2 font-bold text-green-600">
-												₹{bid.bidAmount}
+												₹{bid.proposedAmount ?? bid.bidAmount}
 											</span>
 										</div>
 
@@ -1237,6 +1292,12 @@ function FarmerMyBookings() {
 									)}
 								</div>
 							))
+						)}
+						{bids.length > itemsPerPage && (
+							<div className="flex justify-end items-center gap-2 mt-4">
+								<button onClick={() => setPageBids(Math.max(0, pageBids - 1))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Prev</button>
+								<button onClick={() => setPageBids((pageBids + 1) % Math.max(1, Math.ceil(bids.length/itemsPerPage)))} className="px-3 py-1 bg-gray-100 rounded hover:bg-gray-200">Next</button>
+							</div>
 						)}
 					</div>
 				)}

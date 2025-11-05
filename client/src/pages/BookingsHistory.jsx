@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import api from "../config/api";
 import {
 	Calendar,
@@ -17,21 +18,27 @@ import {
 	Phone,
 	Mail,
 	IndianRupee,
+	ArrowLeft,
 } from "lucide-react";
 
 function FarmerBookings() {
 	const { user, authLoading } = useAuth();
+	const navigate = useNavigate();
 	const [bookings, setBookings] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
 	const [activeTab, setActiveTab] = useState("all");
 	const [statusFilter, setStatusFilter] = useState("all");
 	const [searchQuery, setSearchQuery] = useState("");
+	// pagination
+	const [page, setPage] = useState(0);
+	const pageSize = 5;
 
 	useEffect(() => {
-		if (!authLoading && user) {
-			fetchBookings();
-		}
+		if (authLoading || !user) return;
+		fetchBookings();
+		const id = setInterval(fetchBookings, 30000);
+		return () => clearInterval(id);
 	}, [authLoading, user]);
 
 	const fetchBookings = async () => {
@@ -221,13 +228,18 @@ function FarmerBookings() {
 		<div className="min-h-screen bg-gray-50 p-6">
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
-				<div className="mb-8">
-					<h1 className="text-3xl font-bold text-gray-900 mb-2">
-						My Bookings & Requests
-					</h1>
-					<p className="text-gray-600">
-						Manage all your tractor and worker bookings
-					</p>
+				<div className="mb-8 flex items-center gap-3">
+					<button onClick={() => navigate(-1)} className="p-2 rounded-lg hover:bg-gray-200">
+						<ArrowLeft className="w-6 h-6" />
+					</button>
+					<div>
+						<h1 className="text-3xl font-bold text-gray-900 mb-1">
+							My Bookings & Requests
+						</h1>
+						<p className="text-gray-600">
+							Manage all your tractor and worker bookings
+						</p>
+					</div>
 				</div>
 
 				{/* Stats Cards */}
@@ -345,7 +357,9 @@ function FarmerBookings() {
 					</div>
 				) : (
 					<div className="space-y-4">
-						{filteredBookings.map((booking) => (
+						{filteredBookings
+							.slice(page * pageSize, page * pageSize + pageSize)
+							.map((booking) => (
 							<div
 								key={booking._id}
 								className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow"
@@ -448,6 +462,17 @@ function FarmerBookings() {
 								</div>
 							</div>
 						))}
+					</div>
+				)}
+
+				{/* Pagination */}
+				{filteredBookings.length > pageSize && (
+					<div className="mt-6 flex justify-end items-center gap-2">
+						<button onClick={() => setPage(Math.max(0, page - 1))} className="px-3 py-1 bg-white border rounded hover:bg-gray-50">Prev</button>
+						<span className="text-sm text-gray-600">
+							Page {page + 1} of {Math.ceil(filteredBookings.length / pageSize)}
+						</span>
+						<button onClick={() => setPage((page + 1) % Math.max(1, Math.ceil(filteredBookings.length / pageSize)))} className="px-3 py-1 bg-white border rounded hover:bg-gray-50">Next</button>
 					</div>
 				)}
 			</div>

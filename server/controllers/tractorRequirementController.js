@@ -86,13 +86,27 @@ exports.getAllTractorRequirements = async (req, res) => {
 		const { workType, landType, district, state, urgency, status } = req.query;
 		let query = {};
 
+		// Location defaults: if tractor owner and no district/state provided, use user's address
+		const user = req.user || {};
+		const userDistrict = user?.address?.district;
+		const userState = user?.address?.state;
+
 		if (workType) query.workType = workType;
 		if (landType) query.landType = landType;
-		if (district) query["location.district"] = new RegExp(district, "i");
-		if (state) query["location.state"] = new RegExp(state, "i");
+		if (district || (user.role === "tractor_owner" && userDistrict)) {
+			query["location.district"] = new RegExp(district || userDistrict, "i");
+		}
+		if (state || (user.role === "tractor_owner" && userState)) {
+			query["location.state"] = new RegExp(state || userState, "i");
+		}
 		if (urgency) query.urgency = urgency;
 		if (status) query.status = status;
 		else query.status = "open";
+
+		// Exclude expired requirements by default
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		query.expectedDate = { $gte: today };
 
 		const tractorRequirements = await TractorRequirement.find(query)
 			.populate("farmer", "name phone email address")
@@ -491,7 +505,7 @@ exports.completeWork = async (req, res) => {
 
 		await Notification.create({
 			recipientId: requirement.farmer,
-			type: "work_completed",
+			type: "booking_completed",
 			title: "Work Completed!",
 			message: `${requirement.workType} work has been completed. Please make payment.`,
 			relatedRequirementId: requirement._id,

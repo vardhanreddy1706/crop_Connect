@@ -4,7 +4,9 @@ const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Crop = require("../models/Crop");
 const Notification = require("../models/Notification");
+const User = require("../models/User");
 const Razorpay = require("razorpay");
+const NotificationService = require("../services/notificationService");
 const crypto = require("crypto");
 
 // Initialize Razorpay
@@ -145,17 +147,24 @@ exports.createOrder = async (req, res) => {
 			{ items: [] }
 		);
 
-		// Create notification for seller
-		await Notification.create({
-			recipientId: firstCrop.seller,
-			type: "new_order",
-			title: "🎉 New Order Received!",
-			message: `You have a new order #${order._id.toString().substring(0, 8)}`,
-			relatedUserId: req.user._id,
-			data: {
-				orderId: order._id,
-			},
-		});
+// Notification + emails handled below
+
+// Email both parties (best-effort)
+		try {
+			const seller = await User.findById(firstCrop.seller).select("email name");
+			await NotificationService.notifyOrderCreatedForSeller(
+				{ _id: firstCrop.seller, email: seller?.email, name: seller?.name },
+				order,
+				req.emailTransporter
+			);
+			await NotificationService.notifyOrderCreatedForBuyer(
+				req.user,
+				order,
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (order create) error:", e.message);
+		}
 
 		return res.status(201).json({
 			success: true,
@@ -185,7 +194,7 @@ exports.getBuyerOrders = async (req, res) => {
 				path: "items.crop",
 				select: "cropName variety unit images",
 			})
-			.populate("seller", "name phone email village district state")
+			.populate("seller", "name phone email address")
 			.sort({ createdAt: -1 });
 
 		res.status(200).json({
@@ -247,37 +256,47 @@ exports.confirmOrder = async (req, res) => {
 			});
 		}
 
-		// Verify seller
-		if (order.seller.toString() !== req.user._id.toString()) {
+		// Verify seller (defensive)
+		if (!order.seller || !req.user?._id || order.seller.toString() !== req.user._id.toString()) {
 			return res.status(403).json({
 				success: false,
 				message: "Not authorized",
 			});
 		}
 
-		if (order.status !== "pending") {
-			return res.status(400).json({
-				success: false,
-				message: "Order cannot be confirmed",
-			});
+		// Idempotent / permissive confirm
+		if (order.status === "confirmed") {
+			return res.status(200).json({ success: true, message: "Order already confirmed", order });
+		}
+		// If already picked or completed, treat as no-op success for idempotency
+		if (order.status === "picked" || order.status === "completed") {
+			return res.status(200).json({ success: true, message: `Order already ${order.status}` , order });
+		}
+		if (order.status === "cancelled") {
+			return res.status(400).json({ success: false, message: `Order is ${order.status} and cannot be confirmed` });
 		}
 
+		// For any other state (including pending), set to confirmed
 		order.status = "confirmed";
 		await order.save();
 
-		// Notify buyer
-		await Notification.create({
-			recipientId: order.buyer,
-			type: "order_confirmed",
-			title: "✅ Order Confirmed!",
-			message: `Your order #${order._id
-				.toString()
-				.substring(0, 8)} has been confirmed by the farmer`,
-			relatedUserId: req.user._id,
-			data: {
-				orderId: order._id,
-			},
-		});
+		// Notify buyer (do not fail request if notifications break)
+		try {
+			await Notification.create({
+				recipientId: order.buyer,
+				type: "order_confirmed",
+				title: "✅ Order Confirmed!",
+				message: `Your order #${order._id
+					.toString()
+					.substring(0, 8)} has been confirmed by the farmer`,
+				relatedUserId: req.user._id,
+				data: {
+					orderId: order._id,
+				},
+			});
+		} catch (notifErr) {
+			console.error("Notification error (confirmOrder):", notifErr);
+		}
 
 		return res.status(200).json({
 			success: true,
@@ -309,14 +328,24 @@ exports.markAsPicked = async (req, res) => {
 			});
 		}
 
-		// Verify seller
-		if (order.seller.toString() !== req.user._id.toString()) {
+		// Verify seller (defensive)
+		if (!order.seller || !req.user?._id || order.seller.toString() !== req.user._id.toString()) {
 			return res.status(403).json({
 				success: false,
 				message: "Not authorized",
 			});
 		}
 
+		// Idempotent behaviors
+		if (order.status === "picked") {
+			return res.status(200).json({ success: true, message: "Order already picked", order });
+		}
+		if (order.status === "completed") {
+			return res.status(200).json({ success: true, message: "Order already completed", order });
+		}
+		if (order.status === "cancelled") {
+			return res.status(400).json({ success: false, message: "Cancelled order cannot be picked" });
+		}
 		if (order.status !== "confirmed") {
 			return res.status(400).json({
 				success: false,
@@ -328,19 +357,23 @@ exports.markAsPicked = async (req, res) => {
 		order.pickedUpAt = new Date();
 		await order.save();
 
-		// Notify buyer
-		await Notification.create({
-			recipientId: order.buyer,
-			type: "order_picked",
-			title: "🚚 Order Picked Up!",
-			message: `Your order #${order._id
-				.toString()
-				.substring(0, 8)} has been picked up from the farm`,
-			relatedUserId: req.user._id,
-			data: {
-				orderId: order._id,
-			},
-		});
+		// Notify buyer (do not fail request if notifications break)
+		try {
+			await Notification.create({
+				recipientId: order.buyer,
+				type: "order_picked",
+				title: "🚚 Order Picked Up!",
+				message: `Your order #${order._id
+					.toString()
+					.substring(0, 8)} has been picked up from the farm`,
+				relatedUserId: req.user._id,
+				data: {
+					orderId: order._id,
+				},
+			});
+		} catch (notifErr) {
+			console.error("Notification error (markAsPicked):", notifErr);
+		}
 
 		return res.status(200).json({
 			success: true,
