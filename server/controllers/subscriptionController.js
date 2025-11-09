@@ -23,6 +23,7 @@ exports.subscribe = async (req, res) => {
     // Email confirmation (if transporter is configured)
     if (req.emailTransporter) {
       try {
+        // Send confirmation to subscriber
         await req.emailTransporter.sendMail({
           from: `"Crop Connect" <${process.env.EMAIL_USER}>`,
           to: sub.email,
@@ -37,8 +38,18 @@ exports.subscribe = async (req, res) => {
             </div>
           `,
         });
+
+        // Notify admin/support
+        if (process.env.EMAIL_USER) {
+          await req.emailTransporter.sendMail({
+            from: `"Crop Connect" <${process.env.EMAIL_USER}>`,
+            to: process.env.EMAIL_USER,
+            subject: "New newsletter subscription",
+            text: `New subscriber: ${sub.email} (source: ${sub.source})`,
+          });
+        }
       } catch (e) {
-        console.log("Email confirmation failed:", e.message);
+        console.log("Email confirmation/notify failed:", e.message);
       }
     }
 

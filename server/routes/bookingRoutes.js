@@ -16,6 +16,7 @@ const {
 	createBooking,
 	completeBooking,
 	getWorkerBookings,
+	autoCompleteExpiredBookings,
 } = require("../controllers/bookingController");
 
 // BOOKING CREATION
@@ -54,5 +55,8 @@ router.post("/:id/pay-after-work", protect, choosePayAfterWork);
 
 // BOOKING MANAGEMENT
 router.post("/:id/cancel", protect, cancelBooking);
+
+// ✅ AUTO-COMPLETE EXPIRED BOOKINGS
+router.post("/auto-complete", protect, autoCompleteExpiredBookings);
 
 module.exports = router;

@@ -57,7 +57,9 @@ const cropSchema = new mongoose.Schema(
 		},
 		images: [
 			{
-				type: String,
+				url: { type: String, required: true },
+				fileId: { type: String }, // keep for later deletion if you want
+				name: { type: String },
 			},
 		],
 		status: {

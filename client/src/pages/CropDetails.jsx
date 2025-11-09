@@ -28,6 +28,13 @@ function CropDetails() {
 	const [showPaymentModal, setShowPaymentModal] = useState(false);
 	const [processing, setProcessing] = useState(false);
 
+	const handleImgError = (e) => {
+		e.currentTarget.onerror = null;
+		e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+			crop?.cropName || "Crop"
+		)}&size=400&background=random&color=fff&bold=true&length=2`;
+	};
+
 	// Vehicle & Pickup Details
 	const [vehicleDetails, setVehicleDetails] = useState({
 		vehicleType: "",
@@ -271,8 +278,13 @@ function CropDetails() {
 						<div className="rounded-lg h-96 overflow-hidden bg-gray-100">
 							{Array.isArray(crop.images) && crop.images.length > 0 ? (
 								<img
-									src={crop.images[0]}
+									src={
+										typeof crop.images[0] === "string"
+												? crop.images[0]
+												: crop.images[0]?.url
+									}
 									alt={crop.cropName}
+									onError={handleImgError}
 									className="w-full h-full object-cover"
 								/>
 							) : (

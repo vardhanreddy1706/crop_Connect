@@ -262,8 +262,11 @@ className="hover:text-emerald-400 transition"
 							</div>
 						) : (
 							<form onSubmit={handleSubscribe} className="space-y-2">
-								<input
+<input
 									type="email"
+									name="email"
+									autoComplete="email"
+									inputMode="email"
 									value={email}
 									onChange={(e) => setEmail(e.target.value)}
 									placeholder="Your email address"

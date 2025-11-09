@@ -26,6 +26,91 @@ exports.createTractorService = async (req, res) => {
 			return res.status(400).json({ success: false, message: "Invalid date/time" });
 		}
 
+		// ✅ Validate working duration
+		const workingDuration = parseFloat(req.body.workingDuration || 8);
+		if (!workingDuration || workingDuration < 1 || workingDuration > 24) {
+			return res.status(400).json({
+				success: false,
+				message: "Working duration must be between 1 and 24 hours",
+			});
+		}
+
+		// ✅ Calculate requested time slot (start and end times)
+		const requestedDateStr = new Date(availableDate).toISOString().slice(0, 10);
+		const [requestedHours, requestedMinutes] = availableTime.split(':').map(Number);
+		const requestedStart = new Date(`${requestedDateStr}T${availableTime}`);
+		const requestedEnd = new Date(requestedStart.getTime() + workingDuration * 60 * 60 * 1000);
+		
+		// ✅ Find all existing services by the same owner on the same date
+		const existingServices = await TractorService.find({
+			owner: req.user._id,
+			status: { $ne: "cancelled" }, // Exclude cancelled services
+		}).lean();
+		
+		// ✅ Check for overlapping time slots
+		for (const svc of existingServices) {
+			const svcDateStr = new Date(svc.availableDate).toISOString().slice(0, 10);
+			
+			// Only check services on the same date
+			if (svcDateStr !== requestedDateStr) continue;
+			
+			// Calculate existing service time slot
+			const svcDuration = svc.workingDuration || 8; // Default to 8 hours if not set
+			const svcStart = new Date(`${svcDateStr}T${svc.availableTime}`);
+			const svcEnd = new Date(svcStart.getTime() + svcDuration * 60 * 60 * 1000);
+			
+			// Check if time slots overlap
+			const timeOverlaps = 
+				(requestedStart >= svcStart && requestedStart < svcEnd) ||
+				(requestedEnd > svcStart && requestedEnd <= svcEnd) ||
+				(requestedStart <= svcStart && requestedEnd >= svcEnd);
+			
+			if (timeOverlaps) {
+				const svcEndTime = new Date(svcEnd);
+				const svcEndTimeStr = svcEndTime.toLocaleTimeString("en-IN", { 
+					hour: "2-digit", 
+					minute: "2-digit",
+					hour12: true 
+				});
+				return res.status(409).json({
+					success: false,
+					message: `The slot is already engaged. You have a service posted for ${new Date(availableDate).toLocaleDateString("en-IN")} from ${svc.availableTime} to ${svcEndTimeStr}. Please choose a different time slot or wait until after ${svcEndTimeStr}.`,
+				});
+			}
+		}
+
+		// ✅ Also check if there's an active booking for this time slot
+		const Booking = require("../models/Booking");
+		const activeBookings = await Booking.find({
+			tractorOwnerId: req.user._id,
+			serviceType: "tractor",
+			status: { $in: ["pending", "confirmed", "in_progress"] },
+		}).lean();
+
+		for (const booking of activeBookings) {
+			const bookingStart = new Date(booking.bookingDate);
+			const bookingDurationHours = parseFloat(booking.duration || 8);
+			const bookingEnd = new Date(bookingStart.getTime() + bookingDurationHours * 60 * 60 * 1000);
+
+			// Check if the requested time slot overlaps with existing booking
+			const timeOverlaps = 
+				(requestedStart >= bookingStart && requestedStart < bookingEnd) ||
+				(requestedEnd > bookingStart && requestedEnd <= bookingEnd) ||
+				(requestedStart <= bookingStart && requestedEnd >= bookingEnd);
+			
+			if (timeOverlaps) {
+				const bookingEndTimeStr = bookingEnd.toLocaleTimeString("en-IN", { 
+					hour: "2-digit", 
+					minute: "2-digit",
+					hour12: true 
+				});
+				return res.status(409).json({
+					success: false,
+					message: `You already have a booking for this time slot. The slot is engaged until ${bookingEndTimeStr}. Please choose a different time slot or wait until after ${bookingEndTimeStr}.`,
+				});
+			}
+		}
+
 		const tractorService = await TractorService.create({
 			...req.body,
 			availableDates: [combinedISO],
@@ -107,19 +192,94 @@ exports.createTractorService = async (req, res) => {
 // @access  Public
 exports.getAllTractorServices = async (req, res) => {
 	try {
-		const { typeOfPlowing, landType, location, availability } = req.query;
+		const { typeOfPlowing, landType, location, availability, village, district, state } = req.query;
 
 		let query = {};
 
 		if (typeOfPlowing) query.typeOfPlowing = typeOfPlowing;
 		if (landType) query.landType = landType;
+		// Back-compat single 'location' maps to district
 		if (location) query["location.district"] = new RegExp(location, "i");
+		if (village) query["location.village"] = new RegExp(village, "i");
+		if (district) query["location.district"] = new RegExp(district, "i");
+		if (state) query["location.state"] = new RegExp(state, "i");
 		if (availability) query.availability = availability === "true";
 
+		// ✅ Initial query filtering for performance (comparing farmer's address with service location)
+		// Final filtering happens after population to ensure exact matching
+		if (!village && !district && !state && req.user?.role === "farmer") {
+			// For farmers, filter by service location (not owner's permanent address)
+			if (req.user.address?.village) {
+				query["location.village"] = new RegExp(`^${req.user.address.village}$`, "i");
+			}
+			if (req.user.address?.district) {
+				query["location.district"] = new RegExp(`^${req.user.address.district}$`, "i");
+			}
+			if (req.user.address?.state) {
+				query["location.state"] = new RegExp(`^${req.user.address.state}$`, "i");
+			}
+		}
+
 		let tractorServices = await TractorService.find(query)
-			.populate("owner", "name phone email")
+			.populate("owner", "name phone email address")
 			.sort({ createdAt: -1 })
 			.lean();
+
+		// ✅ Location-based filtering: Compare farmer's permanent address (from registration) 
+		// with the service location (posted by tractor owner when creating service)
+		// Only show services where farmer's address matches the service's posted location
+		if (req.user?.role === "farmer") {
+			// Get farmer's permanent address from User model (entered during registration)
+			const farmerVillage = req.user.address?.village?.trim().toLowerCase();
+			const farmerDistrict = req.user.address?.district?.trim().toLowerCase();
+			const farmerState = req.user.address?.state?.trim().toLowerCase();
+
+			// If farmer has location details, apply location-based filtering
+			if (farmerVillage || farmerDistrict || farmerState) {
+				tractorServices = tractorServices.filter((service) => {
+					// ✅ Get service location from TractorService model (location entered when posting service)
+					// This is the location the tractor owner specified when creating the service
+					// NOT the tractor owner's permanent address from their User profile
+					const serviceLocation = service.location || {};
+					const serviceVillage = serviceLocation.village?.trim().toLowerCase() || "";
+					const serviceDistrict = serviceLocation.district?.trim().toLowerCase() || "";
+					const serviceState = serviceLocation.state?.trim().toLowerCase() || "";
+
+					// ✅ Compare farmer's permanent address (User model) with service's posted location (TractorService model)
+					// Both must have matching village, district, and state
+					
+					// Village matching: Both must have village and they must match exactly
+					if (farmerVillage && serviceVillage) {
+						if (serviceVillage !== farmerVillage) {
+							return false; // Different villages - hide service
+						}
+					} else if (farmerVillage || serviceVillage) {
+						return false; // One has village, other doesn't - different locations
+					}
+					
+					// District matching: Both must have district and they must match exactly
+					if (farmerDistrict && serviceDistrict) {
+						if (serviceDistrict !== farmerDistrict) {
+							return false; // Different districts - hide service
+						}
+					} else if (farmerDistrict || serviceDistrict) {
+						return false; // One has district, other doesn't - different locations
+					}
+					
+					// State matching: Both must have state and they must match exactly
+					if (farmerState && serviceState) {
+						if (serviceState !== farmerState) {
+							return false; // Different states - hide service
+						}
+					} else if (farmerState || serviceState) {
+						return false; // One has state, other doesn't - different locations
+					}
+
+					// ✅ All location fields match - show the service
+					return true;
+				});
+			}
+		}
 
 		// Ensure engagement reflects any active bookings
 		const serviceIds = tractorServices.map((s) => s._id);
@@ -128,13 +288,32 @@ exports.getAllTractorServices = async (req, res) => {
 			serviceId: { $in: serviceIds },
 			serviceType: "tractor",
 			status: { $in: activeStatuses },
-		}).select("serviceId").lean();
-		const engaged = new Set(activeBookings.map((b) => String(b.serviceId)));
-		tractorServices = tractorServices.map((s) => ({
-			...s,
-			isBooked: s.isBooked || engaged.has(String(s._id)),
-			availability: engaged.has(String(s._id)) ? false : s.availability,
-		}));
+		}).select("serviceId bookingDate duration").lean();
+		
+		// Group bookings by service ID
+		const bookingsByService = {};
+		activeBookings.forEach((b) => {
+			const serviceIdStr = String(b.serviceId);
+			if (!bookingsByService[serviceIdStr]) {
+				bookingsByService[serviceIdStr] = [];
+			}
+			bookingsByService[serviceIdStr].push({
+				start: new Date(b.bookingDate),
+				durationHours: parseFloat(b.duration || 8),
+			});
+		});
+		
+		// Mark services with active bookings
+		tractorServices = tractorServices.map((s) => {
+			const serviceIdStr = String(s._id);
+			const hasActiveBookings = bookingsByService[serviceIdStr] && bookingsByService[serviceIdStr].length > 0;
+			return {
+				...s,
+				isBooked: hasActiveBookings,
+				availability: hasActiveBookings ? false : s.availability,
+				activeBookings: bookingsByService[serviceIdStr] || [],
+			};
+		});
 
 		res.status(200).json({
 			success: true,

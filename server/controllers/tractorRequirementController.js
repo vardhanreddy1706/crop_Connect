@@ -4,7 +4,7 @@ const User = require("../models/User");
 const Notification = require("../models/Notification");
 const Booking = require("../models/Booking");
 
-// ✅ REMOVED: const NotificationService = require("../services/notificationService");
+const NotificationService = require("../services/notificationService");
 
 // @desc Create tractor requirement (ENHANCED with auto-notification)
 // @route POST /api/tractor-requirements
@@ -330,11 +330,26 @@ exports.respondToRequirement = async (req, res) => {
 				tractorService,
 				quotedPrice,
 				contactNumber: contactNumber || req.user.phone,
-				workType: tractorRequirement.workType,
-				landSize: tractorRequirement.landSize,
 				estimatedDuration: estimatedDuration || "1 day",
 			},
 		});
+
+		// Email farmer about new bid (best-effort)
+		try {
+			await NotificationService.notifyBidPlaced(
+				tractorRequirement.farmer,
+				req.user,
+				tractorRequirement,
+				{
+					quotedPrice,
+					contactNumber: contactNumber || req.user.phone,
+					estimatedDuration: estimatedDuration || "1 day",
+				},
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (bid placed) error:", e.message);
+		}
 
 		if (req.io) {
 			req.io.to(tractorRequirement.farmer._id.toString()).emit("notification", {
@@ -450,6 +465,40 @@ exports.acceptRequirement = async (req, res) => {
 			});
 		} catch (notifError) {
 			console.error("Notification creation error:", notifError);
+		}
+
+		// Email both parties (best-effort)
+		try {
+			await NotificationService.notifyBidAccepted(
+				req.user,
+				booking,
+				req.emailTransporter
+			);
+			await NotificationService.notifyBookingCreated(
+				requirement.farmer,
+				booking,
+				"tractor",
+				req.emailTransporter
+			);
+			await NotificationService.notifyNewBookingForProvider(
+				req.user,
+				booking,
+				"tractor",
+				req.emailTransporter
+			);
+		} catch (e) {
+			console.error("Email notify (requirement accepted) error:", e.message);
+		}
+
+		// Realtime notify farmer
+		if (req.io) {
+			req.io.to(requirement.farmer._id.toString()).emit("notification", {
+				type: "requirement_accepted",
+				title: "🎉 Requirement Accepted!",
+				message: `${req.user.name} has accepted your ${requirement.workType} request`,
+				data: { bookingId: booking._id },
+				timestamp: new Date(),
+			});
 		}
 
 		res.status(200).json({

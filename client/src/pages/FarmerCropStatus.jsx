@@ -16,7 +16,9 @@ import {
 	User,
 	Clock,
 	ArrowLeft,
+	Star,
 } from "lucide-react";
+import RatingModal from "../components/RatingModal";
 
 const FarmerCropStatus = () => {
 	const navigate = useNavigate();
@@ -29,6 +31,23 @@ const FarmerCropStatus = () => {
 		totalRevenue: 0,
 	});
 	const [loading, setLoading] = useState(true);
+	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
+	
+	// Pagination state
+	const [currentPage, setCurrentPage] = useState(0);
+	const itemsPerPage = 2;
+
+	// Check if already rated helper function
+	const checkIfRated = async (rateeId, transactionRef) => {
+		try {
+			const response = await api.get('/ratings/can-rate', {
+				params: { rateeId, ...transactionRef }
+			});
+			return response.data;
+		} catch (error) {
+			return { canRate: true };
+		}
+	};
 
 	useEffect(() => {
 		fetchSellerOrders();
@@ -278,274 +297,351 @@ const FarmerCropStatus = () => {
 							</div>
 						) : (
 							<div className="space-y-6">
-								{orders.map((order) => (
-									<div
-										key={order._id}
-										className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
-									>
-										{/* Order Header */}
-										<div className="flex justify-between items-start mb-4">
-											<div>
-												<h3 className="text-lg font-bold text-gray-900">
-													Order #{order._id.slice(-8).toUpperCase()}
-												</h3>
-												<p className="text-sm text-gray-600">
-													{new Date(order.createdAt).toLocaleString("en-IN", {
-														dateStyle: "medium",
-														timeStyle: "short",
-													})}
-												</p>
-											</div>
-											<div className="text-right">
-												<span
-													className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(
-														order.status
-													)}`}
-												>
-													{order.status.toUpperCase()}
-												</span>
-												<p className="text-sm text-gray-600 mt-2">
-													Payment:{" "}
+								{/* Paginated Orders */}
+								{orders
+									.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage)
+									.map((order) => (
+										<div
+											key={order._id}
+											className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+										>
+											{/* Order Header */}
+											<div className="flex justify-between items-start mb-4">
+												<div>
+													<h3 className="text-lg font-bold text-gray-900">
+														Order #{order._id.slice(-8).toUpperCase()}
+													</h3>
+													<p className="text-sm text-gray-600">
+														{new Date(order.createdAt).toLocaleString("en-IN", {
+															dateStyle: "medium",
+															timeStyle: "short",
+														})}
+													</p>
+												</div>
+												<div className="text-right">
 													<span
-														className={`font-semibold ${getPaymentColor(
-															order.paymentStatus
+														className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(
+															order.status
 														)}`}
 													>
-														{order.paymentStatus}
+														{order.status.toUpperCase()}
 													</span>
-												</p>
+													<p className="text-sm text-gray-600 mt-2">
+														Payment:{" "}
+														<span
+															className={`font-semibold ${getPaymentColor(
+																order.paymentStatus
+															)}`}
+														>
+															{order.paymentStatus}
+														</span>
+													</p>
+												</div>
 											</div>
-										</div>
 
-										{/* Crop Items */}
-										<div className="mb-4 border-t border-gray-200 pt-4">
-											<h4 className="font-semibold mb-3 flex items-center gap-2">
-												<Package size={18} />
-												Crops Sold:
-											</h4>
-											<div className="space-y-2">
-												{order.items.map((item, idx) => (
-													<div
-														key={idx}
-														className="flex justify-between items-center bg-green-50 p-3 rounded"
-													>
-														<div className="flex items-center gap-3">
-															{item.crop?.images?.[0] && (
-																<img
-																	src={item.crop.images[0]}
-																	alt={item.crop.cropName}
-																	className="w-12 h-12 object-cover rounded"
-																/>
-															)}
+											{/* Crop Items */}
+											<div className="mb-4 border-t border-gray-200 pt-4">
+												<h4 className="font-semibold mb-3 flex items-center gap-2">
+													<Package size={18} />
+													Crops Sold:
+												</h4>
+												<div className="space-y-2">
+													{order.items.map((item, idx) => (
+														<div
+															key={idx}
+															className="flex justify-between items-center bg-green-50 p-3 rounded"
+														>
+															<div className="flex items-center gap-3">
+																{item.crop?.images?.[0] && (
+																	<img
+																		src={
+																			typeof item.crop.images[0] === "string"
+																				? item.crop.images[0]
+																				: item.crop.images[0]?.url
+																		}
+																		alt={item.crop.cropName}
+																		className="w-12 h-12 object-cover rounded"
+																	/>
+																)}
+																<div>
+																	<p className="font-semibold text-gray-900">
+																		{item.crop?.cropName || "Crop"}
+																		{item.crop?.variety &&
+																			` (${item.crop.variety})`}
+																	</p>
+																	<p className="text-sm text-gray-600">
+																		{item.quantity} {item.crop?.unit} × ₹
+																		{item.pricePerUnit}
+																	</p>
+																</div>
+															</div>
+															<p className="font-bold text-green-600">
+																₹{item.total.toLocaleString()}
+															</p>
+														</div>
+													))}
+												</div>
+											</div>
+
+											{/* Buyer Information */}
+											<div className="mb-4 border-t border-gray-200 pt-4">
+												<h4 className="font-semibold mb-3 flex items-center gap-2">
+													<User size={18} />
+													Buyer Details:
+												</h4>
+												<div className="bg-blue-50 p-4 rounded grid grid-cols-1 md:grid-cols-2 gap-3">
+													<div className="flex items-start gap-2">
+														<User size={16} className="mt-1 text-blue-600" />
+														<div>
+															<p className="text-xs text-gray-600">Name</p>
+															<p className="font-semibold">{order.buyer?.name}</p>
+														</div>
+													</div>
+													<div className="flex items-start gap-2">
+														<Phone size={16} className="mt-1 text-blue-600" />
+														<div>
+															<p className="text-xs text-gray-600">Phone</p>
+															<p className="font-semibold">
+																{order.buyer?.phone}
+															</p>
+														</div>
+													</div>
+													<div className="flex items-start gap-2">
+														<MapPin size={16} className="mt-1 text-blue-600" />
+														<div>
+															<p className="text-xs text-gray-600">Location</p>
+															<p className="font-semibold">
+																{order.buyer?.address?.village},{" "}
+																{order.buyer?.address?.district},{" "}
+																{order.buyer?.address?.state}{" "}
+																{order.buyer?.address?.pincode}
+															</p>
+														</div>
+													</div>
+												</div>
+											</div>
+
+											{/* Pickup/Transportation Details */}
+											{order.vehicleDetails && (
+												<div className="mb-4 border-t border-gray-200 pt-4">
+													<h4 className="font-semibold mb-3 flex items-center gap-2">
+														<Truck size={18} />
+														Transportation Details:
+													</h4>
+													<div className="bg-purple-50 p-4 rounded grid grid-cols-1 md:grid-cols-2 gap-3">
+														<div className="flex items-start gap-2">
+															<Calendar
+																size={16}
+																className="mt-1 text-purple-600"
+															/>
 															<div>
-																<p className="font-semibold text-gray-900">
-																	{item.crop?.cropName || "Crop"}
-																	{item.crop?.variety &&
-																		` (${item.crop.variety})`}
+																<p className="text-xs text-gray-600">
+																	Pickup Date
 																</p>
-																<p className="text-sm text-gray-600">
-																	{item.quantity} {item.crop?.unit} × ₹
-																	{item.pricePerUnit}
+																<p className="font-semibold">
+																	{order.pickupSchedule?.date}
 																</p>
 															</div>
 														</div>
-														<p className="font-bold text-green-600">
-															₹{item.total.toLocaleString()}
-														</p>
-													</div>
-												))}
-											</div>
-										</div>
-
-										{/* Buyer Information */}
-										<div className="mb-4 border-t border-gray-200 pt-4">
-											<h4 className="font-semibold mb-3 flex items-center gap-2">
-												<User size={18} />
-												Buyer Details:
-											</h4>
-											<div className="bg-blue-50 p-4 rounded grid grid-cols-1 md:grid-cols-2 gap-3">
-												<div className="flex items-start gap-2">
-													<User size={16} className="mt-1 text-blue-600" />
-													<div>
-														<p className="text-xs text-gray-600">Name</p>
-														<p className="font-semibold">{order.buyer?.name}</p>
-													</div>
-												</div>
-												<div className="flex items-start gap-2">
-													<Phone size={16} className="mt-1 text-blue-600" />
-													<div>
-														<p className="text-xs text-gray-600">Phone</p>
-														<p className="font-semibold">
-															{order.buyer?.phone}
-														</p>
-													</div>
-												</div>
-												<div className="flex items-start gap-2">
-													<MapPin size={16} className="mt-1 text-blue-600" />
-													<div>
-														<p className="text-xs text-gray-600">Location</p>
-														<p className="font-semibold">
-															{order.buyer?.address?.village},{" "}
-															{order.buyer?.address?.district},{" "}
-															{order.buyer?.address?.state}{" "}
-															{order.buyer?.address?.pincode}
-														</p>
-													</div>
-												</div>
-											</div>
-										</div>
-
-										{/* Pickup/Transportation Details */}
-										{order.vehicleDetails && (
-											<div className="mb-4 border-t border-gray-200 pt-4">
-												<h4 className="font-semibold mb-3 flex items-center gap-2">
-													<Truck size={18} />
-													Transportation Details:
-												</h4>
-												<div className="bg-purple-50 p-4 rounded grid grid-cols-1 md:grid-cols-2 gap-3">
-													<div className="flex items-start gap-2">
-														<Calendar
-															size={16}
-															className="mt-1 text-purple-600"
-														/>
-														<div>
-															<p className="text-xs text-gray-600">
-																Pickup Date
-															</p>
-															<p className="font-semibold">
-																{order.pickupSchedule?.date}
-															</p>
+														<div className="flex items-start gap-2">
+															<User size={16} className="mt-1 text-purple-600" />
+															<div>
+																<p className="text-xs text-gray-600">
+																	Driver Name
+																</p>
+																<p className="font-semibold">
+																	{order.vehicleDetails.driverName}
+																</p>
+															</div>
+														</div>
+														<div className="flex items-start gap-2">
+															<Phone size={16} className="mt-1 text-purple-600" />
+															<div>
+																<p className="text-xs text-gray-600">
+																	Driver Phone
+																</p>
+																<p className="font-semibold">
+																	{order.vehicleDetails.driverPhone}
+																</p>
+															</div>
+														</div>
+														<div className="flex items-start gap-2">
+															<Truck size={16} className="mt-1 text-purple-600" />
+															<div>
+																<p className="text-xs text-gray-600">
+																	Vehicle Number
+																</p>
+																<p className="font-semibold">
+																	{order.vehicleDetails.vehicleNumber}
+																</p>
+															</div>
 														</div>
 													</div>
-													<div className="flex items-start gap-2">
-														<User size={16} className="mt-1 text-purple-600" />
-														<div>
-															<p className="text-xs text-gray-600">
-																Driver Name
-															</p>
-															<p className="font-semibold">
-																{order.vehicleDetails.driverName}
-															</p>
-														</div>
-													</div>
-													<div className="flex items-start gap-2">
-														<Phone size={16} className="mt-1 text-purple-600" />
-														<div>
-															<p className="text-xs text-gray-600">
-																Driver Phone
-															</p>
-															<p className="font-semibold">
-																{order.vehicleDetails.driverPhone}
-															</p>
-														</div>
-													</div>
-													<div className="flex items-start gap-2">
-														<Truck size={16} className="mt-1 text-purple-600" />
-														<div>
-															<p className="text-xs text-gray-600">
-																Vehicle Number
-															</p>
-															<p className="font-semibold">
-																{order.vehicleDetails.vehicleNumber}
-															</p>
-														</div>
-													</div>
-												</div>
-											</div>
-										)}
-
-										{/* Payment Details */}
-										<div className="border-t border-gray-200 pt-4">
-											<div className="flex justify-between items-center mb-2">
-												<span className="text-lg font-semibold">
-													Payment Method:
-												</span>
-												<span className="text-gray-700">
-													{order.paymentMethod === "razorpay"
-														? "Online (Razorpay)"
-														: "Pay After Delivery"}
-												</span>
-											</div>
-											<div className="flex justify-between items-center">
-												<span className="text-xl font-bold">Total Amount:</span>
-												<span className="text-2xl font-bold text-green-600">
-													₹{order.totalAmount.toLocaleString()}
-												</span>
-											</div>
-										</div>
-
-										{/* Action Buttons */}
-										<div className="mt-6 flex gap-3 border-t border-gray-200 pt-4">
-										{order.status === "pending" && (
-											<>
-												<button
-													onClick={() => handleConfirmOrder(order._id)}
-													disabled={updatingId === order._id}
-													className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold text-white ${
-														updatingId === order._id
-															? "bg-green-400 cursor-not-allowed"
-															: "bg-green-600 hover:bg-green-700"
-													}`}
-												>
-													<CheckCircle size={20} />
-													{updatingId === order._id ? "Updating..." : "Confirm Order"}
-												</button>
-												<button
-													onClick={() => handleCancelOrder(order._id)}
-													className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 font-semibold"
-												>
-													<XCircle size={20} />
-													Reject Order
-												</button>
-											</>
-										)}
-
-										{order.status === "confirmed" && (
-											<button
-												onClick={() => handleMarkAsPicked(order._id)}
-												disabled={updatingId === order._id}
-												className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold text-white ${
-													updatingId === order._id
-														? "bg-purple-400 cursor-not-allowed"
-														: "bg-purple-600 hover:bg-purple-700"
-												}`}
-											>
-												<Truck size={20} />
-												{updatingId === order._id ? "Updating..." : "Mark as Picked Up"}
-											</button>
-										)}
-
-											{order.status === "picked" && (
-												<div className="flex-1 bg-blue-100 text-blue-800 px-4 py-3 rounded-lg text-center font-semibold">
-													⏳ Waiting for buyer to confirm delivery
 												</div>
 											)}
 
-											{order.status === "completed" && (
-												<div className="flex-1 bg-green-100 text-green-800 px-4 py-3 rounded-lg text-center font-semibold flex items-center justify-center gap-2">
-													<CheckCircle size={20} />
-													Order Completed
+											{/* Payment Details */}
+											<div className="border-t border-gray-200 pt-4">
+												<div className="flex justify-between items-center mb-2">
+													<span className="text-lg font-semibold">
+														Payment Method:
+													</span>
+													<span className="text-gray-700">
+														{order.paymentMethod === "razorpay"
+															? "Online (Razorpay)"
+															: "Pay After Delivery"}
+													</span>
 												</div>
-											)}
+												<div className="flex justify-between items-center">
+													<span className="text-xl font-bold">Total Amount:</span>
+													<span className="text-2xl font-bold text-green-600">
+														₹{order.totalAmount.toLocaleString()}
+													</span>
+												</div>
+											</div>
 
-											{order.status === "cancelled" && (
-												<div className="flex-1 bg-red-100 text-red-800 px-4 py-3 rounded-lg text-center font-semibold">
-													❌ Order Cancelled
-													{order.cancellationReason && (
-														<p className="text-xs mt-1">
-															Reason: {order.cancellationReason}
-														</p>
-													)}
-												</div>
-											)}
+											{/* Action Buttons */}
+											<div className="mt-6 flex gap-3 border-t border-gray-200 pt-4">
+												{order.status === "pending" && (
+													<>
+														<button
+															onClick={() => handleConfirmOrder(order._id)}
+															disabled={updatingId === order._id}
+															className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold text-white ${
+																updatingId === order._id
+																	? "bg-green-400 cursor-not-allowed"
+																	: "bg-green-600 hover:bg-green-700"
+															}`}
+														>
+															<CheckCircle size={20} />
+															{updatingId === order._id ? "Updating..." : "Confirm Order"}
+														</button>
+														<button
+															onClick={() => handleCancelOrder(order._id)}
+															className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 flex items-center justify-center gap-2 font-semibold"
+														>
+															<XCircle size={20} />
+															Reject Order
+														</button>
+													</>
+												)}
+
+												{order.status === "confirmed" && (
+													<button
+														onClick={() => handleMarkAsPicked(order._id)}
+														disabled={updatingId === order._id}
+														className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 font-semibold text-white ${
+															updatingId === order._id
+																? "bg-purple-400 cursor-not-allowed"
+																: "bg-purple-600 hover:bg-purple-700"
+														}`}
+													>
+														<Truck size={20} />
+														{updatingId === order._id ? "Updating..." : "Mark as Picked Up"}
+													</button>
+												)}
+
+												{order.status === "picked" && (
+													<div className="flex-1 bg-blue-100 text-blue-800 px-4 py-3 rounded-lg text-center font-semibold">
+														⏳ Waiting for buyer to confirm delivery
+													</div>
+												)}
+
+												{order.status === "completed" && (
+													<>
+														<div className="flex-1 bg-green-100 text-green-800 px-4 py-3 rounded-lg text-center font-semibold flex items-center justify-center gap-2">
+															<CheckCircle size={20} />
+															Order Completed
+														</div>
+														<button
+															onClick={async () => {
+																const buyerId = typeof order.buyer === 'string' ? order.buyer : order.buyer?._id;
+																if (!buyerId) {
+																	toast.error('Buyer information missing');
+																	return;
+																}
+																const canRateData = await checkIfRated(
+																	buyerId,
+																	{ relatedOrder: order._id }
+																);
+																if (canRateData.canRate) {
+																	setRatingModal({
+																		isOpen: true,
+																		data: {
+																			rateeId: buyerId,
+																			rateeName: order.buyer?.name || 'Buyer',
+																			rateeRole: 'buyer',
+																			ratingType: 'farmer_to_buyer',
+																			relatedOrder: order._id,
+																		}
+																	});
+																} else {
+																	toast.info('You have already rated this buyer');
+																}
+															}}
+															className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition font-semibold shadow-md hover:shadow-lg"
+														>
+															<Star size={20} />
+															Rate Buyer
+														</button>
+													</>
+												)}
+
+												{order.status === "cancelled" && (
+													<div className="flex-1 bg-red-100 text-red-800 px-4 py-3 rounded-lg text-center font-semibold">
+														❌ Order Cancelled
+														{order.cancellationReason && (
+															<p className="text-xs mt-1">
+																Reason: {order.cancellationReason}
+															</p>
+														)}
+													</div>
+												)}
+											</div>
 										</div>
+									))}
+								
+								{/* Pagination Controls */}
+								{orders.length > itemsPerPage && (
+									<div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
+										<button
+											onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+											disabled={currentPage === 0}
+											className="flex items-center gap-2 px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+										>
+											<ArrowLeft size={20} />
+											Previous
+										</button>
+										
+										<div className="text-sm text-gray-600 font-medium">
+											Showing {currentPage * itemsPerPage + 1}-{Math.min((currentPage + 1) * itemsPerPage, orders.length)} of {orders.length} orders
+										</div>
+										
+										<button
+											onClick={() => setCurrentPage(Math.min(Math.ceil(orders.length / itemsPerPage) - 1, currentPage + 1))}
+											disabled={currentPage >= Math.ceil(orders.length / itemsPerPage) - 1}
+											className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+										>
+											Next
+											<ArrowLeft size={20} className="rotate-180" />
+										</button>
 									</div>
-								))}
+								)}
 							</div>
 						)}
 					</div>
 				</div>
 			</div>
+			
+			{/* Rating Modal */}
+			<RatingModal
+				isOpen={ratingModal.isOpen}
+				onClose={() => setRatingModal({ isOpen: false, data: null })}
+				{...ratingModal.data}
+				onRatingSubmitted={() => {
+					fetchSellerOrders();
+				}}
+			/>
 		</div>
 	);
 };

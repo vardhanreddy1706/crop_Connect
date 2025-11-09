@@ -1,4 +1,5 @@
 import api from "../config/api";
+import { useNavigate } from "react-router-dom";
 
 import React, { useState } from "react";
 import {
@@ -74,6 +75,7 @@ const RegisterFB = () => {
 	const [selectedRole, setSelectedRole] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [message, setMessage] = useState(null);
+	const navigate = useNavigate();
 
 	// Common Fields
 	const [commonForm, setCommonForm] = useState({
@@ -273,6 +275,8 @@ const RegisterFB = () => {
 				text: err.response?.data?.message || "Registration failed",
 			});
 		}
+		toast.success("Registration successful! Redirecting to login...");
+setTimeout(() => navigate("/login"), 1500);
 	};
 
 	if (currentStep === "roleSelect") {
@@ -286,6 +290,14 @@ const RegisterFB = () => {
 				}}
 			>
 				<div className="min-h-screen bg-gradient-to-br from-green-0 to-emerald-50 flex items-center justify-center p-6">
+					<div className="absolute top-4 right-4">
+						<button
+  className="bg-white text-green-600 px-4 py-2 rounded-full hover:bg-green-600 hover:text-white transition"
+  onClick={() => navigate("/")}
+>
+  Back to Landing Page
+</button>
+					</div>
 					<div className="max-w-2xl w-full">
 						<div className="text-center mb-12">
 							<h1 className="text-4xl font-bold text-green-800 mb-3">

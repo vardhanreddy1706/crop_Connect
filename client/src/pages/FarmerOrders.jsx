@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import api from "../config/api";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import RatingModal from "../components/RatingModal";
+import RatingStars from "../components/RatingStars";
 import {
 	Package,
 	Truck,
@@ -14,6 +16,7 @@ import {
 	Calendar,
 	Loader,
 	ArrowLeft,
+	Star,
 } from "lucide-react";
 
 function FarmerOrders() {
@@ -21,6 +24,19 @@ function FarmerOrders() {
 	const [orders, setOrders] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [processing, setProcessing] = useState(null);
+	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
+
+	// Check if already rated helper function
+	const checkIfRated = async (rateeId, transactionRef) => {
+		try {
+			const response = await api.get('/ratings/can-rate', {
+				params: { rateeId, ...transactionRef }
+			});
+			return response.data;
+		} catch (error) {
+			return { canRate: true };
+		}
+	};
 
 	useEffect(() => {
 		fetchOrders();
@@ -260,16 +276,54 @@ function FarmerOrders() {
 								)}
 
 								{order.status === "completed" && (
-									<div className="bg-green-50 p-4 rounded-lg text-center">
-										<p className="text-green-700 font-semibold">
-											✅ Order Completed Successfully!
-										</p>
+									<div className="space-y-3">
+										<div className="bg-green-50 p-4 rounded-lg text-center">
+											<p className="text-green-700 font-semibold">
+												✅ Order Completed Successfully!
+											</p>
+										</div>
+										<button
+											onClick={async () => {
+												const canRateData = await checkIfRated(
+													order.buyer._id || order.buyer,
+													{ relatedOrder: order._id }
+												);
+												if (canRateData.canRate) {
+													setRatingModal({
+														isOpen: true,
+														data: {
+															rateeId: order.buyer._id || order.buyer,
+															rateeName: order.buyer?.name || 'Buyer',
+															rateeRole: 'buyer',
+															ratingType: 'farmer_to_buyer',
+															relatedOrder: order._id,
+														}
+													});
+												} else {
+													toast.info('You have already rated this buyer');
+												}
+											}}
+											className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition font-semibold shadow-md hover:shadow-lg"
+										>
+											<Star className="w-5 h-5" />
+											Rate Buyer
+										</button>
 									</div>
 								)}
 							</div>
 						))}
 					</div>
 				)}
+
+				{/* Rating Modal */}
+				<RatingModal
+					isOpen={ratingModal.isOpen}
+					onClose={() => setRatingModal({ isOpen: false, data: null })}
+					{...ratingModal.data}
+					onRatingSubmitted={() => {
+						fetchOrders();
+					}}
+				/>
 			</div>
 		</div>
 	);

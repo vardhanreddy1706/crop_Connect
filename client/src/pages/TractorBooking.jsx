@@ -102,19 +102,18 @@ const fetchAllTractors = async () => {
 		try {
 			setLoading(true);
 			const token = localStorage.getItem("token");
+			// Fetch all tractors without location filters initially
+			// Backend will auto-filter by user's location if user is a farmer
 			const response = await api.get("/tractors", {
-				params: { location: user?.address?.district },
 				headers: {
 					Authorization: `Bearer ${token}`,
 				},
 			});
 
 			if (response.data.success) {
-				const availableTractors = response.data.tractorServices.filter(
-					(t) => t.availability && !t.isBooked
-				);
-				setTractors(availableTractors);
-				setFilteredTractors(availableTractors);
+				const list = response.data.tractorServices || [];
+				setTractors(list);
+				setFilteredTractors(list);
 			}
 		} catch (error) {
 			console.error("Error fetching tractors:", error);
@@ -128,43 +127,57 @@ const fetchAllTractors = async () => {
 	};
 
 
-const handleSearch = () => {
+const handleSearch = async () => {
 		setSearchPerformed(true);
+		setLoading(true);
 
-		if (!searchLocation.district && !searchLocation.state) {
-			setFilteredTractors(tractors);
-			return;
+		try {
+			const token = localStorage.getItem("token");
+			const params = {};
+			
+			// Only include parameters that are provided and not empty
+			if (searchLocation.village && searchLocation.village.trim()) {
+				params.village = searchLocation.village.trim();
+			}
+			if (searchLocation.district && searchLocation.district.trim()) {
+				params.district = searchLocation.district.trim();
+			}
+			if (searchLocation.state && searchLocation.state.trim()) {
+				params.state = searchLocation.state.trim();
+			}
+			// Note: mandal is not supported by backend, but we can filter client-side if needed
+
+			// If no search parameters, fetch all (backend will auto-filter by user location for farmers)
+			const response = await api.get("/tractors", {
+				params: Object.keys(params).length > 0 ? params : undefined,
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			});
+
+			if (response.data.success) {
+				const list = response.data.tractorServices || [];
+				// Apply client-side mandal filter if provided (backend doesn't support it)
+				let filtered = list;
+				if (searchLocation.mandal && searchLocation.mandal.trim()) {
+					filtered = list.filter((tractor) => 
+						(tractor.location?.mandal || "")
+							.toLowerCase()
+							.includes(searchLocation.mandal.toLowerCase())
+					);
+				}
+				setTractors(filtered);
+				setFilteredTractors(filtered);
+			}
+		} catch (error) {
+			console.error("Error searching tractors:", error);
+			setMessage({
+				type: "error",
+				text: "Failed to search tractors",
+			});
+		} finally {
+			setLoading(false);
 		}
-
-		const filtered = tractors.filter((tractor) => {
-			const matchesDistrict =
-				!searchLocation.district ||
-				tractor.location?.district
-					?.toLowerCase()
-					.includes(searchLocation.district.toLowerCase());
-
-		const matchesState =
-			!searchLocation.state ||
-			tractor.location?.state
-				?.toLowerCase()
-				.includes(searchLocation.state.toLowerCase());
-
-		const matchesVillage =
-			!searchLocation.village ||
-			tractor.location?.village
-				?.toLowerCase()
-				.includes(searchLocation.village.toLowerCase());
-
-		const matchesMandal =
-			!searchLocation.mandal ||
-			(tractor.location?.mandal || "")
-				.toLowerCase()
-				.includes(searchLocation.mandal.toLowerCase());
-
-		return matchesDistrict && matchesState && matchesVillage && matchesMandal;
-		});
-
-		setFilteredTractors(filtered);
 	};
 
 	const handleBookNow = (tractor) => {

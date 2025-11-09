@@ -427,7 +427,7 @@ const CropPriceSearch = () => {
 												<td className="px-4 py-3 text-sm">
 													<span
 														className={`font-semibold ${
-															isPositive ? "text-green-600" : "text-red-600"
+															isPositive ? "text-green-600" : "text-green-600"
 														}`}
 													>
 														{isPositive ? "▲" : "▼"} {trend}%

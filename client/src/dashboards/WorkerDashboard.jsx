@@ -3,6 +3,10 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../config/api";
 import toast from "react-hot-toast";
+import RatingModal from "../components/RatingModal";
+import RatingStars from "../components/RatingStars";
+import MyRatingsTab from "../components/MyRatingsTab";
+import RatingsReceivedTab from "../components/RatingsRecieved";
 import {
 	TrendingUp,
 	Users,
@@ -46,6 +50,20 @@ function WorkerDashboard() {
 	const [actionLoading, setActionLoading] = useState(null);
 	const [activeTab, setActiveTab] = useState("overview");
 	const [activeWorkSubTab, setActiveWorkSubTab] = useState("accepted");
+	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
+	const [ratingStats, setRatingStats] = useState({ averageRating: 0, totalRatings: 0, distribution: {} });
+
+	// Check if already rated helper function
+	const checkIfRated = async (rateeId, transactionRef) => {
+		try {
+			const response = await api.get('/ratings/can-rate', {
+				params: { rateeId, ...transactionRef }
+			});
+			return response.data;
+		} catch (error) {
+			return { canRate: true };
+		}
+	};
 
 	// Service Modal State
 	const [showServiceModal, setShowServiceModal] = useState(false);
@@ -94,8 +112,21 @@ function WorkerDashboard() {
 			fetchHireRequests(),
 			fetchMyServices(),
 			fetchAvailableJobs(),
+			fetchRatingStats(),
 		]);
 		setLoading(false);
+	};
+
+	// Fetch rating stats
+	const fetchRatingStats = async () => {
+		try {
+			const response = await api.get(`/ratings/user/${user._id}`);
+			if (response.data.success) {
+				setRatingStats(response.data.data.stats);
+			}
+		} catch (error) {
+			console.error('Fetch rating stats error:', error);
+		}
 	};
 
 	// ✅ CORRECTED: Fetch work orders (bookings where worker is hired)
@@ -461,6 +492,9 @@ function WorkerDashboard() {
 	const [pageServices, setPageServices] = useState(0);
 	const [pageTx, setPageTx] = useState(0);
 	const [pageActivity, setPageActivity] = useState(0);
+	const [pageHireRequests, setPageHireRequests] = useState(0);
+	const [pageWork, setPageWork] = useState(0);
+	const [pageEarnings, setPageEarnings] = useState(0);
 
 	// Utility functions
 	const itemsPerPage = 3;
@@ -498,7 +532,7 @@ function WorkerDashboard() {
 	const isPast = (date) => new Date(date) < new Date();
 
 	if (loading && myServices.length === 0 && workOrders.length === 0) {
-		return (
+			return (
 			<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
 				<div className="text-center">
 					<Loader
@@ -512,7 +546,7 @@ function WorkerDashboard() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-green-200 to-blue-50 flex flex-col">
+		<div className="min-h-screen bg-white flex flex-col">
 			<DashboardNavbar role="Worker" userName={user?.name} onLogout={logout} />
 			<div className="pt-28 pb-8 px-4 flex-1">
 				<div className="max-w-7xl mx-auto">
@@ -640,6 +674,18 @@ function WorkerDashboard() {
 								<IndianRupee className="mr-2" size={20} />
 								{tr("Earnings")}
 							</button>
+
+							<button
+								onClick={() => setActiveTab("my-ratings")}
+								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+									activeTab === "my-ratings"
+										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
+										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
+								}`}
+							>
+								<Star className="mr-2" size={20} />
+								{tr("My Ratings")}
+							</button>
 						</div>
 					</div>
 
@@ -647,7 +693,7 @@ function WorkerDashboard() {
 					{activeTab === "overview" && (
 						<div className="space-y-6">
 							{/* Quick Stats Grid */}
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
 								<div className="bg-white rounded-xl shadow-lg p-6">
 									<h3 className="text-lg font-bold text-gray-800 mb-4">
 										{tr("Work Status")}
@@ -748,6 +794,34 @@ function WorkerDashboard() {
 													.reduce((sum, w) => sum + w.totalCost, 0)}
 											</span>
 										</div>
+									</div>
+								</div>
+
+								<div className="bg-white rounded-xl shadow-lg p-6">
+									<h3 className="text-lg font-bold text-gray-800 mb-4">
+										{tr("My Ratings")}
+									</h3>
+									<div className="space-y-3">
+										<div className="flex items-center justify-center py-3">
+											<div className="text-center">
+												<div className="flex items-center justify-center gap-2 mb-2">
+													<Star className="w-8 h-8 fill-yellow-400 text-yellow-400" />
+													<span className="text-4xl font-bold text-gray-900">
+														{ratingStats.averageRating > 0 ? ratingStats.averageRating.toFixed(1) : '0.0'}
+													</span>
+												</div>
+												<p className="text-sm text-gray-600">
+													{ratingStats.totalRatings} {ratingStats.totalRatings === 1 ? tr('Review') : tr('Reviews')}
+												</p>
+											</div>
+										</div>
+										<button
+											onClick={() => setActiveTab('ratings-received')}
+											className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-4 py-2 rounded-lg transition-all font-medium flex items-center justify-center gap-2"
+										>
+											<Star className="w-4 h-4" />
+											{tr('View All Reviews')}
+										</button>
 									</div>
 								</div>
 							</div>
@@ -1256,8 +1330,14 @@ function WorkerDashboard() {
 										</p>
 									</div>
 								) : (
-									<div className="space-y-4">
-										{hireRequests.map((request) => (
+									<>
+										<div className="space-y-4">
+											{hireRequests
+												.slice(
+													pageHireRequests * itemsPerPage,
+													pageHireRequests * itemsPerPage + itemsPerPage
+												)
+												.map((request) => (
 											<div
 												key={request._id}
 												className="bg-white rounded-xl shadow-lg overflow-hidden p-6 border-2 border-gray-200 hover:border-green-500 transition"
@@ -1433,7 +1513,37 @@ function WorkerDashboard() {
 												)}
 											</div>
 										))}
-									</div>
+										</div>
+										{/* Pagination */}
+										{hireRequests.length > itemsPerPage && (
+											<div className="flex justify-end items-center gap-2 mt-4">
+												<button
+													onClick={() =>
+														setPageHireRequests(Math.max(0, pageHireRequests - 1))
+													}
+													disabled={pageHireRequests === 0}
+													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Prev")}
+												</button>
+												<button
+													onClick={() =>
+														setPageHireRequests(
+															(pageHireRequests + 1) %
+																Math.ceil(hireRequests.length / itemsPerPage)
+														)
+													}
+													disabled={
+														pageHireRequests >=
+														Math.ceil(hireRequests.length / itemsPerPage) - 1
+													}
+													className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Next")}
+												</button>
+											</div>
+										)}
+									</>
 								)}
 							</div>
 						</div>
@@ -1482,8 +1592,8 @@ function WorkerDashboard() {
 							</div>
 
 							{/* Work Orders List */}
-							{workOrders
-								.filter((w) => {
+							{(() => {
+								const filteredWork = workOrders.filter((w) => {
 									if (activeWorkSubTab === "accepted")
 										return w.status === "confirmed";
 									if (activeWorkSubTab === "completed")
@@ -1491,8 +1601,40 @@ function WorkerDashboard() {
 									if (activeWorkSubTab === "cancelled")
 										return w.status === "cancelled";
 									return false;
-								})
-								.map((work) => (
+								});
+								const paginatedWork = filteredWork.slice(
+									pageWork * itemsPerPage,
+									pageWork * itemsPerPage + itemsPerPage
+								);
+
+								return (
+									<>
+										{filteredWork.length === 0 ? (
+											<div className="bg-white rounded-xl shadow-lg p-12 text-center">
+												<Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+												<h3 className="text-xl font-semibold text-gray-900 mb-2">
+													{activeWorkSubTab === "accepted" && tr("No Active Work")}
+													{activeWorkSubTab === "completed" && tr("No Completed Work")}
+													{activeWorkSubTab === "cancelled" && tr("No Cancelled Work")}
+												</h3>
+												<p className="text-gray-600 mb-6">
+													{activeWorkSubTab === "accepted" && tr("You don't have any active work assignments at the moment.")}
+													{activeWorkSubTab === "completed" && tr("You haven't completed any work yet.")}
+													{activeWorkSubTab === "cancelled" && tr("No work has been cancelled.")}
+												</p>
+												{activeWorkSubTab === "accepted" && (
+													<button
+														onClick={() => setActiveTab("available")}
+														className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg inline-flex items-center space-x-2"
+													>
+														<Search className="h-5 w-5" />
+														<span>{tr("Find Work")}</span>
+													</button>
+												)}
+											</div>
+										) : (
+											<>
+										{paginatedWork.map((work) => (
 									<div
 										key={work._id}
 										className="bg-white rounded-xl shadow-lg overflow-hidden"
@@ -1606,37 +1748,77 @@ function WorkerDashboard() {
 												work.status === "completed" && (
 													<div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mt-4">
 														<p className="text-yellow-800 font-semibold flex items-center">
-															<Clock className="mr-2" size={20} />⏳{" "}
+															<Clock className="mr-2" size={20} />{" "}
 															{tr("Waiting for payment from farmer...")}
 														</p>
 													</div>
 												)}
+
+												{work.status === "completed" && (
+													<div className="mt-4">
+														<button
+															onClick={async () => {
+																const farmerId = work.farmer?._id || work.farmer;
+																const canRateData = await checkIfRated(
+																	farmerId,
+																	{ relatedBooking: work._id }
+																);
+																if (canRateData.canRate) {
+																	setRatingModal({
+																		isOpen: true,
+																		data: {
+																			rateeId: farmerId,
+																			rateeName: work.farmer?.name || 'Farmer',
+																			rateeRole: 'farmer',
+																			ratingType: 'worker_to_farmer',
+																			relatedBooking: work._id,
+																		}
+																	});
+																} else {
+																	toast.info('You have already rated this farmer');
+																}
+															}}
+															className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition font-semibold shadow-md hover:shadow-lg"
+														>
+															<Star className="w-5 h-5" />
+															{tr("Rate Farmer")}
+														</button>
+													</div>
+												)}
 										</div>
 									</div>
-								))}
-
-							{workOrders.filter((w) => {
-								if (activeWorkSubTab === "accepted")
-									return w.status === "confirmed";
-								if (activeWorkSubTab === "completed")
-									return w.status === "completed";
-								if (activeWorkSubTab === "cancelled")
-									return w.status === "cancelled";
-								return false;
-							}).length === 0 && (
-								<div className="bg-white rounded-xl shadow-lg p-12 text-center">
-									<AlertCircle
-										className="mx-auto mb-4 text-gray-400"
-										size={64}
-									/>
-									<h3 className="text-xl font-semibold text-gray-700 mb-2">
-										{tr("No work in this category")}
-									</h3>
-									<p className="text-gray-500">
-										{tr("Your work will appear here")}
-									</p>
-								</div>
-							)}
+										))}
+										{/* Pagination */}
+										{filteredWork.length > itemsPerPage && (
+											<div className="flex justify-end items-center gap-2 mt-4">
+												<button
+													onClick={() => setPageWork(Math.max(0, pageWork - 1))}
+													disabled={pageWork === 0}
+													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Prev")}
+												</button>
+												<button
+													onClick={() =>
+														setPageWork(
+															(pageWork + 1) %
+																Math.ceil(filteredWork.length / itemsPerPage)
+														)
+													}
+													disabled={
+														pageWork >= Math.ceil(filteredWork.length / itemsPerPage) - 1
+													}
+													className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Next")}
+												</button>
+											</div>
+										)}
+										</>
+									)}
+								</>
+								);
+							})()}
 						</div>
 					)}
 
@@ -1956,8 +2138,102 @@ function WorkerDashboard() {
 							<h3 className="text-xl font-bold text-gray-800">
 								{tr("Earnings")}
 							</h3>
+
+							{/* Summary */}
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+								<div className="bg-white rounded-xl shadow-lg p-6">
+									<p className="text-gray-600 font-semibold mb-1">{tr("Total Earned")}</p>
+									<p className="text-2xl font-bold text-green-600">
+										₹{transactions.filter(t => t.status === "completed").reduce((s, t) => s + (t.amount || 0), 0)}
+									</p>
+								</div>
+								<div className="bg-white rounded-xl shadow-lg p-6">
+									<p className="text-gray-600 font-semibold mb-1">{tr("Pending Amount")}</p>
+									<p className="text-2xl font-bold text-yellow-600">
+										₹{transactions.filter(t => t.status === "pending").reduce((s, t) => s + (t.amount || 0), 0)}
+									</p>
+								</div>
+								<div className="bg-white rounded-xl shadow-lg p-6">
+									<p className="text-gray-600 font-semibold mb-1">{tr("Payments Received")}</p>
+									<p className="text-2xl font-bold text-gray-800">{transactions.filter(t => t.status === "completed").length}</p>
+								</div>
+							</div>
+
+							{/* Transactions List */}
+							<div className="bg-white rounded-xl shadow-lg p-6">
+								<h4 className="text-lg font-bold text-gray-800 mb-4">{tr("Transactions")}</h4>
+								{transactions.length === 0 ? (
+									<div className="text-center py-10 text-gray-500">{tr("No transactions yet")}</div>
+								) : (
+									<>
+										<div className="overflow-x-auto">
+											<table className="min-w-full">
+												<thead>
+													<tr className="text-left text-sm text-gray-600">
+														<th className="py-2">{tr("Date")}</th>
+														<th className="py-2">{tr("Work")}</th>
+														<th className="py-2">{tr("Amount")}</th>
+														<th className="py-2">{tr("Status")}</th>
+													</tr>
+												</thead>
+												<tbody>
+													{transactions
+														.slice(
+															pageEarnings * itemsPerPage,
+															pageEarnings * itemsPerPage + itemsPerPage
+														)
+														.map((tx) => (
+													<tr key={tx._id} className="border-t">
+														<td className="py-2 text-sm">{formatDate(tx.createdAt)}</td>
+														<td className="py-2 text-sm">{tx.bookingId?.workType || tx.bookingId?.serviceType || "-"}</td>
+														<td className="py-2 font-semibold text-gray-800">₹{tx.amount || 0}</td>
+														<td className="py-2">
+															<span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(tx.status)}`}>
+																{(tx.status || "").toUpperCase()}
+															</span>
+														</td>
+													</tr>
+														))}
+												</tbody>
+											</table>
+										</div>
+										{/* Pagination */}
+										{transactions.length > itemsPerPage && (
+											<div className="flex justify-end items-center gap-2 mt-4">
+												<button
+													onClick={() => setPageEarnings(Math.max(0, pageEarnings - 1))}
+													disabled={pageEarnings === 0}
+													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Prev")}
+												</button>
+												<button
+													onClick={() =>
+														setPageEarnings(
+															(pageEarnings + 1) %
+																Math.ceil(transactions.length / itemsPerPage)
+														)
+													}
+													disabled={
+														pageEarnings >= Math.ceil(transactions.length / itemsPerPage) - 1
+													}
+													className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Next")}
+												</button>
+											</div>
+										)}
+									</>
+								)}
+							</div>
 						</div>
 					)}
+
+					{/* MY RATINGS TAB */}
+					{activeTab === "my-ratings" && <MyRatingsTab />}
+
+					{/* RATINGS RECEIVED TAB */}
+					{activeTab === "ratings-received" && <RatingsReceivedTab />}
 
 					{/* POST SERVICE MODAL */}
 					{showServiceModal && (
@@ -2212,6 +2488,16 @@ function WorkerDashboard() {
 						icon: IndianRupee,
 					},
 				]}
+			/>
+
+			{/* Rating Modal */}
+			<RatingModal
+				isOpen={ratingModal.isOpen}
+				onClose={() => setRatingModal({ isOpen: false, data: null })}
+				{...ratingModal.data}
+				onRatingSubmitted={() => {
+					fetchWorkOrders();
+				}}
 			/>
 		</div>
 	);

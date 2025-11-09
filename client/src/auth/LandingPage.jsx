@@ -24,8 +24,8 @@ import {
 	X,
 	CheckCircle,
 	UserPlus,
+	Sprout,
 } from "lucide-react";
-import logo from "/logo1.png";
 
 function CropConnectLanding() {
 	const navigate = useNavigate();
@@ -131,7 +131,9 @@ function CropConnectLanding() {
 					<div className="flex justify-between items-center h-20">
 						{/* Logo Section */}
 						<div className="flex items-center space-x-3">
-							<img src={logo} alt="Crop Connect Logo" className="h-20 w-auto" />
+							<div className="p-3 rounded-2xl bg-green-600 shadow-md">
+								<Sprout className="w-8 h-8 text-white" strokeWidth={2.5} />
+							</div>
 							<div>
 								<h1 className="text-2xl font-bold bg-gradient-to-r from-green-700 to-emerald-600 bg-clip-text text-transparent">
 									Crop Connect
@@ -512,11 +514,9 @@ function CropConnectLanding() {
 						{/* About Column */}
 						<div>
 							<div className="flex items-center space-x-3 mb-4">
-								<img
-									src={logo}
-									alt="Crop Connect Logo"
-									className="h-8 w-auto"
-								/>
+								<div className="p-2 rounded-xl bg-green-600 shadow">
+									<Sprout className="w-6 h-6 text-white" strokeWidth={2.5} />
+								</div>
 								<h3 className="text-2xl font-bold">Crop Connect</h3>
 							</div>
 							<p className="text-gray-400 leading-relaxed">

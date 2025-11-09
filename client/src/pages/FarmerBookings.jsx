@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../config/api";
 import toast from "react-hot-toast";
+import RatingModal from "../components/RatingModal";
+import RatingStars from "../components/RatingStars";
 
 
 import { useNavigate } from "react-router-dom";
@@ -46,10 +48,13 @@ function FarmerMyBookings() {
 	const [paymentLoading, setPaymentLoading] = useState(null);
 	const [actionLoading, setActionLoading] = useState(null);
 	const [activeTab, setActiveTab] = useState("bookings");
+	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
 
 	// Worker search filters
 	const [workerSearch, setWorkerSearch] = useState({
+		village: "",
 		district: "",
+		state: "",
 		workerType: "",
 		maxCharge: "",
 		minExperience: "",
@@ -57,6 +62,18 @@ function FarmerMyBookings() {
 
 	// Simple pagination for bookings
 	const [pageBookings, setPageBookings] = useState(0);
+
+	// Check if already rated helper function
+	const checkIfRated = async (rateeId, transactionRef) => {
+		try {
+			const response = await api.get('/ratings/can-rate', {
+				params: { rateeId, ...transactionRef }
+			});
+			return response.data;
+		} catch (error) {
+			return { canRate: true };
+		}
+	};
 	const [pageBids, setPageBids] = useState(0);
 	const [pageHire, setPageHire] = useState(0);
 	const [pageApps, setPageApps] = useState(0);
@@ -155,7 +172,9 @@ useEffect(() => {
 			setLoading(true);
 			const params = {};
 
-			if (workerSearch.district) params.location = workerSearch.district;
+			if (workerSearch.district) params.district = workerSearch.district;
+			if (workerSearch.village) params.village = workerSearch.village;
+			if (workerSearch.state) params.state = workerSearch.state;
 			if (workerSearch.workerType) params.workerType = workerSearch.workerType;
 			if (workerSearch.maxCharge) params.maxCharge = workerSearch.maxCharge;
 			if (workerSearch.minExperience)
@@ -179,7 +198,9 @@ useEffect(() => {
 	// ✅ Reset worker filters
 	const handleResetFilters = () => {
 		setWorkerSearch({
+			village: "",
 			district: "",
+			state: "",
 			workerType: "",
 			maxCharge: "",
 			minExperience: "",
@@ -913,6 +934,54 @@ bookings
 												)}
 											</div>
 										)}
+										{/* Rating Button for Completed Bookings */}
+										{booking.status === "completed" && (
+											<div className="mt-4">
+												<button
+													onClick={async () => {
+														// Extract the ID string from the worker/tractor owner object
+														// Note: Booking model uses tractorOwnerId for both workers and tractor owners
+														const rateeObject = booking.tractorOwnerId;
+														const rateeId = typeof rateeObject === 'string' ? rateeObject : rateeObject?._id;
+														
+														// Validate rateeId exists
+														if (!rateeId) {
+															console.error('Missing ratee ID:', { booking, rateeObject, rateeId });
+															toast.error('Unable to rate: Service provider information missing');
+															return;
+														}
+														
+														const ratingType = booking.serviceType === 'worker'
+															? 'farmer_to_worker'
+															: 'farmer_to_tractor_owner';
+														const rateeRole = booking.serviceType === 'worker' ? 'worker' : 'tractor_owner';
+														
+														const canRateData = await checkIfRated(
+															rateeId,
+															{ relatedBooking: booking._id }
+														);
+														if (canRateData.canRate) {
+															setRatingModal({
+																isOpen: true,
+																data: {
+																	rateeId,
+																	rateeName: booking.workerName || booking.tractorOwnerName || 'Service Provider',
+																	rateeRole,
+																	ratingType,
+																	relatedBooking: booking._id,
+																}
+															});
+														} else {
+															toast.info('You have already rated this service');
+														}
+													}}
+													className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition font-semibold shadow-md hover:shadow-lg"
+												>
+													<Star className="w-5 h-5" />
+													Rate Your Experience
+												</button>
+											</div>
+										)}
 									</div>
 								</div>
 							))
@@ -1313,7 +1382,14 @@ bookings
 								Find Workers
 							</h3>
 
-							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+                                <input
+                                    type="text"
+                                    placeholder="Village"
+                                    value={workerSearch.village}
+                                    onChange={(e) => setWorkerSearch({ ...workerSearch, village: e.target.value })}
+                                    className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                />
 								<input
 									type="text"
 									placeholder="Search by District"
@@ -1326,6 +1402,13 @@ bookings
 									}
 									className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
 								/>
+                                <input
+                                    type="text"
+                                    placeholder="State"
+                                    value={workerSearch.state}
+                                    onChange={(e) => setWorkerSearch({ ...workerSearch, state: e.target.value })}
+                                    className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                />
 
 								<select
 									value={workerSearch.workerType}
@@ -1611,6 +1694,16 @@ bookings
 					</div>
 				)}
 			</div>
+
+			{/* Rating Modal */}
+			<RatingModal
+				isOpen={ratingModal.isOpen}
+				onClose={() => setRatingModal({ isOpen: false, data: null })}
+				{...ratingModal.data}
+				onRatingSubmitted={() => {
+					fetchBookings();
+				}}
+			/>
 		</div>
 	);
 }

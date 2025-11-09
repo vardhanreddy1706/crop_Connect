@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 
+
 export default function Chatbot() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [messages, setMessages] = useState([]);
@@ -106,14 +107,13 @@ export default function Chatbot() {
 	};
 
 	return (
-		<div className="fixed bottom-6 right-6 z-50">
-			{/* Chat Window */}
+		<>
+			{/* Chat Window (opens to the left of the bottom-right button) */}
 			<div
-				className={`w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col transition-all duration-300 transform ${
-					isOpen
-						? "opacity-100 translate-y-0 scale-100"
-						: "opacity-0 translate-y-10 scale-95 pointer-events-none"
+				className={`fixed z-50 w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col transition-all duration-300 transform ${
+					isOpen ? "opacity-100 translate-x-0" : "opacity-0 pointer-events-none translate-x-4"
 				}`}
+				style={{ bottom: 24, right: 96 }}
 			>
 				{/* Header */}
 				<div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-5 rounded-t-2xl flex justify-between items-center shadow-md">
@@ -218,11 +218,13 @@ export default function Chatbot() {
 				</form>
 			</div>
 
-			{/* Toggle Button */}
+			{/* Toggle Button pinned to bottom-right */}
 			{!isOpen && (
 				<button
+					aria-label="Open chat assistant"
 					onClick={() => setIsOpen(true)}
-					className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white p-4 rounded-full shadow-2xl hover:shadow-xl transition-all transform hover:scale-110 animate-bounce"
+					className="fixed z-50 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white p-4 rounded-full shadow-2xl hover:shadow-xl transition-all transform hover:scale-110 animate-bounce"
+					style={{ bottom: 24, right: 24 }}
 				>
 					<MessageCircle size={28} />
 				</button>
@@ -243,6 +245,6 @@ export default function Chatbot() {
 					animation: fadeIn 0.3s ease-out;
 				}
 			`}</style>
-		</div>
+		</>
 	);
 }

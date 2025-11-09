@@ -16,6 +16,7 @@ exports.getCart = async (req, res) => {
         await cart.populate({
             path: 'items.itemId',
             select: 'cropName pricePerUnit unit quantity', // ✅ Include quantity
+            model: 'Crop',
         });
 
         const cartItems = cart.items.map((item) => ({
@@ -186,6 +187,7 @@ exports.updateCartQuantity = async (req, res) => {
         await cart.populate({
             path: 'items.itemId',
             select: 'cropName pricePerUnit unit quantity',
+            model: 'Crop',
         });
 
         // Return updated cart with available quantities

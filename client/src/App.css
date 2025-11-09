@@ -1,1 +1,25 @@
 @import "tailwindcss";
+
+@keyframes marquee {
+	0% {
+		transform: translateX(0);
+	}
+	100% {
+		transform: translateX(-50%);
+	}
+}
+
+/* ===== MOBILE RESPONSIVE UTILITIES ===== */
+
+/* Ensure images don't overflow */
+img {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Smooth scrolling for mobile */
+html {
+	scroll-behavior: smooth;
+	-webkit-overflow-scrolling: touch;
+}
+

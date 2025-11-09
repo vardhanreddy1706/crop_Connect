@@ -366,6 +366,43 @@ exports.workerAcceptHireRequest = async (req, res) => {
 		const durationDays = durationMatch ? parseInt(durationMatch[1]) : 1;
 		const totalCost = hireRequest.agreedAmount * durationDays;
 
+		// Parse booking date and calculate time slot (for workers, duration is in days)
+		const requested = new Date(hireRequest.workDetails.startDate || Date.now());
+		const bookingStartTime = new Date(requested);
+		bookingStartTime.setHours(0, 0, 0, 0); // Start of day
+		const bookingEndTime = new Date(bookingStartTime);
+		bookingEndTime.setDate(bookingEndTime.getDate() + durationDays);
+		bookingEndTime.setHours(23, 59, 59, 999); // End of last day
+
+		// Enforce: worker not double-booked during overlapping time slot
+		const overlappingBookings = await Booking.find({
+			tractorOwnerId: req.user._id,
+			serviceType: "worker",
+			status: { $in: ["pending", "confirmed", "in_progress"] },
+		});
+
+		for (const existingBooking of overlappingBookings) {
+			const existingStart = new Date(existingBooking.bookingDate);
+			existingStart.setHours(0, 0, 0, 0);
+			const existingDurationDays = parseFloat(existingBooking.duration || 1);
+			const existingEnd = new Date(existingStart);
+			existingEnd.setDate(existingEnd.getDate() + existingDurationDays);
+			existingEnd.setHours(23, 59, 59, 999);
+
+			// Check if time slots overlap
+			const timeOverlaps = 
+				(bookingStartTime >= existingStart && bookingStartTime < existingEnd) ||
+				(bookingEndTime > existingStart && bookingEndTime <= existingEnd) ||
+				(bookingStartTime <= existingStart && bookingEndTime >= existingEnd);
+
+			if (timeOverlaps) {
+				return res.status(400).json({
+					success: false,
+					message: `You are already booked from ${existingStart.toLocaleDateString()} for ${existingDurationDays} day(s). Please choose a different time slot.`,
+				});
+			}
+		}
+
 // Enforce: female worker only booked once
 		if (req.user.gender === "female") {
 			const existing = await hasActiveWorkerBooking(req.user._id);
@@ -384,7 +421,7 @@ exports.workerAcceptHireRequest = async (req, res) => {
 			serviceType: "worker",
 			serviceId: hireRequest.workerService?._id,
 			serviceModel: "WorkerService",
-			bookingDate: hireRequest.workDetails.startDate,
+			bookingDate: requested,
 			duration: durationDays,
 			totalCost: totalCost,
 			location: hireRequest.workDetails.location,
@@ -398,12 +435,11 @@ exports.workerAcceptHireRequest = async (req, res) => {
 		hireRequest.bookingId = booking._id;
 		await hireRequest.save();
 
-		// Update worker service availability and booking status
+		// Update worker service booking status (availability checked dynamically based on time slots)
 		if (hireRequest.workerService) {
 			await WorkerService.findByIdAndUpdate(
 				hireRequest.workerService._id,
 				{
-					availability: false,
 					bookingStatus: "booked",
 					currentBookingId: booking._id,
 				},

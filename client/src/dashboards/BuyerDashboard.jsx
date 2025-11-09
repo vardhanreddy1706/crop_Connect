@@ -19,6 +19,7 @@ import {
 	faMapMarkerAlt,
 	faCalendar,
 	faTruck,
+	faStar,
 } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -27,10 +28,15 @@ import DashboardFooter from "../components/DashboardFooter";
 import api from "../config/api";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
+import RatingModal from "../components/RatingModal";
+import MyRatingsTab from "../components/MyRatingsTab";
+import RatingsReceivedTab from "../components/RatingsRecieved";
 
 // Helper functions
-const getAvailableQuantity = (item) =>
-	Number(item?.availableQuantity || item?.crop?.quantity || 999);
+const getAvailableQuantity = (item) => {
+	const v = item?.availableQuantity ?? item?.crop?.quantity ?? item?.available ?? 0;
+	return Number(v);
+};
 const getItemId = (item) =>
 	item?.itemId?.toString() ||
 	item?.crop?._id?.toString() ||
@@ -67,6 +73,26 @@ function BuyerDashboard() {
 	const [loading, setLoading] = useState(true);
 	const [processing, setProcessing] = useState(false);
 	const [isConnected, setIsConnected] = useState(false);
+
+	// Pagination states
+	const itemsPerPage = 3;
+	const [pageOrders, setPageOrders] = useState(0);
+	const [pageTransactions, setPageTransactions] = useState(0);
+
+	// Rating modal state
+	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
+
+	// Check if already rated helper function
+	const checkIfRated = async (rateeId, transactionRef) => {
+		try {
+			const response = await api.get('/ratings/can-rate', {
+				params: { rateeId, ...transactionRef }
+			});
+			return response.data;
+		} catch (error) {
+			return { canRate: true };
+		}
+	};
 
 	// Checkout modal form state
 	const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -571,6 +597,28 @@ function BuyerDashboard() {
 								<FontAwesomeIcon icon={faCreditCard} className="mr-2" />
 								{tr("Transaction History")}
 							</button>
+							<button
+								onClick={() => setActiveTab("my-ratings")}
+								className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 ${
+									activeTab === "my-ratings"
+										? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
+										: "text-gray-600 hover:bg-gray-50"
+								}`}
+							>
+								<FontAwesomeIcon icon={faStar} className="mr-2" />
+								{tr("My Ratings")}
+							</button>
+							<button
+								onClick={() => setActiveTab("ratings-received")}
+								className={`flex-1 py-4 px-6 text-center font-semibold transition-all duration-200 ${
+									activeTab === "ratings-received"
+										? "bg-gradient-to-r from-green-500 to-emerald-600 text-white border-b-4 border-green-600"
+										: "text-gray-600 hover:bg-gray-50"
+								}`}
+							>
+								<FontAwesomeIcon icon={faStar} className="mr-2" />
+								{tr("Reviews")}
+							</button>
 						</div>
 					</div>
 
@@ -600,7 +648,13 @@ function BuyerDashboard() {
 									</button>
 								</div>
 							) : (
-								orders.map((order) => (
+								<>
+									{orders
+										.slice(
+											pageOrders * itemsPerPage,
+											pageOrders * itemsPerPage + itemsPerPage
+										)
+										.map((order) => (
 									<div
 										key={order._id}
 										className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border-l-4 border-green-500"
@@ -720,85 +774,85 @@ function BuyerDashboard() {
 
 										{/* Vehicle & Pickup Details */}
 										{order.vehicleDetails && (
-											<div className="grid md:grid-cols-2 gap-4 mb-4 p-4 bg-blue-50 rounded-xl">
-												<div>
-													<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-														<FontAwesomeIcon
-															icon={faTruck}
-															className="text-blue-600"
-														/>
-														{tr("Vehicle Details")}
-													</h4>
-													<p className="text-sm">
-														<strong>{tr("Type:")}</strong>{" "}
-														{order.vehicleDetails.vehicleType}
-													</p>
-													<p className="text-sm">
-														<strong>{tr("Number:")}</strong>{" "}
-														{order.vehicleDetails.vehicleNumber}
-													</p>
-													<p className="text-sm">
-														<strong>{tr("Driver:")}</strong>{" "}
-														{order.vehicleDetails.driverName}
-													</p>
-													<p className="text-sm">
-														<strong>{tr("Phone:")}</strong>{" "}
-														<a
-															href={`tel:${order.vehicleDetails.driverPhone}`}
-															className="text-blue-600 hover:underline"
-														>
-															{order.vehicleDetails.driverPhone}
-														</a>
-													</p>
-												</div>
-												<div>
-													<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-														<FontAwesomeIcon
-															icon={faCalendar}
-															className="text-blue-600"
-														/>
-														{tr("Pickup Schedule")}
-													</h4>
-													<p className="text-sm">
-														<strong>{tr("Date:")}</strong>{" "}
-														{new Date(
-															order.pickupSchedule.date
-														).toLocaleDateString("en-IN")}
-													</p>
-													<p className="text-sm capitalize">
-														<strong>{tr("Time:")}</strong>{" "}
-														{order.pickupSchedule.timeSlot}
-													</p>
-													<p className="text-sm mt-2">
-														<strong>{tr("Payment:")}</strong>{" "}
-														<span
-															className={`font-semibold ${
-																order.paymentStatus === "completed"
-																	? "text-green-600"
-																	: "text-orange-600"
-															}`}
-														>
-															{order.paymentMethod === "razorpay"
-																? "Paid Online"
-																: "Pay After Delivery"}{" "}
-															({order.paymentStatus})
-														</span>
-													</p>
-												</div>
+											<div className="grid md:grid-cols-2 gap-4 mb-4 p-4 bg-blue-900 border-2 border-blue-200 rounded-xl">
+														<div>
+															<h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-white">
+																<FontAwesomeIcon
+																	icon={faTruck}
+																	className="text-blue-400"
+																/>
+																{tr("Vehicle Details")}
+															</h4>
+															<p className="text-sm text-gray-300">
+																<strong className="text-white">{tr("Type:")}</strong>{" "}
+																{order.vehicleDetails.vehicleType}
+															</p>
+															<p className="text-sm text-gray-300">
+																<strong className="text-white">{tr("Number:")}</strong>{" "}
+																{order.vehicleDetails.vehicleNumber}
+															</p>
+															<p className="text-sm text-gray-300">
+																<strong className="text-white">{tr("Driver:")}</strong>{" "}
+																{order.vehicleDetails.driverName}
+															</p>
+															<p className="text-sm text-gray-300">
+																<strong className="text-white">{tr("Phone:")}</strong>{" "}
+																<a
+																	href={`tel:${order.vehicleDetails.driverPhone}`}
+																	className="text-blue-400 hover:underline font-semibold"
+																>
+																	{order.vehicleDetails.driverPhone}
+																</a>
+															</p>
+														</div>
+														<div>
+															<h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-white">
+																<FontAwesomeIcon
+																	icon={faCalendar}
+																	className="text-blue-400"
+																/>
+																{tr("Pickup Schedule")}
+															</h4>
+															<p className="text-sm text-gray-300">
+																<strong className="text-white">{tr("Date:")}</strong>{" "}
+																{new Date(
+																	order.pickupSchedule.date
+																).toLocaleDateString("en-IN")}
+															</p>
+															<p className="text-sm capitalize text-gray-300">
+																<strong className="text-white">{tr("Time:")}</strong>{" "}
+																{order.pickupSchedule.timeSlot}
+															</p>
+															<p className="text-sm mt-2 text-gray-300">
+																<strong className="text-white">{tr("Payment:")}</strong>{" "}
+																<span
+																	className={`font-semibold ${
+																		order.paymentStatus === "completed"
+																			? "text-green-400"
+																			: "text-orange-400"
+																	}`}
+																>
+																	{order.paymentMethod === "razorpay"
+																		? "Paid Online"
+																		: "Pay After Delivery"}{" "}
+																	({order.paymentStatus})
+																</span>
+															</p>
+														</div>
 											</div>
 										)}
 
 										{/* Pick-up Address (Farmer/Seller) */}
-										<div className="mb-4 p-4 bg-green-50 rounded-xl">
-											<h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
+										<div className="mb-4 p-4 bg-green-900 border-2 border-green-200 rounded-xl">
+											<h4 className="font-semibold text-sm mb-2 flex items-center gap-2 text-white">
 												<FontAwesomeIcon
 													icon={faMapMarkerAlt}
-													className="text-green-600"
+													className="text-green-400"
 												/>
 												{tr("Pick-up Address (Farmer)")}
 											</h4>
 											{order.seller?.address ? (
-												<p className="text-sm">
+												<p className="text-sm text-gray-200">
 													{order.seller.address.village || ""}
 													{order.seller.address.village ? ", " : ""}
 													{order.seller.address.district || ""}
@@ -807,7 +861,7 @@ function BuyerDashboard() {
 													{order.seller.address.pincode || ""}
 												</p>
 											) : (
-												<p className="text-sm text-gray-600">
+												<p className="text-sm text-gray-300">
 													{order.deliveryAddress?.fullAddress ||
 														tr("Address not available")}
 												</p>
@@ -819,9 +873,9 @@ function BuyerDashboard() {
 											<span className="text-lg font-semibold text-gray-800">
 												{tr("Order Total")}
 											</span>
-											<span className="text-2xl font-bold text-green-600">
-												₹{order.totalAmount.toLocaleString()}
-											</span>
+												<span className="text-2xl font-bold text-white">
+													₹{order.totalAmount.toLocaleString()}
+												</span>
 										</div>
 
 										{/* Actions */}
@@ -845,9 +899,91 @@ function BuyerDashboard() {
 													{tr("Mark as Received")}
 												</button>
 											)}
+											{order.status === "completed" && (
+												<button
+													onClick={async () => {
+														const sellerId = typeof order.seller === 'string' ? order.seller : order.seller?._id;
+														if (!sellerId) {
+															toast.error('Seller information missing');
+															return;
+														}
+														const canRateData = await checkIfRated(
+															sellerId,
+															{ relatedOrder: order._id }
+														);
+														if (canRateData.canRate) {
+															setRatingModal({
+																isOpen: true,
+																data: {
+																	rateeId: sellerId,
+																	rateeName: order.seller?.name || 'Farmer',
+																	rateeRole: 'farmer',
+																	ratingType: 'buyer_to_farmer',
+																	relatedOrder: order._id,
+																}
+															});
+														} else {
+															toast.info('You have already rated this farmer');
+														}
+													}}
+													className="flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+												>
+													<FontAwesomeIcon icon={faStar} />
+													{tr("Rate Farmer")}
+												</button>
+											)}
 										</div>
+
+										{/* Order Items */}
+										<div className="space-y-3 mb-6">
+										{order.items.map((item, i) => (
+											<div
+												key={i}
+												className="flex justify-between items-center bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-xl hover:shadow-md transition-shadow"
+											>
+												<div className="flex-1">
+													<p className="font-bold text-gray-900">
+														{getItemName(item)}
+													</p>
+													<p className="text-sm text-gray-600">
+														{getQuantity(item)} {getItemUnit(item)} × ₹{getUnitPrice(item)}
+													</p>
+												</div>
+												<p className="text-lg font-bold text-green-600">
+													₹{(getQuantity(item) * getUnitPrice(item)).toLocaleString()}
+												</p>
+											</div>
+										))}
 									</div>
-								))
+								</div>
+								))}
+								{/* Pagination */}
+								{orders.length > itemsPerPage && (
+									<div className="flex justify-end items-center gap-2 mt-6">
+										<button
+											onClick={() => setPageOrders(Math.max(0, pageOrders - 1))}
+											disabled={pageOrders === 0}
+											className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+										>
+											{tr("Prev")}
+										</button>
+										<button
+											onClick={() =>
+												setPageOrders(
+													(pageOrders + 1) %
+														Math.ceil(orders.length / itemsPerPage)
+												)
+											}
+											disabled={
+												pageOrders >= Math.ceil(orders.length / itemsPerPage) - 1
+											}
+											className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+										>
+											{tr("Next")}
+										</button>
+									</div>
+								)}
+							</>
 							)}
 						</div>
 					) : activeTab === "transactions" ? (
@@ -855,22 +991,30 @@ function BuyerDashboard() {
 							<h3 className="text-xl font-bold text-gray-800 mb-4">
 								Transaction History
 							</h3>
-							{orders.length === 0 ? (
-								<p className="text-gray-500">No transactions yet.</p>
-							) : (
-								<div className="space-y-3">
-									{orders
-										.filter(
-											(o) =>
-												(o.paymentMethod === "razorpay" &&
-													o.razorpayPaymentId) ||
-												(o.paymentMethod === "payAfterDelivery" &&
-													o.paymentStatus === "completed")
-										)
-										.sort(
-											(a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-										)
-										.map((o) => (
+							{(() => {
+								const transactions = orders
+									.filter(
+										(o) =>
+											(o.paymentMethod === "razorpay" &&
+												o.razorpayPaymentId) ||
+											(o.paymentMethod === "payAfterDelivery" &&
+												o.paymentStatus === "completed")
+									)
+									.sort(
+										(a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+									);
+								
+								return transactions.length === 0 ? (
+									<p className="text-gray-500">No transactions yet.</p>
+								) : (
+									<>
+										<div className="space-y-3">
+											{transactions
+												.slice(
+													pageTransactions * itemsPerPage,
+													pageTransactions * itemsPerPage + itemsPerPage
+												)
+												.map((o) => (
 											<div
 												key={o._id}
 												className="border border-gray-200 rounded-xl p-4 hover:shadow-sm"
@@ -934,10 +1078,42 @@ function BuyerDashboard() {
 													</div>
 												)}
 											</div>
-										))}
-								</div>
-							)}
+												))}
+										</div>
+										{/* Pagination */}
+										{transactions.length > itemsPerPage && (
+											<div className="flex justify-end items-center gap-2 mt-4">
+												<button
+													onClick={() => setPageTransactions(Math.max(0, pageTransactions - 1))}
+													disabled={pageTransactions === 0}
+													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Prev")}
+												</button>
+												<button
+													onClick={() =>
+														setPageTransactions(
+															(pageTransactions + 1) %
+																Math.ceil(transactions.length / itemsPerPage)
+														)
+													}
+													disabled={
+														pageTransactions >= Math.ceil(transactions.length / itemsPerPage) - 1
+													}
+													className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+												>
+													{tr("Next")}
+												</button>
+											</div>
+										)}
+									</>
+								);
+							})()}
 						</div>
+					) : activeTab === "my-ratings" ? (
+						<MyRatingsTab />
+					) : activeTab === "ratings-received" ? (
+						<RatingsReceivedTab />
 					) : (
 						<div className="bg-white rounded-2xl shadow-lg p-8">
 							{cart.length === 0 ? (
@@ -1174,7 +1350,7 @@ function BuyerDashboard() {
 															vehicleType: e.target.value,
 														})
 													}
-													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 bg-white text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
 												>
 													<option value="">Select Vehicle Type</option>
 													<option value="Truck">Truck</option>
@@ -1197,7 +1373,7 @@ function BuyerDashboard() {
 														})
 													}
 													placeholder="e.g., MH12AB1234"
-													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 bg-white text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
 												/>
 											</div>
 											<div>
@@ -1214,7 +1390,7 @@ function BuyerDashboard() {
 														})
 													}
 													placeholder="Driver's Full Name"
-													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 bg-white text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
 												/>
 											</div>
 											<div>
@@ -1231,7 +1407,7 @@ function BuyerDashboard() {
 														})
 													}
 													placeholder="10-digit mobile number"
-													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 bg-white text-gray-900 placeholder:text-gray-400 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
 												/>
 											</div>
 										</div>
@@ -1261,7 +1437,7 @@ function BuyerDashboard() {
 														})
 													}
 													min={new Date().toISOString().split("T")[0]}
-													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 bg-white text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
 												/>
 											</div>
 											<div>
@@ -1276,7 +1452,7 @@ function BuyerDashboard() {
 															timeSlot: e.target.value,
 														})
 													}
-													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
+													className="w-full border-2 border-gray-300 rounded-xl px-4 py-3 bg-white text-gray-900 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all"
 												>
 													<option value="morning">
 														🌅 Morning (6 AM - 12 PM)
@@ -1421,10 +1597,43 @@ function BuyerDashboard() {
 											) : (
 												<>
 													<FontAwesomeIcon icon={faCheckCircle} />
-													Place Order
+													{tr("Mark as Received")}
 												</>
 											)}
 										</button>
+										{order.status === "completed" && (
+											<button
+												onClick={async () => {
+													const sellerId = typeof order.seller === 'string' ? order.seller : order.seller?._id;
+													if (!sellerId) {
+														toast.error('Seller information missing');
+														return;
+													}
+													const canRateData = await checkIfRated(
+														sellerId,
+														{ relatedOrder: order._id }
+													);
+													if (canRateData.canRate) {
+														setRatingModal({
+															isOpen: true,
+															data: {
+																rateeId: sellerId,
+																rateeName: order.seller?.name || 'Farmer',
+																rateeRole: 'farmer',
+																ratingType: 'buyer_to_farmer',
+																relatedOrder: order._id,
+															}
+														});
+													} else {
+														toast.info('You have already rated this farmer');
+													}
+												}}
+												className="flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-6 py-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+											>
+												<FontAwesomeIcon icon={faStar} />
+												{tr("Rate Farmer")}
+											</button>
+										)}
 									</div>
 								</div>
 							</div>
@@ -1450,6 +1659,16 @@ function BuyerDashboard() {
 					}
 					role="Buyer"
 					fullWidth
+				/>
+
+				{/* Rating Modal */}
+				<RatingModal
+					isOpen={ratingModal.isOpen}
+					onClose={() => setRatingModal({ isOpen: false, data: null })}
+					{...ratingModal.data}
+					onRatingSubmitted={() => {
+						fetchOrders();
+					}}
 				/>
 			</div>
 		</div>

@@ -3,12 +3,13 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import { LanguageProvider } from "./context/LanguageContext";
 import { Toaster } from "react-hot-toast";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
 	<React.StrictMode>
-		
+		<LanguageProvider>
 			<AuthProvider>
 				<NotificationProvider>
 					<App />
@@ -36,6 +37,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 					/>
 				</NotificationProvider>
 			</AuthProvider>
-		
+		</LanguageProvider>
 	</React.StrictMode>
 );

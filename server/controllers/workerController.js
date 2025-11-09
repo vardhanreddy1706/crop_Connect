@@ -147,15 +147,23 @@ exports.createWorkerService = async (req, res) => {
 // @access Public
 const getAvailableWorkers = async (req, res) => {
 	try {
-		const { workerType, location, maxCharge, minExperience } = req.query;
+		const { workerType, location, maxCharge, minExperience, village, district, state } = req.query;
 		const query = { availability: true };
 
 		if (workerType) {
 			query.workerType = workerType;
 		}
 
-		if (location) {
-			query["location.district"] = new RegExp(location, "i");
+		if (location) query["location.district"] = new RegExp(location, "i");
+		if (village) query["location.village"] = new RegExp(village, "i");
+		if (district) query["location.district"] = new RegExp(district, "i");
+		if (state) query["location.state"] = new RegExp(state, "i");
+
+		// Auto-defaults for farmers: show same-village workers if no filters supplied
+		if (!village && !district && !state && req.user?.role === "farmer") {
+			if (req.user.address?.village) query["location.village"] = new RegExp(req.user.address.village, "i");
+			if (req.user.address?.district) query["location.district"] = new RegExp(req.user.address.district, "i");
+			if (req.user.address?.state) query["location.state"] = new RegExp(req.user.address.state, "i");
 		}
 
 		if (maxCharge) {
@@ -166,9 +174,44 @@ const getAvailableWorkers = async (req, res) => {
 			query.experience = { $gte: Number(minExperience) };
 		}
 
-		const workers = await WorkerService.find(query)
+		let workers = await WorkerService.find(query)
 			.populate("worker", "name phone email")
-			.sort({ createdAt: -1 });
+			.sort({ createdAt: -1 })
+			.lean();
+
+		// Reflect engagement if any active booking exists for the worker service
+		const serviceIds = workers.map((w) => w._id);
+		const activeStatuses = ["pending", "confirmed", "in_progress"];
+		const activeBookings = await require("../models/Booking").find({
+			serviceId: { $in: serviceIds },
+			serviceType: "worker",
+			status: { $in: activeStatuses },
+		}).select("serviceId bookingDate duration").lean();
+		
+		// Group bookings by service ID
+		const bookingsByService = {};
+		activeBookings.forEach((b) => {
+			const serviceIdStr = String(b.serviceId);
+			if (!bookingsByService[serviceIdStr]) {
+				bookingsByService[serviceIdStr] = [];
+			}
+			bookingsByService[serviceIdStr].push({
+				start: new Date(b.bookingDate),
+				durationDays: parseFloat(b.duration || 1),
+			});
+		});
+		
+		// Mark workers with active bookings
+		workers = workers.map((s) => {
+			const serviceIdStr = String(s._id);
+			const hasActiveBookings = bookingsByService[serviceIdStr] && bookingsByService[serviceIdStr].length > 0;
+			return {
+				...s,
+				bookingStatus: hasActiveBookings ? "booked" : (s.bookingStatus || "available"),
+				availability: hasActiveBookings ? false : s.availability,
+				activeBookings: bookingsByService[serviceIdStr] || [],
+			};
+		});
 
 		res.status(200).json({
 			success: true,

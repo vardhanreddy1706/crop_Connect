@@ -42,6 +42,16 @@ const tractorServiceSchema = new mongoose.Schema(
 			required: [true, "Please provide charge per acre"],
 			min: 0,
 		},
+		chargePerHour: {
+			type: Number,
+			min: 0,
+		},
+		workingDuration: {
+			type: Number, // Duration in hours
+			default: 8,
+			min: 1,
+			max: 24,
+		},
 		location: {
 			village: String,
 			district: String,

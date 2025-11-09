@@ -51,3 +51,97 @@
 .animation-delay-4000 {
 	animation-delay: 4s;
 }
+
+/* Dark Mode Support */
+:root {
+	--bg-primary: #ffffff;
+	--bg-secondary: #f9fafb;
+	--text-primary: #111827;
+	--text-secondary: #6b7280;
+	--border-color: #e5e7eb;
+	--accent-color: #10b981;
+}
+
+.dark {
+	--bg-primary: #1f2937;
+	--bg-secondary: #111827;
+	--text-primary: #f9fafb;
+	--text-secondary: #d1d5db;
+	--border-color: #374151;
+	--accent-color: #10b981;
+}
+
+.dark {
+	color-scheme: dark;
+}
+
+/* Loading Skeleton Animation */
+@keyframes shimmer {
+	0% {
+		background-position: -1000px 0;
+	}
+	100% {
+		background-position: 1000px 0;
+	}
+}
+
+.animate-shimmer {
+	animation: shimmer 2s infinite linear;
+	background: linear-gradient(
+		to right,
+		#f0f0f0 0%,
+		#e0e0e0 50%,
+		#f0f0f0 100%
+	);
+	background-size: 1000px 100%;
+}
+
+.dark .animate-shimmer {
+	background: linear-gradient(
+		to right,
+		#374151 0%,
+		#4b5563 50%,
+		#374151 100%
+	);
+	background-size: 1000px 100%;
+}
+
+/* Smooth Transitions */
+* {
+	transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+	width: 12px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--accent-color);
+	border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: #059669;
+}
+
+/* Focus Styles for Accessibility */
+*:focus-visible {
+	outline: 2px solid var(--accent-color);
+	outline-offset: 2px;
+}
+
+/* Loading Spinner */
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.animate-spin-slow {
+	animation: spin 3s linear infinite;
+}

@@ -64,16 +64,27 @@ exports.getTransactionDashboard = async (req, res) => {
 		};
 
 		// Get pending bookings - optimized
-		const pendingPaymentBookings = await Booking.find({
-			[userRole === "farmer" ? "farmer" : "serviceId"]: userId,
+        const pendingPaymentBookings = await Booking.find({
+            [userRole === "farmer" ? "farmer" : "tractorOwnerId"]: userId,
 			status: "completed",
 			paymentStatus: "pending",
 		})
 			.populate("farmer", "name phone")
-			.populate("serviceId", "name phone")
+            .populate("tractorOwnerId", "name phone")
 			.sort({ updatedAt: -1 })
 			.limit(10)
 			.lean();
+
+		// Add pending bookings amounts to pending stats
+		const pendingBookingsAmount = pendingPaymentBookings.reduce(
+			(sum, booking) => sum + (booking.totalCost || 0),
+			0
+		);
+		const pendingBookingsCount = pendingPaymentBookings.length;
+
+		// Update final stats to include pending bookings
+		finalStats.pendingAmount = (finalStats.pendingAmount || 0) + pendingBookingsAmount;
+		finalStats.pendingTransactions = (finalStats.pendingTransactions || 0) + pendingBookingsCount;
 
 		res.status(200).json({
 			success: true,
@@ -121,24 +132,27 @@ const booking = await Booking.findById(bookingId)
 				.status(400)
 				.json({ success: false, message: "Payment already completed" });
 
-		const transaction = await Transaction.create({
-			bookingId,
-			farmerId: booking.farmer._id,
-			tractorOwnerId: booking.serviceId._id,
-			amount: booking.totalCost,
-			method: paymentMethod,
-			status: "completed",
-			notes: `Payment for ${booking.workType} work`,
-		});
+        const transaction = await Transaction.create({
+            bookingId,
+            farmerId: booking.farmer._id,
+            // Use the provider user id for both tractor and worker flows
+            tractorOwnerId: booking.tractorOwnerId,
+            // Record workerId when this is a worker service booking
+            workerId: booking.serviceType === "worker" ? booking.tractorOwnerId : undefined,
+            amount: booking.totalCost,
+            method: paymentMethod,
+            status: "completed",
+            notes: `Payment for ${booking.workType} work`,
+        });
 
 		booking.paymentStatus = "paid";
 		await booking.save();
 
-		await Notification.create({
-			recipientId: booking.serviceId._id,
+        await Notification.create({
+            recipientId: booking.tractorOwnerId,
 			type: "payment_received",
 			title: "💰 Payment Received",
-			message: `You received ₹${booking.totalCost} from ${booking.farmer.name} for ${booking.workType} work`,
+            message: `You received ₹${booking.totalCost} from ${booking.farmer.name} for ${booking.workType} work`,
 			relatedBookingId: bookingId,
 			data: {
 				amount: booking.totalCost,
@@ -152,12 +166,12 @@ const booking = await Booking.findById(bookingId)
 			recipientId: booking.farmer._id,
 			type: "payment_sent",
 			title: "✅ Payment Completed",
-			message: `Payment of ₹${booking.totalCost} sent successfully to ${booking.serviceId.name}`,
+            message: `Payment of ₹${booking.totalCost} sent successfully`,
 			relatedBookingId: bookingId,
 			data: {
 				amount: booking.totalCost,
 				paymentMethod,
-				tractorOwnerName: booking.serviceId.name,
+                tractorOwnerName: undefined,
 				workType: booking.workType,
 			},
 		});
@@ -178,8 +192,8 @@ const booking = await Booking.findById(bookingId)
 			console.error("Email notify (payAfterWorkCompletion) error:", e.message);
 		}
 
-		if (req.io) {
-			req.io.to(booking.serviceId._id.toString()).emit("notification", {
+        if (req.io) {
+            req.io.to(booking.tractorOwnerId.toString()).emit("notification", {
 				type: "payment_received",
 				title: "💰 Payment Received",
 				message: `You received ₹${booking.totalCost} from ${booking.farmer.name}`,
@@ -433,25 +447,30 @@ if (expectedSignature !== signature) {
 	}
 };
 exports.getWorkerTransactions = async (req, res) => {
-	try {
-		const transactions = await Transaction.find({
-			$or: [{ senderId: req.user.id }, { receiverId: req.user.id }],
-		})
-			.populate("senderId", "name email")
-			.populate("receiverId", "name email")
-			.populate("bookingId")
-			.sort({ createdAt: -1 });
+    try {
+        const userId = req.user._id;
+        const transactions = await Transaction.find({
+            $or: [
+                { tractorOwnerId: userId }, // service provider for both tractor and worker
+                { workerId: userId }, // explicit worker linkage if recorded
+            ],
+        })
+            .populate("bookingId")
+            .populate("farmerId", "name phone")
+            .populate("tractorOwnerId", "name phone")
+            .populate("workerId", "name phone")
+            .sort({ createdAt: -1 });
 
-		res.status(200).json({
-			success: true,
-			count: transactions.length,
-			transactions,
-		});
-	} catch (error) {
-		console.error("Get worker transactions error:", error);
-		res.status(500).json({
-			success: false,
-			message: error.message || "Failed to fetch transactions",
-		});
-	}
+        res.status(200).json({
+            success: true,
+            count: transactions.length,
+            transactions,
+        });
+    } catch (error) {
+        console.error("Get worker transactions error:", error);
+        res.status(500).json({
+            success: false,
+            message: error.message || "Failed to fetch transactions",
+        });
+    }
 };

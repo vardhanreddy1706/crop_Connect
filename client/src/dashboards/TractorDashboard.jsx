@@ -25,6 +25,7 @@ import {
 	Package,
 	Activity,
 	Briefcase,
+	Star,
 } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
@@ -34,6 +35,9 @@ import LanguageSelector from "../components/LanguageSelector";
 import DashboardNavbar from "../components/DashboardNavbar";
 import DashboardFooter from "../components/DashboardFooter";
 import { useLanguage } from "../context/LanguageContext";
+import RatingModal from "../components/RatingModal";
+import MyRatingsTab from "../components/MyRatingsTab";
+import RatingsReceivedTab from "../components/RatingsRecieved";
 
 const TractorDashboard = () => {
 	const { user, logout } = useAuth();
@@ -46,7 +50,7 @@ const TractorDashboard = () => {
 
 	// ==================== STATE MANAGEMENT ====================
 	const [activeTab, setActiveTab] = useState("overview");
-	const [myWorkSubTab, setMyWorkSubTab] = useState("accepted"); // NEW: subtab for My Work
+	const [myWorkSubTab, setMyWorkSubTab] = useState("active"); // Default to Active Work subtab
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 
@@ -78,6 +82,14 @@ const TractorDashboard = () => {
 		status: "",
 	});
 
+	// Pagination states
+	const itemsPerPage = 3;
+	const [pageNotifications, setPageNotifications] = useState(0);
+	const [pageRequirements, setPageRequirements] = useState(0);
+	const [pageMyWork, setPageMyWork] = useState(0);
+	const [pageServices, setPageServices] = useState(0);
+	const [pagePayments, setPagePayments] = useState(0);
+
 // New service form
 const [newService, setNewService] = useState({
 	brand: "",
@@ -86,6 +98,8 @@ const [newService, setNewService] = useState({
 	typeOfPlowing: "",
 	landType: "",
 	chargePerAcre: "",
+	chargePerHour: "",
+	workingDuration: "8", // Default 8 hours
 	location: { district: "", state: "", village: "", pincode: "" },
 	contactNumber: user?.phone || "",
 	availability: true,
@@ -99,6 +113,21 @@ const [newService, setNewService] = useState({
 		proposedDuration: "1",
 		message: "",
 	});
+
+	// Rating modal state
+	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
+
+	// Check if already rated helper function
+	const checkIfRated = async (rateeId, transactionRef) => {
+		try {
+			const response = await api.get('/ratings/can-rate', {
+				params: { rateeId, ...transactionRef }
+			});
+			return response.data;
+		} catch (error) {
+			return { canRate: true };
+		}
+	};
 
 	// ==================== DATA FETCHING ====================
 	const fetchAllData = useCallback(async () => {
@@ -162,6 +191,24 @@ api.get("/tractor-requirements", { params: { district: user?.address?.district, 
 		fetchAllData();
 	}, [fetchAllData]);
 
+	// ✅ Periodically refresh data to update active work status and auto-complete expired bookings
+	useEffect(() => {
+		const interval = setInterval(async () => {
+			if (activeTab === "mywork") {
+				// Call auto-complete endpoint to mark expired bookings as complete
+				try {
+					await api.post("/bookings/auto-complete");
+				} catch (error) {
+					console.error("Auto-complete error:", error);
+				}
+				// Refresh data to show updated status
+				fetchAllData();
+			}
+		}, 60000); // Refresh every minute
+
+		return () => clearInterval(interval);
+	}, [activeTab, fetchAllData]);
+
 // ==================== SERVICE POSTING ====================
 const handleCreateService = async (e) => {
 	e.preventDefault();
@@ -190,6 +237,8 @@ setShowServiceForm(false);
 					typeOfPlowing: "",
 					landType: "",
 					chargePerAcre: "",
+					chargePerHour: "",
+					workingDuration: "8",
 					location: { district: "", state: "", village: "", pincode: "" },
 					contactNumber: user?.phone || "",
 					availability: true,
@@ -198,7 +247,8 @@ setShowServiceForm(false);
 				});
 			fetchAllData();
 		} catch (error) {
-			toast.error(error.message || "Failed to post service");
+			const errorMessage = error.response?.data?.message || error.message || tr("Failed to post service");
+			toast.error(errorMessage);
 		}
 	};
 
@@ -266,10 +316,10 @@ setShowServiceForm(false);
 	// ==================== RENDER ====================
 	if (loading) {
 		return (
-			<div className="min-h-screen bg-gray-50 flex items-center justify-center">
+			<div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
 				<div className="text-center">
 								<div className="animate-spin rounded-full h-16 w-16 border-b-4 border-green-600 mx-auto mb-4"></div>
-								<p className="text-gray-600 text-lg">{tr("Loading your dashboard...")}</p>
+								<p className="text-gray-600 dark:text-gray-300 text-lg">{tr("Loading your dashboard...")}</p>
 				</div>
 			</div>
 		);
@@ -290,6 +340,8 @@ setShowServiceForm(false);
 					{ id: "mywork", label: tr("My Work"), icon: Briefcase, badge: stats.acceptedWork },
 					{ id: "services", label: tr("My Services"), icon: Settings, badge: stats.totalServices },
 					{ id: "payments", label: tr("Payments"), icon: IndianRupee },
+					{ id: "my-ratings", label: tr("My Ratings"), icon: Star },
+					{ id: "ratings-received", label: tr("Reviews"), icon: Star },
 				]}
 				activeTab={activeTab}
 				onTabChange={setActiveTab}
@@ -304,6 +356,9 @@ setShowServiceForm(false);
 						dashboardData={dashboardData}
 						notifications={notifications}
 						setActiveTab={setActiveTab}
+						pageNotifications={pageNotifications}
+						setPageNotifications={setPageNotifications}
+						itemsPerPage={itemsPerPage}
 					/>
 				)}
 
@@ -316,29 +371,53 @@ setShowServiceForm(false);
 						setFilters={setFilters}
 						onPlaceBid={(req) => setShowBidModal(req)}
 						myBids={myBids}
+						pageRequirements={pageRequirements}
+						setPageRequirements={setPageRequirements}
+						itemsPerPage={itemsPerPage}
 					/>
 				)}
 
 				{activeTab === "mywork" && (
-					<MyWorkTab
-						myWork={myWork}
-						activeSubTab={myWorkSubTab}
-						setActiveSubTab={setMyWorkSubTab}
-						onMarkComplete={handleMarkWorkComplete}
-					/>
-				)}
+				<MyWorkTab
+					myWork={myWork}
+					activeSubTab={myWorkSubTab}
+					setActiveSubTab={setMyWorkSubTab}
+					onMarkComplete={handleMarkWorkComplete}
+					pageMyWork={pageMyWork}
+					setPageMyWork={setPageMyWork}
+					itemsPerPage={itemsPerPage}
+					checkIfRated={checkIfRated}
+					setRatingModal={setRatingModal}
+				/>
+			)}
 
 				{activeTab === "services" && (
 					<ServicesTab
 						services={myServices}
 						onCancel={() => {}}
 						onPostNew={() => setShowServiceForm(true)}
+						onWithdraw={async (serviceId) => {
+							try {
+								const response = await api.delete(`/tractors/${serviceId}`);
+								if (response.data.success) {
+									toast.success(tr("Service withdrawn successfully"));
+									fetchAllData();
+								}
+							} catch (error) {
+								console.error("Withdraw service error:", error);
+								toast.error(error.response?.data?.message || tr("Failed to withdraw service"));
+							}
+						}}
 					/>
 				)}
 
 				{activeTab === "payments" && (
 					<PaymentsTab dashboardData={dashboardData} />
 				)}
+
+				{activeTab === "my-ratings" && <MyRatingsTab />}
+
+				{activeTab === "ratings-received" && <RatingsReceivedTab />}
 			</main>
 
 			{/* Dashboard Footer */}
@@ -370,6 +449,16 @@ setShowServiceForm(false);
 					onClose={() => setShowBidModal(null)}
 				/>
 			)}
+
+			{/* Rating Modal */}
+			<RatingModal
+				isOpen={ratingModal.isOpen}
+				onClose={() => setRatingModal({ isOpen: false, data: null })}
+				{...ratingModal.data}
+				onRatingSubmitted={() => {
+					fetchAllData();
+				}}
+			/>
 			</div>
 		</div>
 	);
@@ -377,11 +466,27 @@ setShowServiceForm(false);
 
 // Continue with Part 2...
 // ==================== MY WORK TAB (NEW) ====================
-const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) => {
+const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete, pageMyWork, setPageMyWork, itemsPerPage, checkIfRated, setRatingModal }) => {
     const { tr } = useLanguage();
 
+    // Helper function to check if work is currently active/ongoing
+    const isWorkActive = (work) => {
+        if (work.status !== "confirmed" && work.status !== "in_progress") {
+            return false;
+        }
+        
+        const now = new Date();
+        const bookingStart = new Date(work.bookingDate);
+        const durationHours = parseFloat(work.duration || 8);
+        const bookingEnd = new Date(bookingStart.getTime() + durationHours * 60 * 60 * 1000);
+        
+        // Work is active if current time is between start and end time
+        return now >= bookingStart && now < bookingEnd;
+    };
+
     const filteredWork = myWork.filter((work) => {
-        if (activeSubTab === "accepted") return work.status === "confirmed";
+        if (activeSubTab === "active") return isWorkActive(work);
+        if (activeSubTab === "accepted") return work.status === "confirmed" && !isWorkActive(work);
         if (activeSubTab === "completed") return work.status === "completed";
         if (activeSubTab === "cancelled") return work.status === "cancelled";
         return false;
@@ -410,6 +515,7 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
             {/* Sub Tabs */}
             <div className="flex gap-4 border-b">
                 {[
+                    { id: "active", label: tr("Active Work"), icon: Activity },
                     { id: "accepted", label: tr("Accepted Work"), icon: CheckCircle },
                     { id: "completed", label: tr("Completed"), icon: Package },
                     { id: "cancelled", label: tr("Cancelled"), icon: XCircle },
@@ -428,7 +534,20 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                         <span className="bg-gray-100 px-2 py-0.5 rounded-full text-xs">
                             {
                                 myWork.filter((w) => {
-                                    if (tab.id === "accepted") return w.status === "confirmed";
+                                    if (tab.id === "active") {
+                                        const now = new Date();
+                                        const bookingStart = new Date(w.bookingDate);
+                                        const durationHours = parseFloat(w.duration || 8);
+                                        const bookingEnd = new Date(bookingStart.getTime() + durationHours * 60 * 60 * 1000);
+                                        return (w.status === "confirmed" || w.status === "in_progress") && now >= bookingStart && now < bookingEnd;
+                                    }
+                                    if (tab.id === "accepted") {
+                                        const now = new Date();
+                                        const bookingStart = new Date(w.bookingDate);
+                                        const durationHours = parseFloat(w.duration || 8);
+                                        const bookingEnd = new Date(bookingStart.getTime() + durationHours * 60 * 60 * 1000);
+                                        return w.status === "confirmed" && !(now >= bookingStart && now < bookingEnd);
+                                    }
                                     if (tab.id === "completed") return w.status === "completed";
                                     if (tab.id === "cancelled") return w.status === "cancelled";
                                     return false;
@@ -451,8 +570,14 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                     </p>
                 </div>
             ) : (
+                <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {filteredWork.map((work) => (
+                        {filteredWork
+                            .slice(
+                                pageMyWork * itemsPerPage,
+                                pageMyWork * itemsPerPage + itemsPerPage
+                            )
+                            .map((work) => (
                         <div
                             key={work._id}
                             className="bg-white rounded-xl shadow-sm border-2 border-gray-200 hover:border-green-500 transition-all p-6"
@@ -461,17 +586,20 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                             <div className="flex justify-between items-start mb-4">
                                 <span
                                     className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                                        work.status === "confirmed"
+                                        isWorkActive(work)
+                                            ? "bg-orange-100 text-orange-800 animate-pulse"
+                                            : work.status === "confirmed"
                                             ? "bg-blue-100 text-blue-800"
                                             : work.status === "completed"
                                             ? "bg-green-100 text-green-800"
                                             : "bg-red-100 text-red-800"
                                     }`}
                                 >
-                                    {work.status === "confirmed" && <Clock className="h-3 w-3 mr-1" />}
+                                    {isWorkActive(work) && <Activity className="h-3 w-3 mr-1" />}
+                                    {!isWorkActive(work) && work.status === "confirmed" && <Clock className="h-3 w-3 mr-1" />}
                                     {work.status === "completed" && <CheckCircle className="h-3 w-3 mr-1" />}
                                     {work.status === "cancelled" && <XCircle className="h-3 w-3 mr-1" />}
-                                    {work.status.toUpperCase()}
+                                    {isWorkActive(work) ? tr("ONGOING") : work.status.toUpperCase()}
                                 </span>
                                 <span className="text-2xl font-bold text-green-600">
                                     ₹{work.totalCost}
@@ -552,6 +680,36 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                                         ✅ {tr("Payment Received")}
                                     </div>
                                 )}
+                                {work.status === "completed" && (
+                                    <button
+                                        onClick={async () => {
+                                            const farmerId = typeof work.farmer === 'string' ? work.farmer : work.farmer?._id;
+                                            if (!farmerId) {
+                                                toast.error('Farmer information missing');
+                                                return;
+                                            }
+                                            const canRateData = await checkIfRated(farmerId, { relatedBooking: work._id });
+                                            if (canRateData.canRate) {
+                                                setRatingModal({
+                                                    isOpen: true,
+                                                    data: {
+                                                        rateeId: farmerId,
+                                                        rateeName: work.farmer?.name || 'Farmer',
+                                                        rateeRole: 'farmer',
+                                                        ratingType: 'tractor_owner_to_farmer',
+                                                        relatedBooking: work._id,
+                                                    }
+                                                });
+                                            } else {
+                                                toast.info('You have already rated this farmer');
+                                            }
+                                        }}
+                                        className="flex-1 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-4 py-2 rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition-all flex items-center justify-center space-x-2 text-sm font-medium shadow-md hover:shadow-lg"
+                                    >
+                                        <Star className="h-4 w-4" />
+                                        <span>{tr("Rate Farmer")}</span>
+                                    </button>
+                                )}
                             </div>
 
                             {/* Booking ID */}
@@ -560,14 +718,41 @@ const MyWorkTab = ({ myWork, activeSubTab, setActiveSubTab, onMarkComplete }) =>
                             </div>
                         </div>
                     ))}
+                    </div>
+                    {/* Pagination */}
+                    {filteredWork.length > itemsPerPage && (
+                        <div className="flex justify-end items-center gap-2 mt-6">
+                            <button
+                                onClick={() => setPageMyWork(Math.max(0, pageMyWork - 1))}
+                                disabled={pageMyWork === 0}
+                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                            >
+                                {tr("Prev")}
+                            </button>
+                            <button
+                                onClick={() =>
+                                    setPageMyWork(
+                                        (pageMyWork + 1) %
+                                            Math.ceil(filteredWork.length / itemsPerPage)
+                                    )
+                                }
+                                disabled={
+                                    pageMyWork >= Math.ceil(filteredWork.length / itemsPerPage) - 1
+                                }
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                            >
+                                {tr("Next")}
+                            </button>
                 </div>
+                    )}
+                </>
             )}
         </div>
     );
 };
 
 // ==================== REQUIREMENTS TAB (UPDATED) ====================
-const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, setFilters, onPlaceBid, myBids }) => {
+const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, setFilters, onPlaceBid, myBids, pageRequirements, setPageRequirements, itemsPerPage }) => {
     const { tr } = useLanguage();
     const hasBidOnRequirement = (reqId) => {
         return myBids.some((bid) => bid.requirementId?._id === reqId);
@@ -642,8 +827,14 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                     <p className="text-gray-600">{tr("Check back later for new work opportunities")}</p>
                 </div>
             ) : (
+                <>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {requirements.map((req) => {
+                        {requirements
+                            .slice(
+                                pageRequirements * itemsPerPage,
+                                pageRequirements * itemsPerPage + itemsPerPage
+                            )
+                            .map((req) => {
                         const bidPlaced = hasBidOnRequirement(req._id);
                         const bid = myBids.find((b) => b.requirementId?._id === req._id);
 
@@ -766,14 +957,41 @@ const RequirementsTab = ({ requirements, searchTerm, setSearchTerm, filters, set
                             </div>
                         );
                     })}
+                    </div>
+                    {/* Pagination */}
+                    {requirements.length > itemsPerPage && (
+                        <div className="flex justify-end items-center gap-2 mt-6">
+                            <button
+                                onClick={() => setPageRequirements(Math.max(0, pageRequirements - 1))}
+                                disabled={pageRequirements === 0}
+                                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                            >
+                                {tr("Prev")}
+                            </button>
+                            <button
+                                onClick={() =>
+                                    setPageRequirements(
+                                        (pageRequirements + 1) %
+                                            Math.ceil(requirements.length / itemsPerPage)
+                                    )
+                                }
+                                disabled={
+                                    pageRequirements >= Math.ceil(requirements.length / itemsPerPage) - 1
+                                }
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                            >
+                                {tr("Next")}
+                            </button>
                 </div>
+                    )}
+                </>
             )}
         </div>
     );
 };
 
 // ==================== OTHER TABS (Keep your existing ones) ====================
-const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => {
+const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab, pageNotifications, setPageNotifications, itemsPerPage }) => {
     const { tr } = useLanguage();
     return (
     <div className="space-y-6">
@@ -817,7 +1035,12 @@ const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => {
                     {tr("Recent Notifications")}
                 </h3>
                 <div className="space-y-3">
-                    {notifications.slice(0, 5).map((notif) => (
+                    {notifications
+                        .slice(
+                            pageNotifications * itemsPerPage,
+                            pageNotifications * itemsPerPage + itemsPerPage
+                        )
+                        .map((notif) => (
                         <div key={notif._id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
                             <div className="flex-1">
                                 <p className="text-sm font-medium text-gray-900">{notif.title}</p>
@@ -829,6 +1052,31 @@ const OverviewTab = ({ stats, dashboardData, notifications, setActiveTab }) => {
                         </div>
                     ))}
                 </div>
+                {notifications.length > itemsPerPage && (
+                    <div className="flex justify-end items-center gap-2 mt-4">
+                        <button
+                            onClick={() => setPageNotifications(Math.max(0, pageNotifications - 1))}
+                            disabled={pageNotifications === 0}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                        >
+                            {tr("Prev")}
+                        </button>
+                        <button
+                            onClick={() =>
+                                setPageNotifications(
+                                    (pageNotifications + 1) %
+                                        Math.ceil(notifications.length / itemsPerPage)
+                                )
+                            }
+                            disabled={
+                                pageNotifications >= Math.ceil(notifications.length / itemsPerPage) - 1
+                            }
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                        >
+                            {tr("Next")}
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm p-6">
@@ -1173,6 +1421,56 @@ const ServiceFormModal = ({ newService, setNewService, onSubmit, onClose }) => {
                             />
                         </div>
 
+                        {/* Charge per Hour */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Charge per Hour (₹) *
+                            </label>
+                            <input
+                                type="number"
+                                required
+                                min="1"
+                                value={newService.chargePerHour}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, chargePerHour: e.target.value })
+                                }
+                                placeholder="e.g., 500"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                        </div>
+
+                        {/* Working Duration */}
+                        <div>
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                Working Duration (Hours) *
+                            </label>
+                            <input
+                                type="number"
+                                required
+                                min="1"
+                                max="24"
+                                value={newService.workingDuration}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, workingDuration: e.target.value })
+                                }
+                                placeholder="e.g., 6"
+                                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                                {newService.availableTime && newService.workingDuration
+                                    ? (() => {
+                                        const [hours, minutes] = newService.availableTime.split(':').map(Number);
+                                        const durationHours = Number(newService.workingDuration);
+                                        const totalMinutes = hours * 60 + minutes + durationHours * 60;
+                                        const endHours = Math.floor(totalMinutes / 60) % 24;
+                                        const endMinutes = totalMinutes % 60;
+                                        const endTimeStr = `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+                                        return `Service will be available from ${newService.availableTime} to ${endTimeStr} (${durationHours} hours)`;
+                                    })()
+                                    : "Enter time and duration to see end time"}
+                            </p>
+                        </div>
+
                         {/* District */}
                         <div>
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1327,23 +1625,49 @@ const ServiceFormModal = ({ newService, setNewService, onSubmit, onClose }) => {
 const isSvcExpired = (svc) => {
     try {
         if (!svc) return false;
-        if (svc.availability === false) return false; // engaged/unavailable handled separately
+        if (svc.availability === false || svc.isBooked) return false; // engaged/unavailable handled separately
         const now = new Date();
+        
+        // Check if availableDate and availableTime have passed
         if (svc.availableDate) {
-            const when = new Date(`${new Date(svc.availableDate).toISOString().slice(0,10)}T${(svc.availableTime||"00:00").padStart(5,"0")}`);
+            // Parse the date and time together
+            const dateStr = new Date(svc.availableDate).toISOString().slice(0, 10);
+            const timeStr = (svc.availableTime || "00:00").padStart(5, "0");
+            const when = new Date(`${dateStr}T${timeStr}`);
+            
             if (!isNaN(when.getTime())) {
+                // Service is expired if the date/time has passed
                 return when < now;
             }
         }
+        
+        // Backward compatibility: check availableDates array
         if (Array.isArray(svc.availableDates) && svc.availableDates.length > 0) {
             return svc.availableDates.every((d) => new Date(d) < now);
         }
+        
         return false;
     } catch { return false; }
 };
 
-const ServicesTab = ({ services, onCancel, onPostNew }) => {
+const ServicesTab = ({ services, onCancel, onPostNew, onWithdraw }) => {
     const { tr } = useLanguage();
+    const itemsPerPage = 3;
+    const [pageServices, setPageServices] = useState(0);
+    const [withdrawingId, setWithdrawingId] = useState(null);
+    
+    const handleWithdraw = async (serviceId) => {
+        if (!window.confirm(tr("Are you sure you want to withdraw this service? This action cannot be undone."))) {
+            return;
+        }
+        setWithdrawingId(serviceId);
+        try {
+            await onWithdraw(serviceId);
+        } finally {
+            setWithdrawingId(null);
+        }
+    };
+    
     return (
     <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -1358,10 +1682,10 @@ const ServicesTab = ({ services, onCancel, onPostNew }) => {
         </div>
 
         {services.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-                <Tractor className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{tr("No services posted yet")}</h3>
-                <p className="text-gray-600 mb-6">{tr("Post your first tractor service to get started")}</p>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
+                <Tractor className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{tr("No services posted yet")}</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">{tr("Post your first tractor service to get started and receive work requests from farmers")}</p>
                 <button
                     onClick={onPostNew}
                     className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg inline-flex items-center space-x-2"
@@ -1370,34 +1694,58 @@ const ServicesTab = ({ services, onCancel, onPostNew }) => {
                     <span>{tr("Post Service")}</span>
                 </button>
             </div>
+        ) : services.filter((s)=>!isSvcExpired(s)).length === 0 ? (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-12 text-center">
+                <AlertCircle className="h-16 w-16 text-orange-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{tr("All services expired")}</h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">{tr("Your posted services have passed their availability dates. Post a new service to continue receiving work requests.")}</p>
+                <button
+                    onClick={onPostNew}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg inline-flex items-center space-x-2"
+                >
+                    <Plus className="h-5 w-5" />
+                    <span>{tr("Post New Service")}</span>
+                </button>
+            </div>
         ) : (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {services.filter((s)=>!isSvcExpired(s)).map((service) => (
+                    {services
+                        .filter((s)=>!isSvcExpired(s))
+                        .slice(
+                            pageServices * itemsPerPage,
+                            pageServices * itemsPerPage + itemsPerPage
+                        )
+                        .map((service) => (
                     <div
                         key={service._id}
-                        className="bg-white rounded-xl shadow-sm border-2 border-gray-200 p-6"
+                        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border-2 border-gray-200 dark:border-gray-700 p-6"
                     >
                         <div className="flex justify-between items-start mb-4">
                             <div>
-                                <h3 className="text-xl font-bold text-gray-900">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                     {service.brand} {service.model}
                                 </h3>
-                                <p className="text-gray-600">{service.vehicleNumber}</p>
+                                <p className="text-gray-600 dark:text-gray-400">{service.vehicleNumber}</p>
                             </div>
 									<span
 										className={`px-3 py-1 rounded-full text-xs font-semibold ${
 											(!service.availability || service.isBooked)
 												? "bg-blue-100 text-blue-800"
 												: isSvcExpired(service)
-												? "bg-gray-200 text-gray-700"
+												? "bg-red-100 text-red-800"
 												: "bg-green-100 text-green-800"
 										}`}
 									>
-										{(!service.availability || service.isBooked) ? tr("Engaged") : isSvcExpired(service) ? tr("Expired") : tr("Available")}
+										{(!service.availability || service.isBooked) 
+											? tr("Engaged") 
+											: isSvcExpired(service) 
+											? tr("Expired") 
+											: tr("Available")}
 									</span>
                         </div>
 
-                        <div className="space-y-2 text-sm text-gray-700">
+                        <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                             <p>
                                 <strong>{tr("Service:")}</strong> {service.typeOfPlowing}
                             </p>
@@ -1411,43 +1759,248 @@ const ServicesTab = ({ services, onCancel, onPostNew }) => {
                                 <strong>{tr("Location:")}</strong> {service.location.district},{" "}
                                 {service.location.state}
                             </p>
+                            {service.availableDate && (
+                                <p className="flex items-center">
+                                    <Calendar className="h-4 w-4 mr-2 text-green-600" />
+                                    <strong>{tr("Available Date:")}</strong>{" "}
+                                    {new Date(service.availableDate).toLocaleDateString("en-IN", {
+                                        weekday: "short",
+                                        year: "numeric",
+                                        month: "short",
+                                        day: "numeric",
+                                    })}
+                                </p>
+                            )}
+                            {service.availableTime && (
+                                <p className="flex items-center">
+                                    <Clock className="h-4 w-4 mr-2 text-green-600" />
+                                    <strong>{tr("Available Time:")}</strong>{" "}
+                                    {service.availableTime}
+                                    {service.workingDuration && (
+                                        <span className="ml-2 text-gray-600">
+                                            ({tr("Duration:")} {service.workingDuration} {tr("hours")})
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                            {service.chargePerHour && (
+                                <p>
+                                    <strong>{tr("Charge per Hour:")}</strong> ₹{service.chargePerHour}/hour
+                                </p>
+                            )}
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                            {(!service.availability || service.isBooked) ? (
+                                <div className="text-sm text-gray-500 italic">
+                                    {tr("Cannot withdraw - Service is engaged")}
+                                </div>
+                            ) : isSvcExpired(service) ? (
+                                <div className="text-sm text-gray-500 italic">
+                                    {tr("Service expired - Past availability date/time")}
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => handleWithdraw(service._id)}
+                                    disabled={withdrawingId === service._id}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm flex items-center justify-center"
+                                >
+                                    {withdrawingId === service._id ? (
+                                        <>
+                                            <Activity className="h-4 w-4 mr-2 animate-spin" />
+                                            {tr("Withdrawing...")}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <X className="h-4 w-4 mr-2" />
+                                            {tr("Withdraw Service")}
+                                        </>
+                                    )}
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}
+                </div>
+                {/* Pagination */}
+                {services.filter((s)=>!isSvcExpired(s)).length > itemsPerPage && (
+                    <div className="flex justify-end items-center gap-2 mt-6">
+                        <button
+                            onClick={() => setPageServices(Math.max(0, pageServices - 1))}
+                            disabled={pageServices === 0}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                        >
+                            {tr("Prev")}
+                        </button>
+                        <button
+                            onClick={() =>
+                                setPageServices(
+                                    (pageServices + 1) %
+                                        Math.ceil(services.filter((s)=>!isSvcExpired(s)).length / itemsPerPage)
+                                )
+                            }
+                            disabled={
+                                pageServices >= Math.ceil(services.filter((s)=>!isSvcExpired(s)).length / itemsPerPage) - 1
+                            }
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                        >
+                            {tr("Next")}
+                        </button>
             </div>
+                )}
+            </>
         )}
     </div>
 );
 };
 
 // ==================== PAYMENTS TAB (Keep your existing) ====================
-const PaymentsTab = ({ dashboardData }) => { const { tr } = useLanguage(); return (
+const PaymentsTab = ({ dashboardData }) => {
+    const { tr } = useLanguage();
+    const itemsPerPage = 3;
+    const [pagePendingPayments, setPagePendingPayments] = useState(0);
+    const [pageCompletedPayments, setPageCompletedPayments] = useState(0);
+    const pendingTx = (dashboardData?.transactions || []).filter((t) => t.status === "pending");
+    const completedTx = (dashboardData?.transactions || []).filter((t) => t.status === "completed");
+    const pendingBookings = dashboardData?.pendingPaymentBookings || [];
+    const allPending = [...pendingTx, ...pendingBookings];
+
+    // Calculate pending amounts from both sources
+    const pendingTxAmount = pendingTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const pendingBookingsAmount = pendingBookings.reduce((sum, b) => sum + (b.totalCost || 0), 0);
+    const totalPendingAmount = dashboardData?.stats?.pendingAmount ?? (pendingTxAmount + pendingBookingsAmount);
+    const totalPendingCount = dashboardData?.stats?.pendingTransactions ?? (pendingTx.length + pendingBookings.length);
+
+    const formatDate = (date) => new Date(date).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    return (
     <div className="space-y-6">
         <h2 className="text-2xl font-bold text-gray-900">{tr("Payments & Earnings")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl shadow-sm p-6">
                 <p className="text-gray-600 text-sm mb-2">{tr("Total Earnings")}</p>
-                <p className="text-3xl font-bold text-green-600">
-                    ₹{dashboardData?.stats?.totalAmount?.toLocaleString() || 0}
-                </p>
+                    <p className="text-3xl font-bold text-green-600">₹{dashboardData?.stats?.totalAmount?.toLocaleString() || 0}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6">
                 <p className="text-gray-600 text-sm mb-2">{tr("Pending Payments")}</p>
-                <p className="text-3xl font-bold text-orange-600">
-                    ₹{dashboardData?.stats?.pendingAmount?.toLocaleString() || 0}
-                </p>
+                    <p className="text-3xl font-bold text-orange-600">₹{totalPendingAmount.toLocaleString()}</p>
                 <p className="text-sm text-gray-600 mt-1">
-                    {dashboardData?.stats?.pendingTransactions || 0} {tr("pending")}
+                        {totalPendingCount} {tr("pending")}
                 </p>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6">
                 <p className="text-gray-600 text-sm mb-2">{tr("Completed Payments")}</p>
-                <p className="text-3xl font-bold text-gray-900">
-                    {dashboardData?.stats?.completedTransactions ?? (dashboardData?.transactions?.filter((t) => t.status === "completed").length || 0)}
-                </p>
+                    <p className="text-3xl font-bold text-gray-900">{dashboardData?.stats?.completedTransactions ?? completedTx.length}</p>
             </div>
         </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">{tr("Pending Transactions")}</h3>
+                    {allPending.length === 0 ? (
+                        <p className="text-gray-500">{tr("No pending transactions")}</p>
+                    ) : (
+                        <>
+                            <div className="space-y-3">
+                                {allPending
+                                    .slice(
+                                        pagePendingPayments * itemsPerPage,
+                                        pagePendingPayments * itemsPerPage + itemsPerPage
+                                    )
+                                    .map((item) => (
+                                    <div key={item._id} className="border border-orange-200 rounded-lg p-3 bg-orange-50">
+                                        <div className="flex justify-between">
+                                            <span className="text-sm font-medium text-gray-800">{item.bookingId?.workType || item.workType || "Work"}</span>
+                                            <span className="text-sm font-semibold text-orange-700">₹{item.amount || item.totalCost}</span>
     </div>
-)};
+                                        <div className="text-xs text-gray-600 mt-1">{formatDate(item.createdAt || item.updatedAt)}</div>
+                                        {item.totalCost && <div className="text-xs text-gray-600 mt-1">{tr("Completed, awaiting payment")}</div>}
+                                    </div>
+                                ))}
+                            </div>
+                            {allPending.length > itemsPerPage && (
+                                <div className="flex justify-end items-center gap-2 mt-4">
+                                    <button
+                                        onClick={() => setPagePendingPayments(Math.max(0, pagePendingPayments - 1))}
+                                        disabled={pagePendingPayments === 0}
+                                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                                    >
+                                        {tr("Prev")}
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            setPagePendingPayments(
+                                                (pagePendingPayments + 1) %
+                                                    Math.ceil(allPending.length / itemsPerPage)
+                                            )
+                                        }
+                                        disabled={
+                                            pagePendingPayments >= Math.ceil(allPending.length / itemsPerPage) - 1
+                                        }
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                                    >
+                                        {tr("Next")}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">{tr("Recent Payments")}</h3>
+                    {completedTx.length === 0 ? (
+                        <p className="text-gray-500">{tr("No completed payments yet")}</p>
+                    ) : (
+                        <>
+                            <div className="space-y-3">
+                                {completedTx
+                                    .slice(
+                                        pageCompletedPayments * itemsPerPage,
+                                        pageCompletedPayments * itemsPerPage + itemsPerPage
+                                    )
+                                    .map((t) => (
+                                    <div key={t._id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                        <div className="flex justify-between">
+                                            <span className="text-sm font-medium text-gray-800">{t.bookingId?.workType || "Work"}</span>
+                                            <span className="text-sm font-semibold text-green-700">₹{t.amount}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-600 mt-1">{formatDate(t.createdAt)}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            {completedTx.length > itemsPerPage && (
+                                <div className="flex justify-end items-center gap-2 mt-4">
+                                    <button
+                                        onClick={() => setPageCompletedPayments(Math.max(0, pageCompletedPayments - 1))}
+                                        disabled={pageCompletedPayments === 0}
+                                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                                    >
+                                        {tr("Prev")}
+                                    </button>
+                                    <button
+                                        onClick={() =>
+                                            setPageCompletedPayments(
+                                                (pageCompletedPayments + 1) %
+                                                    Math.ceil(completedTx.length / itemsPerPage)
+                                            )
+                                        }
+                                        disabled={
+                                            pageCompletedPayments >= Math.ceil(completedTx.length / itemsPerPage) - 1
+                                        }
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-sm"
+                                    >
+                                        {tr("Next")}
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default TractorDashboard;

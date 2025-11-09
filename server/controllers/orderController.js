@@ -294,6 +294,18 @@ exports.confirmOrder = async (req, res) => {
 					orderId: order._id,
 				},
 			});
+			// Email buyer
+			const buyer = await User.findById(order.buyer).select("email name");
+			await NotificationService.notifyOrderConfirmed(buyer, order, req.emailTransporter);
+			// Realtime toast
+			if (req.io) {
+				req.io.to(order.buyer.toString()).emit("notification", {
+					type: "order_confirmed",
+					title: "✅ Order Confirmed!",
+					message: `Your order #${order._id.toString().substring(0,8)} has been confirmed`,
+					data: { orderId: order._id },
+				});
+			}
 		} catch (notifErr) {
 			console.error("Notification error (confirmOrder):", notifErr);
 		}
@@ -371,6 +383,18 @@ exports.markAsPicked = async (req, res) => {
 					orderId: order._id,
 				},
 			});
+			// Email buyer
+			const buyer = await User.findById(order.buyer).select("email name");
+			await NotificationService.notifyOrderPicked(buyer, order, req.emailTransporter);
+			// Realtime toast
+			if (req.io) {
+				req.io.to(order.buyer.toString()).emit("notification", {
+					type: "order_picked",
+					title: "🚚 Order Picked Up!",
+					message: `Your order #${order._id.toString().substring(0,8)} has been picked up`,
+					data: { orderId: order._id },
+				});
+			}
 		} catch (notifErr) {
 			console.error("Notification error (markAsPicked):", notifErr);
 		}
@@ -427,6 +451,18 @@ exports.completeOrder = async (req, res) => {
 				relatedUserId: req.user._id,
 				data: { orderId: order._id },
 			});
+			// Email seller
+			const seller = await User.findById(order.seller).select("email name");
+			await NotificationService.notifyOrderCompleted(seller, order, req.emailTransporter);
+			// Realtime toast
+			if (req.io) {
+				req.io.to(order.seller.toString()).emit("notification", {
+					type: "order_completed",
+					title: "✨ Order Completed!",
+					message: `Order #${order._id.toString().slice(0,8)} marked completed by buyer`,
+					data: { orderId: order._id },
+				});
+			}
 		} catch (notifErr) {
 			console.error("Notification error:", notifErr);
 			// don’t fail the request just because notifications broke

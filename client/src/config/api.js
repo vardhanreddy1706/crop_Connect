@@ -1,13 +1,23 @@
 import axios from "axios";
 import toast from "react-hot-toast";
 
-const API_BASE_URL =
-	import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+// Dynamically determine the API base URL
+const envUrl = import.meta.env.VITE_API_BASE_URL;
+
+const defaultApiUrl = (() => {
+	if (typeof window === "undefined") return "http://localhost:8000/api";
+
+	// Use the same hostname the frontend is served from
+	const host = window.location.hostname;
+	return `http://${host}:8000/api`;
+})();
+
+const API_BASE_URL = envUrl || defaultApiUrl;
 const isDevelopment = import.meta.env.MODE === "development";
 
 const api = axios.create({
 	baseURL: API_BASE_URL,
-	timeout: 10000, // 10 seconds - reasonable timeout
+	timeout: 10000,
 	headers: { "Content-Type": "application/json" },
 	withCredentials: true,
 });
@@ -24,14 +34,15 @@ api.interceptors.request.use(
 		config.metadata = { startTime: new Date() };
 
 		if (isDevelopment) {
-			console.log(`🔵 ${config.method?.toUpperCase()} ${config.url}`);
+			const fullUrl = `${config.baseURL || API_BASE_URL}${config.url}`;
+			console.log(`🔵 ${config.method?.toUpperCase()} ${fullUrl}`);
 		}
 		return config;
 	},
 	(error) => Promise.reject(error)
 );
 
-// RESPONSE INTERCEPTOR - FIXED!
+// RESPONSE INTERCEPTOR
 api.interceptors.response.use(
 	(response) => {
 		const duration = new Date() - response.config.metadata.startTime;
@@ -42,27 +53,22 @@ api.interceptors.response.use(
 				} (${duration}ms)`
 			);
 		}
-
-		// Clear any retry for this request
 		const requestKey = `${response.config.method}-${response.config.url}`;
 		retryQueue.delete(requestKey);
-
 		return response;
 	},
 	async (error) => {
 		const originalRequest = error.config;
 		const requestKey = `${originalRequest?.method}-${originalRequest?.url}`;
 
-		// NETWORK ERROR HANDLING - IMPROVED
+		// NETWORK ERROR HANDLING
 		if (
 			error.code === "ECONNABORTED" ||
 			error.message === "Network Error" ||
 			!error.response
 		) {
-			// Only retry if not already retried
 			if (!retryQueue.has(requestKey)) {
 				retryQueue.set(requestKey, 1);
-
 				console.log(`🔄 Retrying ${originalRequest.url}...`);
 				await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -70,7 +76,6 @@ api.interceptors.response.use(
 					return await api(originalRequest);
 				} catch (retryError) {
 					retryQueue.delete(requestKey);
-					// Only show error if it's an important request
 					if (
 						!originalRequest.url.includes("/notifications") &&
 						!originalRequest.url.includes("/health")
@@ -95,7 +100,6 @@ api.interceptors.response.use(
 			console.error(`❌ ${status}: ${errorMessage}`);
 		}
 
-		// Handle errors - 2 second toasts
 		switch (status) {
 			case 400:
 				toast.error(errorMessage || "Invalid request", {
@@ -103,11 +107,9 @@ api.interceptors.response.use(
 					id: "bad-request",
 				});
 				break;
-
 			case 401:
 				localStorage.removeItem("token");
 				localStorage.removeItem("user");
-
 				if (!["/login", "/", "/register"].includes(window.location.pathname)) {
 					toast.error("Session expired. Please login again.", {
 						duration: 3000,
@@ -116,13 +118,10 @@ api.interceptors.response.use(
 					setTimeout(() => (window.location.href = "/login"), 1000);
 				}
 				break;
-
 			case 403:
 				toast.error("Access denied", { duration: 2000, id: "forbidden" });
 				break;
-
 			case 404:
-				// Don't show toast for 404 on optional requests
 				if (!originalRequest.url.includes("/notifications")) {
 					toast.error("Resource not found", {
 						duration: 2000,
@@ -130,7 +129,6 @@ api.interceptors.response.use(
 					});
 				}
 				break;
-
 			case 500:
 			case 502:
 			case 503:
@@ -139,7 +137,6 @@ api.interceptors.response.use(
 					id: "server-error",
 				});
 				break;
-
 			default:
 				if (errorMessage && !originalRequest.url.includes("/notifications")) {
 					toast.error(errorMessage, { duration: 2000, id: `error-${status}` });
@@ -155,6 +152,7 @@ api.interceptors.response.use(
 	}
 );
 
+// Utilities
 export const checkBackendHealth = async () => {
 	try {
 		const response = await axios.get(
@@ -183,15 +181,15 @@ export const logout = () => {
 	window.location.href = "/login";
 };
 
-// Network status - 2 second toasts
+// Online/offline toasts
 if (typeof window !== "undefined") {
-	window.addEventListener("online", () => {
-		toast.success("Internet restored", { duration: 2000, id: "online" });
-	});
+	window.addEventListener("online", () =>
+		toast.success("Internet restored", { duration: 2000, id: "online" })
+	);
 
-	window.addEventListener("offline", () => {
-		toast.error("No internet", { duration: 2000, id: "offline" });
-	});
+	window.addEventListener("offline", () =>
+		toast.error("No internet", { duration: 2000, id: "offline" })
+	);
 }
 
 export default api;

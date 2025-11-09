@@ -38,26 +38,6 @@ const createBooking = async (req, res) => {
 			});
 		}
 
-		// Prevent double booking when the service is engaged or already booked
-		if (!tractorService.availability || tractorService.isBooked) {
-			return res.status(409).json({
-				success: false,
-				message: "This tractor service is currently engaged or unavailable",
-			});
-		}
-		// Defensive: check any active booking exists for this service
-		const existingActive = await Booking.findOne({
-			serviceId: tractorServiceId,
-			serviceType: "tractor",
-			status: { $in: ["pending", "confirmed", "in_progress"] },
-		});
-		if (existingActive) {
-			return res.status(409).json({
-				success: false,
-				message: "This tractor service already has an active booking",
-			});
-		}
-
 		// Calculate cost
 		const acres = parseFloat(landSize || 1) || 1;
 		const totalCost = Math.round(tractorService.chargePerAcre * acres);
@@ -68,6 +48,38 @@ const createBooking = async (req, res) => {
 			locationObj = { district: location, fullAddress: location };
 		}
 
+		// Parse booking date and calculate time slot
+		const requested = new Date(bookingDate || Date.now());
+		const bookingDurationHours = parseFloat(duration || 8);
+		const bookingStartTime = new Date(requested);
+		const bookingEndTime = new Date(bookingStartTime.getTime() + bookingDurationHours * 60 * 60 * 1000);
+
+		// Enforce: tractor not double-booked during overlapping time slot
+		const overlappingBookings = await Booking.find({
+			serviceId: tractorServiceId,
+			serviceType: "tractor",
+			status: { $in: ["pending", "confirmed", "in_progress"] },
+		});
+
+		for (const existingBooking of overlappingBookings) {
+			const existingStart = new Date(existingBooking.bookingDate);
+			const existingDurationHours = parseFloat(existingBooking.duration || 8);
+			const existingEnd = new Date(existingStart.getTime() + existingDurationHours * 60 * 60 * 1000);
+
+			// Check if time slots overlap
+			const timeOverlaps = 
+				(bookingStartTime >= existingStart && bookingStartTime < existingEnd) ||
+				(bookingEndTime > existingStart && bookingEndTime <= existingEnd) ||
+				(bookingStartTime <= existingStart && bookingEndTime >= existingEnd);
+
+			if (timeOverlaps) {
+				return res.status(409).json({
+					success: false,
+					message: `This tractor service is already booked from ${existingStart.toLocaleString()} for ${existingDurationHours} hours. Please choose a different time slot.`,
+				});
+			}
+		}
+
 		// Create booking
 		const booking = await Booking.create({
 			farmer: req.user._id,
@@ -75,7 +87,7 @@ const createBooking = async (req, res) => {
 			serviceType: "tractor",
 			serviceId: tractorServiceId,
 			serviceModel: "TractorService",
-			bookingDate,
+			bookingDate: requested,
 			duration: duration || 8,
 			totalCost,
 			location: locationObj,
@@ -86,11 +98,8 @@ const createBooking = async (req, res) => {
 			notes,
 		});
 
-		// Mark the tractor service engaged immediately
-		await TractorService.findByIdAndUpdate(tractorServiceId, {
-			availability: false,
-			isBooked: true,
-		});
+		// Note: We don't mark the service as permanently unavailable here
+		// Availability is checked dynamically based on time slot conflicts
 
 		// Populate tractor owner details
 		await booking.populate("tractorOwnerId", "name phone email");
@@ -595,17 +604,29 @@ const completeWork = async (req, res) => {
 		booking.workCompletedAt = new Date();
 		await booking.save();
 
-		// ✅ Update service availability back to true
-		if (booking.serviceType === "worker" && booking.serviceId) {
-			await WorkerService.findByIdAndUpdate(booking.serviceId, {
-				availability: true,
-				isBooked: false,
+		// ✅ Check if service has other active bookings before marking as available
+		if (booking.serviceId) {
+			const otherActiveBookings = await Booking.countDocuments({
+				serviceId: booking.serviceId,
+				serviceType: booking.serviceType,
+				status: { $in: ["pending", "confirmed", "in_progress"] },
+				_id: { $ne: booking._id },
 			});
-		} else if (booking.serviceType === "tractor" && booking.serviceId) {
-			await TractorService.findByIdAndUpdate(booking.serviceId, {
-				availability: true,
-				isBooked: false,
-			});
+
+			// Only mark as available if no other active bookings exist
+			if (otherActiveBookings === 0) {
+				if (booking.serviceType === "worker") {
+					await WorkerService.findByIdAndUpdate(booking.serviceId, {
+						availability: true,
+						bookingStatus: "available",
+					});
+				} else if (booking.serviceType === "tractor") {
+					await TractorService.findByIdAndUpdate(booking.serviceId, {
+						availability: true,
+						isBooked: false,
+					});
+				}
+			}
 		}
 
 		// Create notification for farmer (ensure correct id shape)
@@ -649,12 +670,29 @@ const cancelBooking = async (req, res) => {
 		booking.status = "cancelled";
 		await booking.save();
 
-		// Free up the service for future bookings
-		if (booking.serviceType === "tractor" && booking.serviceId) {
-			await TractorService.findByIdAndUpdate(booking.serviceId, {
-				availability: true,
-				isBooked: false,
+		// ✅ Check if service has other active bookings before marking as available
+		if (booking.serviceId) {
+			const otherActiveBookings = await Booking.countDocuments({
+				serviceId: booking.serviceId,
+				serviceType: booking.serviceType,
+				status: { $in: ["pending", "confirmed", "in_progress"] },
+				_id: { $ne: booking._id },
 			});
+
+			// Only mark as available if no other active bookings exist
+			if (otherActiveBookings === 0) {
+				if (booking.serviceType === "worker") {
+					await WorkerService.findByIdAndUpdate(booking.serviceId, {
+						availability: true,
+						bookingStatus: "available",
+					});
+				} else if (booking.serviceType === "tractor") {
+					await TractorService.findByIdAndUpdate(booking.serviceId, {
+						availability: true,
+						isBooked: false,
+					});
+				}
+			}
 		}
 
 		// Notify other user
@@ -807,6 +845,120 @@ const markBookingComplete = async (req, res) => {
 	}
 };
 
+// ✅ Auto-complete bookings when time passes and send payment notifications
+const autoCompleteExpiredBookings = async (req, res) => {
+	try {
+		const now = new Date();
+		
+		// Find bookings that should be completed (time has passed)
+		// Status must be "confirmed" or "in_progress"
+		// bookingDate + duration < current time
+		const expiredBookings = await Booking.find({
+			status: { $in: ["confirmed", "in_progress"] },
+		})
+			.populate("farmer", "name email phone")
+			.populate("tractorOwnerId", "name email phone")
+			.lean();
+
+		const completedBookings = [];
+		
+		for (const booking of expiredBookings) {
+			const bookingStart = new Date(booking.bookingDate);
+			const durationHours = parseFloat(booking.duration || 8);
+			const bookingEnd = new Date(bookingStart.getTime() + durationHours * 60 * 60 * 1000);
+			
+			// If current time has passed the end time, mark as completed
+			if (now >= bookingEnd) {
+				// Update booking status
+				await Booking.findByIdAndUpdate(booking._id, {
+					status: "completed",
+					workCompletedAt: now,
+				});
+
+				// Update service availability if no other active bookings
+				if (booking.serviceId) {
+					const otherActiveBookings = await Booking.countDocuments({
+						serviceId: booking.serviceId,
+						serviceType: booking.serviceType,
+						status: { $in: ["pending", "confirmed", "in_progress"] },
+						_id: { $ne: booking._id },
+					});
+
+					if (otherActiveBookings === 0) {
+						if (booking.serviceType === "worker") {
+							await WorkerService.findByIdAndUpdate(booking.serviceId, {
+								availability: true,
+								bookingStatus: "available",
+							});
+						} else if (booking.serviceType === "tractor") {
+							await TractorService.findByIdAndUpdate(booking.serviceId, {
+								availability: true,
+								isBooked: false,
+							});
+						}
+					}
+				}
+
+				// Create notification for farmer
+				await Notification.create({
+					recipientId: booking.farmer._id,
+					type: "booking_completed",
+					title: "🎊 Work Completed Automatically",
+					message: `The work has been automatically marked as completed. ${booking.paymentStatus === "pending" ? "Please proceed with payment." : ""}`,
+					relatedBookingId: booking._id,
+					data: {
+						bookingId: booking._id,
+						totalCost: booking.totalCost,
+						paymentStatus: booking.paymentStatus,
+					},
+				});
+
+				// ✅ Send payment notification email if payment is pending
+				if (booking.paymentStatus === "pending" && booking.farmer?.email) {
+					try {
+						const emailTransporter = req.emailTransporter || null;
+						if (emailTransporter) {
+							// Use NotificationService to send email
+							await NotificationService.notifyPaymentSent(
+								booking.farmer,
+								{ amount: booking.totalCost, method: "pending", bookingId: booking._id },
+								emailTransporter
+							);
+							
+							// Also send a custom notification about work completion
+							const Notification = require("../models/Notification");
+							await Notification.create({
+								recipientId: booking.farmer._id,
+								type: "payment_required",
+								title: "💰 Payment Required - Work Completed",
+								message: `The work has been automatically marked as completed. Please proceed with payment of ₹${booking.totalCost}.`,
+								relatedBookingId: booking._id,
+							});
+						}
+					} catch (emailError) {
+						console.error("Payment notification email error:", emailError);
+					}
+				}
+
+				completedBookings.push(booking._id);
+			}
+		}
+
+		res.status(200).json({
+			success: true,
+			message: `Auto-completed ${completedBookings.length} booking(s)`,
+			completedCount: completedBookings.length,
+			completedBookings,
+		});
+	} catch (error) {
+		console.error("Auto-complete expired bookings error:", error);
+		res.status(500).json({
+			success: false,
+			message: error.message || "Failed to auto-complete bookings",
+		});
+	}
+};
+
 module.exports = {
 	getFarmerTractorBookings,
 	getFarmerWorkerBookings,
@@ -823,4 +975,5 @@ module.exports = {
 	completeBooking,
 	getWorkerBookings,
 	markBookingComplete,
+	autoCompleteExpiredBookings,
 };

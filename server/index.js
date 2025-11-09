@@ -11,7 +11,6 @@ const connectDB = require("./config/db");
 const errorHandler = require("./middlewares/errorHandler");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-
 // Load environment variables
 dotenv.config();
 
@@ -19,22 +18,43 @@ dotenv.config();
 connectDB();
 
 // Initialize Express app
+const axios = require("axios");
+
 const app = express();
+app.use(express.json({ limit: "10mb" })); // raise limit if needed
 
 // Create HTTP server for Socket.IO
 const server = http.createServer(app);
 
-// Initialize Socket.IO
+// Initialize Socket.IO with flexible CORS for all localhost ports
 const io = new Server(server, {
 	cors: {
-		origin: [
-			"http://localhost:5174",
-			"http://localhost:5173",
-			"http://localhost:3000",
-			"http://127.0.0.1:5174",
-			"http://127.0.0.1:5173",
-			process.env.CLIENT_URL,
-		].filter(Boolean),
+		origin: function (origin, callback) {
+			// Allow requests with no origin (mobile apps, Postman, etc.)
+			if (!origin) return callback(null, true);
+			
+			// Allow all localhost and 127.0.0.1 on any port (HTTP and HTTPS)
+			if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
+				return callback(null, true);
+			}
+			
+			// Allow local network IPs (HTTP and HTTPS)
+			if (origin.match(/^https?:\/\/\d+\.\d+\.\d+\.\d+(:\d+)?$/)) {
+				return callback(null, true);
+			}
+			
+			// Allow production URL if set
+			if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
+				return callback(null, true);
+			}
+			
+			// For development, allow all origins
+			if (process.env.NODE_ENV === 'development') {
+				return callback(null, true);
+			}
+			
+			callback(new Error('Not allowed by CORS'));
+		},
 		methods: ["GET", "POST", "PUT", "DELETE"],
 		credentials: true,
 	},
@@ -81,48 +101,40 @@ try {
 // 1. Helmet - Set security headers
 app.use(helmet());
 
-app.get("/api/crop-prices", async (req, res) => {
-	try {
-		const apiKey = process.env.DATA_GOV_API_KEY;
-		if (!apiKey) {
-			return res.status(500).json({ success: false, message: "DATA_GOV_API_KEY missing" });
-		}
-		const limit = Number(req.query.limit) || 100;
-		const url = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=${apiKey}&format=json&limit=${limit}`;
-		const apiRes = await fetch(url);
-		if (!apiRes.ok) {
-			return res.status(apiRes.status).json({ success: false, message: "Failed to fetch crop prices" });
-		}
-		const data = await apiRes.json();
-		res.header("Access-Control-Allow-Origin", "*");
-		res.json(data);
-	} catch (e) {
-		console.error("Crop prices API error:", e);
-		res.status(500).json({ success: false, message: "Internal error fetching crop prices" });
-	}
-});
 
 
-// 3. CORS Configuration
+// 3. CORS Configuration - Allow all localhost ports
 const corsOptions = {
 	origin: function (origin, callback) {
+		// Allow requests with no origin (mobile apps, Postman, etc.)
 		if (!origin) return callback(null, true);
 
-		const allowedOrigins = [
-			"http://localhost:5174",
-			"http://localhost:5173",
-			"http://localhost:3000",
-			"http://127.0.0.1:5174",
-			"http://127.0.0.1:5173",
-			process.env.CLIENT_URL,
-		].filter(Boolean);
-
-		if (allowedOrigins.indexOf(origin) !== -1) {
-			callback(null, true);
-		} else {
-			console.log("❌ CORS blocked origin:", origin);
-			callback(null, true); // Allow anyway for development
+		// Allow all localhost and 127.0.0.1 on ANY port (HTTP and HTTPS)
+		if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
+			console.log("✅ CORS allowed origin:", origin);
+			return callback(null, true);
 		}
+		
+		// Allow local network IPs (HTTP and HTTPS)
+		if (origin.match(/^https?:\/\/\d+\.\d+\.\d+\.\d+(:\d+)?$/)) {
+			console.log("✅ CORS allowed network IP:", origin);
+			return callback(null, true);
+		}
+
+		// Allow production URL if set
+		if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
+			console.log("✅ CORS allowed production origin:", origin);
+			return callback(null, true);
+		}
+
+		// For development mode, allow everything
+		if (process.env.NODE_ENV === 'development') {
+			console.log("⚠️  CORS allowing all origins (development mode):", origin);
+			return callback(null, true);
+		}
+
+		console.log("❌ CORS blocked origin:", origin);
+		callback(new Error('Not allowed by CORS'));
 	},
 	credentials: true,
 	methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -133,23 +145,21 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-
 // 2. Rate limiting - ✅ FIXED: More permissive for development
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,  // ✅ 1 minute window (shorter but resets faster)
-  max: 100,  // ✅ 100 requests per minute (much more permissive)
-  message: "Too many requests from this IP, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-  // ✅ Skip rate limiting for development
-  skip: (req) => process.env.NODE_ENV === "development",
+	windowMs: 1 * 60 * 1000, // ✅ 1 minute window (shorter but resets faster)
+	max: 100, // ✅ 100 requests per minute (much more permissive)
+	message: "Too many requests from this IP, please try again later.",
+	standardHeaders: true,
+	legacyHeaders: false,
+	// ✅ Skip rate limiting for development
+	skip: (req) => process.env.NODE_ENV === "development",
 });
 
 // ✅ Apply rate limiter AFTER CORS (so CORS headers are always sent)
 // We'll move this below CORS middleware
 
 app.use("/api/", limiter);
-
 
 // 4. Compression
 app.use(compression());
@@ -166,6 +176,34 @@ app.use((req, res, next) => {
 	req.io = io;
 	req.emailTransporter = emailTransporter;
 	next();
+});
+
+
+app.get("/api/crop-prices", async (req, res) => {
+	try {
+		const apiKey = process.env.DATA_GOV_API_KEY;
+		if (!apiKey) {
+			return res
+				.status(500)
+				.json({ success: false, message: "DATA_GOV_API_KEY missing" });
+		}
+		const limit = Number(req.query.limit) || 100;
+		const url = `https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=${apiKey}&format=json&limit=${limit}`;
+		const apiRes = await fetch(url);
+		if (!apiRes.ok) {
+			return res
+				.status(apiRes.status)
+				.json({ success: false, message: "Failed to fetch crop prices" });
+		}
+		const data = await apiRes.json();
+		// res.header("Access-Control-Allow-Origin", "*");
+		res.json(data);
+	} catch (e) {
+		console.error("Crop prices API error:", e);
+		res
+			.status(500)
+			.json({ success: false, message: "Internal error fetching crop prices" });
+	}
 });
 
 // ========================
@@ -194,27 +232,25 @@ io.on("connection", (socket) => {
 	});
 });
 
-
-
 // Initialize Gemini AI
 let genAI = null;
 let model = null;
 
 try {
-  const apiKey = process.env.GEMINI_API_KEY;
-  
-  if (!apiKey) {
-    console.log("⚠️  GEMINI_API_KEY not found in .env");
-  } else {
-    console.log("🔑 Gemini API Key loaded:", apiKey.substring(0, 10) + "...");
-    genAI = new GoogleGenerativeAI(apiKey);
-    model = genAI.getGenerativeModel({
+	const apiKey = process.env.GEMINI_API_KEY;
+
+	if (!apiKey) {
+		console.log("⚠️  GEMINI_API_KEY not found in .env");
+	} else {
+		console.log("🔑 Gemini API Key loaded:", apiKey.substring(0, 10) + "...");
+		genAI = new GoogleGenerativeAI(apiKey);
+		model = genAI.getGenerativeModel({
 			model: "gemini-2.5-pro",
 		});
-    console.log("✅ Gemini AI initialized successfully");
-  }
+		console.log("✅ Gemini AI initialized successfully");
+	}
 } catch (error) {
-  console.error("❌ Failed to initialize Gemini AI:", error.message);
+	console.error("❌ Failed to initialize Gemini AI:", error.message);
 }
 
 // ... rest of your server setup ...
@@ -303,8 +339,6 @@ Provide a helpful, practical answer in 2-3 sentences. Be conversational and supp
 	}
 });
 
-
-
 // ========================
 // IMPORT ROUTES
 // ========================
@@ -325,6 +359,7 @@ const workerHireRoutes = require("./routes/workHireRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const cartRoutes = require("./routes/cartRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const ratingRoutes = require("./routes/ratingRoutes");
 
 // ========================
 // API ROUTES
@@ -346,6 +381,7 @@ app.use("/api/worker-hires", workerHireRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/ratings", ratingRoutes);
 
 // ========================
 // WELCOME ROUTE

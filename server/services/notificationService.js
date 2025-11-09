@@ -584,6 +584,42 @@ class NotificationService {
 
 		return notification;
 	}
+
+	// ========================================
+	// 7. ORDER (CROP) NOTIFICATIONS
+	// ========================================
+	static async notifyOrderConfirmed(buyer, order, emailTransporter = null) {
+		if (buyer?.email) {
+			await sendEmail(
+				buyer.email,
+				"✅ Order Confirmed",
+				`Your crop order <strong>#${String(order._id).slice(0,8)}</strong> has been confirmed by the seller.`,
+				emailTransporter
+			);
+		}
+	}
+
+	static async notifyOrderPicked(buyer, order, emailTransporter = null) {
+		if (buyer?.email) {
+			await sendEmail(
+				buyer.email,
+				"🚚 Order Picked Up",
+				`Your crop order <strong>#${String(order._id).slice(0,8)}</strong> has been picked up from the farm.`,
+				emailTransporter
+			);
+		}
+	}
+
+	static async notifyOrderCompleted(seller, order, emailTransporter = null) {
+		if (seller?.email) {
+			await sendEmail(
+				seller.email,
+				"✅ Order Completed",
+				`Order <strong>#${String(order._id).slice(0,8)}</strong> was marked as received by the buyer.`,
+				emailTransporter
+			);
+		}
+	}
 }
 
 module.exports = NotificationService;

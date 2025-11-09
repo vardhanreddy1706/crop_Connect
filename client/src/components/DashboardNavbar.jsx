@@ -1,7 +1,8 @@
 import React from "react";
-import { Sprout, LogOut, Menu, X } from "lucide-react";
+import { Sprout, LogOut, Menu, X, Moon, Sun } from "lucide-react";
 import { NotificationBell } from "./NotificationBell";
 import LanguageSelector from "./LanguageSelector";
+import { Link } from "react-router-dom";
 
 /**
  * Modern, elegant Dashboard Navbar for CropConnect
@@ -22,7 +23,35 @@ export default function DashboardNavbar({
   onTabChange,
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [darkMode, setDarkMode] = React.useState(() => {
+    // Check localStorage or system preference
+    const saved = localStorage.getItem('darkMode');
+    if (saved !== null) return saved === 'true';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+  
   const showTabs = Array.isArray(tabs) && tabs.length > 0 && typeof onTabChange === "function";
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('darkMode', newMode.toString());
+    if (newMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Apply dark mode on mount
+  React.useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   // Role-based theme colors
   const roleThemes = {
@@ -41,7 +70,7 @@ export default function DashboardNavbar({
         <div className="flex items-center justify-between h-20">
           {/* Left: Brand + Tagline */}
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-2xl bg-gradient-to-br ${theme.gradient} shadow-lg hover:shadow-xl transition-shadow duration-300`}>
+            <div className="p-3 rounded-2xl bg-green-600 shadow-lg hover:shadow-xl transition-shadow duration-300">
               <Sprout className="w-7 h-7 text-white" strokeWidth={2.5} />
             </div>
             <div>
@@ -76,11 +105,35 @@ export default function DashboardNavbar({
               </div>
             )}
 
+            {/* Dark Mode Toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Toggle dark mode"
+              title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {darkMode ? (
+                <Sun className="w-5 h-5 text-yellow-500" />
+              ) : (
+                <Moon className="w-5 h-5 text-gray-700" />
+              )}
+            </button>
+
             {/* Notification Bell */}
             <NotificationBell />
 
             {/* Language Selector */}
             <LanguageSelector />
+
+            {/* Browse Crops (Buyer only) */}
+            {role === "Buyer" && (
+              <Link
+                to="/crops"
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white bg-green-600 hover:bg-green-700 transition-all duration-200 font-semibold shadow-sm hover:shadow-md"
+              >
+                Browse Crops
+              </Link>
+            )}
 
             {/* Logout Button */}
             {typeof onLogout === "function" && (
@@ -120,6 +173,16 @@ export default function DashboardNavbar({
                 </div>
               </div>
             )}
+            {/* Mobile: Browse Crops (Buyer only) */}
+            {role === "Buyer" && (
+              <Link
+                to="/crops"
+                className="block w-full text-center px-4 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700"
+              >
+                Browse Crops
+              </Link>
+            )}
+
             {typeof onLogout === "function" && (
               <button
                 onClick={onLogout}

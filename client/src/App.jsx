@@ -6,13 +6,18 @@ import {
 	useLocation,
 } from "react-router-dom";
 
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useAuth } from "./context/AuthContext";
 
 // Pages
 import CropConnectLanding from "./auth/LandingPage";
 import Login from "./auth/Login";
 import Register from "./auth/Register";
 import RegisterFB from "./auth/RegistrationFB";
+
+import HelpCenterPage from './pages/HelpCenter';
+import BlogPage from './pages/Blog';
+import TermsOfServicePage from './pages/TermsOfService';
+import PrivacyPolicyPage from './pages/PrivacyPolicy';
 
 import About from "./pages/About";
 import Contact from "./help/Contact";
@@ -25,11 +30,10 @@ import TractorBooking from "./pages/TractorBooking";
 import WorkerBookings from "./pages/Bookings";
 import FarmerBookings from "./pages/BookingsHistory";
 import TransactionHistory from "./pages/TransactionHistory";
-import { NotificationProvider } from "./context/NotificationContext";
 import FarmerMyBookings from "./pages/FarmerBookings";
-import { LanguageProvider } from "./context/LanguageContext";
 import FarmerOrders from "./pages/FarmerOrders";
 import FarmerCropStatus from "./pages/FarmerCropStatus";
+import FarmerRatings from "./pages/FarmerRatings";
 import CropListings from "./pages/CropListings";
 // Dashboards
 import BuyerDashboard from "./dashboards/BuyerDashboard";
@@ -45,6 +49,10 @@ import TermsAndConditions from "./help/TermsAndConditions";
 
 import "./App.css";
 import Chatbot from "./components/ChatBot";
+
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+
 
 // Loading Component
 const LoadingSpinner = () => (
@@ -155,6 +163,9 @@ function AppRoutes() {
 				}
 			/>
 
+			<Route path="/forgot-password" element={<ForgotPassword />} />
+<Route path="/reset-password/:token" element={<ResetPassword />} />
+
 			{/* Protected Routes - Require Authentication */}
 			<Route
 				path="/about"
@@ -198,6 +209,8 @@ function AppRoutes() {
 					</ProtectedRoute>
 				}
 			/>
+
+			
 
 			{/* Product Routes */}
 			<Route
@@ -306,7 +319,21 @@ function AppRoutes() {
 				}
 			/>
 			<Route path="/farmer-crop-status" element={<FarmerCropStatus />} />
+			<Route
+				path="/farmer-ratings"
+				element={
+					<ProtectedRoute allowedRoles={["farmer"]}>
+						<FarmerRatings />
+					</ProtectedRoute>
+				}
+			/>
+             
 
+
+			 <Route path="/help" element={<HelpCenterPage />} />
+<Route path="/blog" element={<BlogPage />} />
+<Route path="/terms" element={<TermsOfServicePage />} />
+<Route path="/privacy" element={<PrivacyPolicyPage />} />
 			{/* Help Routes - Protected */}
 			<Route
 				path="/help/contact"
@@ -370,16 +397,10 @@ function ChatbotOverlay() {
 
 function App() {
 	return (
-		<LanguageProvider>
-			<NotificationProvider>
-				<Router>
-					<AuthProvider>
-						<AppRoutes />
-						<ChatbotOverlay />
-					</AuthProvider>
-				</Router>
-			</NotificationProvider>
-		</LanguageProvider>
+		<Router>
+			<AppRoutes />
+			<ChatbotOverlay />
+		</Router>
 	);
 }
 
