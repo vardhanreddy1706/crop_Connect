@@ -5,7 +5,10 @@ const helmet = require("helmet");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
 const cookieParser = require("cookie-parser");
+const https = require("https");
 const http = require("http");
+const fs = require("fs");
+const path = require("path");
 const { Server } = require("socket.io");
 const connectDB = require("./config/db");
 const errorHandler = require("./middlewares/errorHandler");
@@ -23,8 +26,33 @@ const axios = require("axios");
 const app = express();
 app.use(express.json({ limit: "10mb" })); // raise limit if needed
 
-// Create HTTP server for Socket.IO
-const server = http.createServer(app);
+// Create HTTP/HTTPS server for Socket.IO
+let server;
+let isHttps = false;
+
+try {
+	// Check if SSL certificates exist
+	const sslKeyPath = path.join(__dirname, "ssl", "key.pem");
+	const sslCertPath = path.join(__dirname, "ssl", "cert.pem");
+
+	if (fs.existsSync(sslKeyPath) && fs.existsSync(sslCertPath)) {
+		const sslOptions = {
+			key: fs.readFileSync(sslKeyPath),
+			cert: fs.readFileSync(sslCertPath),
+		};
+		server = https.createServer(sslOptions, app);
+		isHttps = true;
+		console.log("✅ HTTPS server initialized with SSL certificates");
+	} else {
+		server = http.createServer(app);
+		console.log("⚠️  HTTP server initialized (SSL certificates not found)");
+		console.log("   To enable HTTPS, run: npm run generate-ssl");
+	}
+} catch (error) {
+	console.error("❌ Error initializing server:", error.message);
+	server = http.createServer(app);
+	console.log("⚠️  Fallback to HTTP server");
+}
 
 // Initialize Socket.IO with flexible CORS for all localhost ports
 const io = new Server(server, {
@@ -32,28 +60,28 @@ const io = new Server(server, {
 		origin: function (origin, callback) {
 			// Allow requests with no origin (mobile apps, Postman, etc.)
 			if (!origin) return callback(null, true);
-			
+
 			// Allow all localhost and 127.0.0.1 on any port (HTTP and HTTPS)
 			if (origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/)) {
 				return callback(null, true);
 			}
-			
+
 			// Allow local network IPs (HTTP and HTTPS)
 			if (origin.match(/^https?:\/\/\d+\.\d+\.\d+\.\d+(:\d+)?$/)) {
 				return callback(null, true);
 			}
-			
+
 			// Allow production URL if set
 			if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
 				return callback(null, true);
 			}
-			
+
 			// For development, allow all origins
-			if (process.env.NODE_ENV === 'development') {
+			if (process.env.NODE_ENV === "development") {
 				return callback(null, true);
 			}
-			
-			callback(new Error('Not allowed by CORS'));
+
+			callback(new Error("Not allowed by CORS"));
 		},
 		methods: ["GET", "POST", "PUT", "DELETE"],
 		credentials: true,
@@ -101,8 +129,6 @@ try {
 // 1. Helmet - Set security headers
 app.use(helmet());
 
-
-
 // 3. CORS Configuration - Allow all localhost ports
 const corsOptions = {
 	origin: function (origin, callback) {
@@ -114,7 +140,7 @@ const corsOptions = {
 			console.log("✅ CORS allowed origin:", origin);
 			return callback(null, true);
 		}
-		
+
 		// Allow local network IPs (HTTP and HTTPS)
 		if (origin.match(/^https?:\/\/\d+\.\d+\.\d+\.\d+(:\d+)?$/)) {
 			console.log("✅ CORS allowed network IP:", origin);
@@ -128,13 +154,13 @@ const corsOptions = {
 		}
 
 		// For development mode, allow everything
-		if (process.env.NODE_ENV === 'development') {
+		if (process.env.NODE_ENV === "development") {
 			console.log("⚠️  CORS allowing all origins (development mode):", origin);
 			return callback(null, true);
 		}
 
 		console.log("❌ CORS blocked origin:", origin);
-		callback(new Error('Not allowed by CORS'));
+		callback(new Error("Not allowed by CORS"));
 	},
 	credentials: true,
 	methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -177,7 +203,6 @@ app.use((req, res, next) => {
 	req.emailTransporter = emailTransporter;
 	next();
 });
-
 
 app.get("/api/crop-prices", async (req, res) => {
 	try {
@@ -446,14 +471,16 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 8000;
 
 server.listen(PORT, () => {
+	const protocol = isHttps ? "https" : "http";
 	console.log("\n🚀 ========================================");
 	console.log(
 		`✅ Server running in ${process.env.NODE_ENV || "development"} mode`
 	);
-	console.log(`🌐 Server URL: http://localhost:${PORT}`);
-	console.log(`📡 API Base: http://localhost:${PORT}/api`);
+	console.log(`🌐 Server URL: ${protocol}://localhost:${PORT}`);
+	console.log(`📡 API Base: ${protocol}://localhost:${PORT}/api`);
 	console.log(`🔐 JWT Authentication: Enabled`);
-	console.log(`🌐 CORS: Enabled for http://localhost:5174`);
+	console.log(`🔒 HTTPS: ${isHttps ? "Enabled ✅" : "Disabled ⚠️"}`);
+	console.log(`🌐 CORS: Enabled for localhost and network IPs`);
 	console.log(`🔔 Socket.IO: Enabled for real-time notifications`);
 	console.log(
 		`📧 Email Service: ${

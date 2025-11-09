@@ -7,9 +7,11 @@ const envUrl = import.meta.env.VITE_API_BASE_URL;
 const defaultApiUrl = (() => {
 	if (typeof window === "undefined") return "http://localhost:8000/api";
 
-	// Use the same hostname the frontend is served from
+	// Use the same protocol, hostname, and port as the frontend
+	const protocol = window.location.protocol; // 'https:' or 'http:'
 	const host = window.location.hostname;
-	return `http://${host}:8000/api`;
+	const port = 8000; // Backend port
+	return `${protocol}//${host}:${port}/api`;
 })();
 
 const API_BASE_URL = envUrl || defaultApiUrl;

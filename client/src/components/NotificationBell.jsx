@@ -11,7 +11,7 @@ export const NotificationBell = () => {
 		<div className="relative">
 			<button
 				onClick={() => setShowDropdown(!showDropdown)}
-				className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+				className="relative p-2 text-white bg-gray-800 hover:bg-gray-100 hover:text-red-600 rounded-lg transition"
 			>
 				<Bell className="w-6 h-6" />
 				{unreadCount > 0 && (

@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import RatingModal from "../components/RatingModal";
 import RatingStars from "../components/RatingStars";
 import MyRatingsTab from "../components/MyRatingsTab";
-import RatingsReceivedTab from "../components/RatingsRecieved";
+import RatingsReceivedTab from "../components/RatingsReceived";
 import {
 	TrendingUp,
 	Users,
@@ -51,13 +51,17 @@ function WorkerDashboard() {
 	const [activeTab, setActiveTab] = useState("overview");
 	const [activeWorkSubTab, setActiveWorkSubTab] = useState("accepted");
 	const [ratingModal, setRatingModal] = useState({ isOpen: false, data: null });
-	const [ratingStats, setRatingStats] = useState({ averageRating: 0, totalRatings: 0, distribution: {} });
+	const [ratingStats, setRatingStats] = useState({
+		averageRating: 0,
+		totalRatings: 0,
+		distribution: {},
+	});
 
 	// Check if already rated helper function
 	const checkIfRated = async (rateeId, transactionRef) => {
 		try {
-			const response = await api.get('/ratings/can-rate', {
-				params: { rateeId, ...transactionRef }
+			const response = await api.get("/ratings/can-rate", {
+				params: { rateeId, ...transactionRef },
 			});
 			return response.data;
 		} catch (error) {
@@ -125,7 +129,7 @@ function WorkerDashboard() {
 				setRatingStats(response.data.data.stats);
 			}
 		} catch (error) {
-			console.error('Fetch rating stats error:', error);
+			console.error("Fetch rating stats error:", error);
 		}
 	};
 
@@ -532,7 +536,7 @@ function WorkerDashboard() {
 	const isPast = (date) => new Date(date) < new Date();
 
 	if (loading && myServices.length === 0 && workOrders.length === 0) {
-			return (
+		return (
 			<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
 				<div className="text-center">
 					<Loader
@@ -553,96 +557,123 @@ function WorkerDashboard() {
 					{/* Header replaced by DashboardNavbar */}
 
 					{/* Stats Cards */}
-					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-						<div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
+						<div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl shadow-lg p-4 md:p-6 hover:shadow-2xl transition-all duration-300">
 							<div className="flex items-center justify-between mb-2">
-								<Briefcase size={32} className="opacity-80" />
-								<span className="text-3xl font-bold">{stats.totalWork}</span>
+								<Briefcase size={24} className="md:size-32 opacity-80" />
+								<span className="text-2xl md:text-3xl font-bold">
+									{stats.totalWork}
+								</span>
 							</div>
-							<p className="text-blue-100 font-semibold">{tr("Total Work")}</p>
+							<p className="text-blue-100 font-semibold text-sm md:text-base">
+								{tr("Total Work")}
+							</p>
 						</div>
 
-						<div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-xl shadow-lg p-4 md:p-6 hover:shadow-2xl transition-all duration-300">
 							<div className="flex items-center justify-between mb-2">
-								<CheckCircle size={32} className="opacity-80" />
-								<span className="text-3xl font-bold">{stats.accepted}</span>
+								<CheckCircle size={24} className="md:size-32 opacity-80" />
+								<span className="text-2xl md:text-3xl font-bold">
+									{stats.accepted}
+								</span>
 							</div>
-							<p className="text-green-100 font-semibold">{tr("Accepted")}</p>
+							<p className="text-green-100 font-semibold text-sm md:text-base">
+								{tr("Accepted")}
+							</p>
 						</div>
 
-						<div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white rounded-xl shadow-lg p-4 md:p-6 hover:shadow-2xl transition-all duration-300">
 							<div className="flex items-center justify-between mb-2">
-								<Clock size={32} className="opacity-80" />
-								<span className="text-3xl font-bold">{stats.pending}</span>
+								<Clock size={24} className="md:size-32 opacity-80" />
+								<span className="text-2xl md:text-3xl font-bold">
+									{stats.pending}
+								</span>
 							</div>
-							<p className="text-yellow-100 font-semibold">
+							<p className="text-yellow-100 font-semibold text-sm md:text-base">
 								{tr("Pending Requests")}
 							</p>
 						</div>
 
-						<div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300">
+						<div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl shadow-lg p-4 md:p-6 hover:shadow-2xl transition-all duration-300">
 							<div className="flex items-center justify-between mb-2">
-								<IndianRupee size={32} className="opacity-80" />
-								<span className="text-3xl font-bold">
+								<IndianRupee size={24} className="md:size-32 opacity-80" />
+								<span className="text-2xl md:text-3xl font-bold">
 									₹{stats.totalEarnings}
 								</span>
 							</div>
-							<p className="text-purple-100 font-semibold">
+							<p className="text-purple-100 font-semibold text-sm md:text-base">
 								{tr("Total Earnings")}
 							</p>
 						</div>
 					</div>
 
 					{/* Tab Navigation */}
-					<div className="bg-white rounded-2xl shadow-xl p-2 mb-8">
-						<div className="flex flex-wrap gap-2">
+					<div className="bg-white rounded-2xl shadow-xl p-2 md:p-4 mb-6 md:mb-8">
+						<div className="flex flex-wrap gap-1 md:gap-2">
 							<button
 								onClick={() => setActiveTab("overview")}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "overview"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<TrendingUp className="mr-2" size={20} />
-								{tr("Overview")}
+								<TrendingUp className="mr-1 md:mr-2" size={16} />
+								<span className="hidden sm:inline">{tr("Overview")}</span>
+								<span className="sm:hidden">{tr("Overview")}</span>
 							</button>
 
 							<button
 								onClick={() => setActiveTab("services")}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "services"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<Briefcase className="mr-2" size={20} />
-								{tr("My Services")} ({visibleServices.length})
+								<Briefcase className="mr-1 md:mr-2" size={16} />
+								<span className="hidden sm:inline">
+									{tr("My Services")} ({visibleServices.length})
+								</span>
+								<span className="sm:hidden">
+									{tr("Services")} ({visibleServices.length})
+								</span>
 							</button>
 
 							<button
 								onClick={() => setActiveTab("hire-requests")}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "hire-requests"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<Mail className="mr-2" size={20} />
-								{tr("Hire Requests")} (
-								{hireRequests.filter((r) => r.status === "pending").length})
+								<Mail className="mr-1 md:mr-2" size={16} />
+								<span className="hidden sm:inline">
+									{tr("Hire Requests")} (
+									{hireRequests.filter((r) => r.status === "pending").length})
+								</span>
+								<span className="sm:hidden">
+									{tr("Requests")} (
+									{hireRequests.filter((r) => r.status === "pending").length})
+								</span>
 							</button>
 
 							<button
 								onClick={() => setActiveTab("work")}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "work"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<Users className="mr-2" size={20} />
-								{tr("My Work")} ({workOrders.length})
+								<Users className="mr-1 md:mr-2" size={16} />
+								<span className="hidden sm:inline">
+									{tr("My Work")} ({workOrders.length})
+								</span>
+								<span className="sm:hidden">
+									{tr("Work")} ({workOrders.length})
+								</span>
 							</button>
 
 							<button
@@ -650,14 +681,15 @@ function WorkerDashboard() {
 									setActiveTab("available");
 									fetchAvailableJobs();
 								}}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "available"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<Search className="mr-2" size={20} />
-								{tr("Available Work")}
+								<Search className="mr-1 md:mr-2" size={16} />
+								<span className="hidden sm:inline">{tr("Available Work")}</span>
+								<span className="sm:hidden">{tr("Available")}</span>
 							</button>
 
 							<button
@@ -665,26 +697,27 @@ function WorkerDashboard() {
 									setActiveTab("earnings");
 									fetchTransactions();
 								}}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "earnings"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<IndianRupee className="mr-2" size={20} />
+								<IndianRupee className="mr-1 md:mr-2" size={16} />
 								{tr("Earnings")}
 							</button>
 
 							<button
 								onClick={() => setActiveTab("my-ratings")}
-								className={`flex-1 min-w-[120px] py-3 px-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center ${
+								className={`flex-1 min-w-[100px] md:min-w-[120px] py-2 md:py-3 px-2 md:px-4 rounded-lg md:rounded-xl text-sm md:text-base font-bold transition-all duration-300 flex items-center justify-center ${
 									activeTab === "my-ratings"
 										? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg scale-105"
 										: "bg-gray-100 text-gray-600 hover:bg-gray-200"
 								}`}
 							>
-								<Star className="mr-2" size={20} />
-								{tr("My Ratings")}
+								<Star className="mr-1 md:mr-2" size={16} />
+								<span className="hidden sm:inline">{tr("My Ratings")}</span>
+								<span className="sm:hidden">{tr("Ratings")}</span>
 							</button>
 						</div>
 					</div>
@@ -807,20 +840,25 @@ function WorkerDashboard() {
 												<div className="flex items-center justify-center gap-2 mb-2">
 													<Star className="w-8 h-8 fill-yellow-400 text-yellow-400" />
 													<span className="text-4xl font-bold text-gray-900">
-														{ratingStats.averageRating > 0 ? ratingStats.averageRating.toFixed(1) : '0.0'}
+														{ratingStats.averageRating > 0
+															? ratingStats.averageRating.toFixed(1)
+															: "0.0"}
 													</span>
 												</div>
 												<p className="text-sm text-gray-600">
-													{ratingStats.totalRatings} {ratingStats.totalRatings === 1 ? tr('Review') : tr('Reviews')}
+													{ratingStats.totalRatings}{" "}
+													{ratingStats.totalRatings === 1
+														? tr("Review")
+														: tr("Reviews")}
 												</p>
 											</div>
 										</div>
 										<button
-											onClick={() => setActiveTab('ratings-received')}
+											onClick={() => setActiveTab("ratings-received")}
 											className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white px-4 py-2 rounded-lg transition-all font-medium flex items-center justify-center gap-2"
 										>
 											<Star className="w-4 h-4" />
-											{tr('View All Reviews')}
+											{tr("View All Reviews")}
 										</button>
 									</div>
 								</div>
@@ -1338,188 +1376,203 @@ function WorkerDashboard() {
 													pageHireRequests * itemsPerPage + itemsPerPage
 												)
 												.map((request) => (
-											<div
-												key={request._id}
-												className="bg-white rounded-xl shadow-lg overflow-hidden p-6 border-2 border-gray-200 hover:border-green-500 transition"
-											>
-												<div className="flex justify-between items-start mb-4">
-													<div>
-														<h3 className="text-xl font-bold text-gray-900 mb-1">
-															Hire Request from{" "}
-															{request.farmer?.name || "Farmer"}
-														</h3>
-														<p className="text-sm text-gray-600">
-															{request.workerService?.workerType || "Service"}
-														</p>
-													</div>
-													<span
-														className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
-															request.status
-														)}`}
+													<div
+														key={request._id}
+														className="bg-white rounded-xl shadow-lg overflow-hidden p-6 border-2 border-gray-200 hover:border-green-500 transition"
 													>
-														{request.status?.toUpperCase() || "PENDING"}
-													</span>
-												</div>
-
-												<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-													<div className="flex items-center text-gray-700">
-														<IndianRupee
-															className="mr-2 text-green-600"
-															size={18}
-														/>
-														<span className="font-semibold">
-															{tr("Amount:")}
-														</span>
-														<span className="ml-2 font-bold text-green-600">
-															₹{request.agreedAmount || 0}/day
-														</span>
-													</div>
-
-													<div className="flex items-center text-gray-700">
-														<Clock className="mr-2 text-green-600" size={18} />
-														<span className="font-semibold">
-															{tr("Received:")}
-														</span>
-														<span className="ml-2">
-															{formatDate(request.createdAt)}
-														</span>
-													</div>
-
-													<div className="flex items-center text-gray-700">
-														<Phone className="mr-2 text-green-600" size={18} />
-														<span className="font-semibold">
-															{tr("Contact:")}
-														</span>
-														<span className="ml-2">
-															{request.farmer?.phone || "N/A"}
-														</span>
-													</div>
-
-													<div className="flex items-center text-gray-700">
-														<Mail className="mr-2 text-green-600" size={18} />
-														<span className="font-semibold">
-															{tr("Email:")}
-														</span>
-														<span className="ml-2 text-sm">
-															{request.farmer?.email || "N/A"}
-														</span>
-													</div>
-												</div>
-
-												{request.notes && (
-													<div className="bg-blue-50 p-4 rounded-lg mb-4">
-														<p className="text-sm text-gray-700">
-															<span className="font-semibold">
-																{tr("Notes:")}
-															</span>{" "}
-															{request.notes}
-														</p>
-													</div>
-												)}
-
-												{request.workDetails && (
-													<div className="bg-gray-50 p-4 rounded-lg mb-4">
-														<p className="font-semibold text-gray-700 mb-2">
-															{tr("Work Details:")}
-														</p>
-														<div className="text-sm text-gray-600 space-y-1">
-															{request.workDetails.startDate && (
-																<p>
-																	{tr("Start Date:")}{" "}
-																	{formatDate(request.workDetails.startDate)}
+														<div className="flex justify-between items-start mb-4">
+															<div>
+																<h3 className="text-xl font-bold text-gray-900 mb-1">
+																	Hire Request from{" "}
+																	{request.farmer?.name || "Farmer"}
+																</h3>
+																<p className="text-sm text-gray-600">
+																	{request.workerService?.workerType ||
+																		"Service"}
 																</p>
-															)}
-															{request.workDetails.duration && (
-																<p>
-																	{tr("Duration:")}{" "}
-																	{request.workDetails.duration} {tr("day(s)")}
-																</p>
-															)}
-															{request.workDetails.workDescription && (
-																<p>
-																	{tr("Work:")}{" "}
-																	{request.workDetails.workDescription}
-																</p>
-															)}
-															{request.workDetails.location?.district && (
-																<p>
-																	{tr("Location:")}{" "}
-																	{request.workDetails.location.district}
-																</p>
-															)}
+															</div>
+															<span
+																className={`px-4 py-2 rounded-full text-sm font-semibold ${getStatusColor(
+																	request.status
+																)}`}
+															>
+																{request.status?.toUpperCase() || "PENDING"}
+															</span>
 														</div>
-													</div>
-												)}
 
-												{request.status === "pending" && (
-													<div className="flex gap-2 pt-4 border-t-2">
-														<button
-															onClick={() =>
-																handleAcceptHireRequest(request._id)
-															}
-															disabled={actionLoading === request._id}
-															className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
-														>
-															{actionLoading === request._id ? (
-																<Loader
-																	className="animate-spin mr-2"
-																	size={16}
+														<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+															<div className="flex items-center text-gray-700">
+																<IndianRupee
+																	className="mr-2 text-green-600"
+																	size={18}
 																/>
-															) : (
-																<CheckCircle className="mr-2" size={16} />
-															)}
-															{tr("Accept & Book")}
-														</button>
-														<button
-															onClick={() =>
-																handleRejectHireRequest(request._id)
-															}
-															disabled={actionLoading === request._id}
-															className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
-														>
-															<XCircle className="mr-2" size={16} />
-															{tr("Reject")}
-														</button>
-													</div>
-												)}
+																<span className="font-semibold">
+																	{tr("Amount:")}
+																</span>
+																<span className="ml-2 font-bold text-green-600">
+																	₹{request.agreedAmount || 0}/day
+																</span>
+															</div>
 
-												{request.status === "accepted" && (
-													<div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
-														<p className="text-green-800 font-semibold flex items-center mb-2">
-															<CheckCircle className="mr-2" size={20} />✅{" "}
-															{tr("Request accepted! Booking created.")}
-														</p>
-														<button
-															onClick={() => setActiveTab("work")}
-															className="text-green-600 font-semibold underline"
-														>
-															{tr("View Booking →")}
-														</button>
-													</div>
-												)}
+															<div className="flex items-center text-gray-700">
+																<Clock
+																	className="mr-2 text-green-600"
+																	size={18}
+																/>
+																<span className="font-semibold">
+																	{tr("Received:")}
+																</span>
+																<span className="ml-2">
+																	{formatDate(request.createdAt)}
+																</span>
+															</div>
 
-												{request.status === "rejected" && (
-													<div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
-														<p className="text-red-800 font-semibold flex items-center">
-															<XCircle className="mr-2" size={20} />❌{" "}
-															{tr("Request rejected")}
-														</p>
-														{request.rejectionReason && (
-															<p className="text-red-600 text-sm mt-2">
-																{tr("Reason:")} {request.rejectionReason}
-															</p>
+															<div className="flex items-center text-gray-700">
+																<Phone
+																	className="mr-2 text-green-600"
+																	size={18}
+																/>
+																<span className="font-semibold">
+																	{tr("Contact:")}
+																</span>
+																<span className="ml-2">
+																	{request.farmer?.phone || "N/A"}
+																</span>
+															</div>
+
+															<div className="flex items-center text-gray-700">
+																<Mail
+																	className="mr-2 text-green-600"
+																	size={18}
+																/>
+																<span className="font-semibold">
+																	{tr("Email:")}
+																</span>
+																<span className="ml-2 text-sm">
+																	{request.farmer?.email || "N/A"}
+																</span>
+															</div>
+														</div>
+
+														{request.notes && (
+															<div className="bg-blue-50 p-4 rounded-lg mb-4">
+																<p className="text-sm text-gray-700">
+																	<span className="font-semibold">
+																		{tr("Notes:")}
+																	</span>{" "}
+																	{request.notes}
+																</p>
+															</div>
+														)}
+
+														{request.workDetails && (
+															<div className="bg-gray-50 p-4 rounded-lg mb-4">
+																<p className="font-semibold text-gray-700 mb-2">
+																	{tr("Work Details:")}
+																</p>
+																<div className="text-sm text-gray-600 space-y-1">
+																	{request.workDetails.startDate && (
+																		<p>
+																			{tr("Start Date:")}{" "}
+																			{formatDate(
+																				request.workDetails.startDate
+																			)}
+																		</p>
+																	)}
+																	{request.workDetails.duration && (
+																		<p>
+																			{tr("Duration:")}{" "}
+																			{request.workDetails.duration}{" "}
+																			{tr("day(s)")}
+																		</p>
+																	)}
+																	{request.workDetails.workDescription && (
+																		<p>
+																			{tr("Work:")}{" "}
+																			{request.workDetails.workDescription}
+																		</p>
+																	)}
+																	{request.workDetails.location?.district && (
+																		<p>
+																			{tr("Location:")}{" "}
+																			{request.workDetails.location.district}
+																		</p>
+																	)}
+																</div>
+															</div>
+														)}
+
+														{request.status === "pending" && (
+															<div className="flex gap-2 pt-4 border-t-2">
+																<button
+																	onClick={() =>
+																		handleAcceptHireRequest(request._id)
+																	}
+																	disabled={actionLoading === request._id}
+																	className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
+																>
+																	{actionLoading === request._id ? (
+																		<Loader
+																			className="animate-spin mr-2"
+																			size={16}
+																		/>
+																	) : (
+																		<CheckCircle className="mr-2" size={16} />
+																	)}
+																	{tr("Accept & Book")}
+																</button>
+																<button
+																	onClick={() =>
+																		handleRejectHireRequest(request._id)
+																	}
+																	disabled={actionLoading === request._id}
+																	className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
+																>
+																	<XCircle className="mr-2" size={16} />
+																	{tr("Reject")}
+																</button>
+															</div>
+														)}
+
+														{request.status === "accepted" && (
+															<div className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+																<p className="text-green-800 font-semibold flex items-center mb-2">
+																	<CheckCircle className="mr-2" size={20} />✅{" "}
+																	{tr("Request accepted! Booking created.")}
+																</p>
+																<button
+																	onClick={() => setActiveTab("work")}
+																	className="text-green-600 font-semibold underline"
+																>
+																	{tr("View Booking →")}
+																</button>
+															</div>
+														)}
+
+														{request.status === "rejected" && (
+															<div className="bg-red-50 p-4 rounded-lg border-2 border-red-200">
+																<p className="text-red-800 font-semibold flex items-center">
+																	<XCircle className="mr-2" size={20} />❌{" "}
+																	{tr("Request rejected")}
+																</p>
+																{request.rejectionReason && (
+																	<p className="text-red-600 text-sm mt-2">
+																		{tr("Reason:")} {request.rejectionReason}
+																	</p>
+																)}
+															</div>
 														)}
 													</div>
-												)}
-											</div>
-										))}
+												))}
 										</div>
 										{/* Pagination */}
 										{hireRequests.length > itemsPerPage && (
 											<div className="flex justify-end items-center gap-2 mt-4">
 												<button
 													onClick={() =>
-														setPageHireRequests(Math.max(0, pageHireRequests - 1))
+														setPageHireRequests(
+															Math.max(0, pageHireRequests - 1)
+														)
 													}
 													disabled={pageHireRequests === 0}
 													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
@@ -1613,14 +1666,22 @@ function WorkerDashboard() {
 											<div className="bg-white rounded-xl shadow-lg p-12 text-center">
 												<Briefcase className="h-16 w-16 text-gray-400 mx-auto mb-4" />
 												<h3 className="text-xl font-semibold text-gray-900 mb-2">
-													{activeWorkSubTab === "accepted" && tr("No Active Work")}
-													{activeWorkSubTab === "completed" && tr("No Completed Work")}
-													{activeWorkSubTab === "cancelled" && tr("No Cancelled Work")}
+													{activeWorkSubTab === "accepted" &&
+														tr("No Active Work")}
+													{activeWorkSubTab === "completed" &&
+														tr("No Completed Work")}
+													{activeWorkSubTab === "cancelled" &&
+														tr("No Cancelled Work")}
 												</h3>
 												<p className="text-gray-600 mb-6">
-													{activeWorkSubTab === "accepted" && tr("You don't have any active work assignments at the moment.")}
-													{activeWorkSubTab === "completed" && tr("You haven't completed any work yet.")}
-													{activeWorkSubTab === "cancelled" && tr("No work has been cancelled.")}
+													{activeWorkSubTab === "accepted" &&
+														tr(
+															"You don't have any active work assignments at the moment."
+														)}
+													{activeWorkSubTab === "completed" &&
+														tr("You haven't completed any work yet.")}
+													{activeWorkSubTab === "cancelled" &&
+														tr("No work has been cancelled.")}
 												</p>
 												{activeWorkSubTab === "accepted" && (
 													<button
@@ -1634,189 +1695,220 @@ function WorkerDashboard() {
 											</div>
 										) : (
 											<>
-										{paginatedWork.map((work) => (
-									<div
-										key={work._id}
-										className="bg-white rounded-xl shadow-lg overflow-hidden"
-									>
-										<div
-											className={`p-6 bg-gradient-to-r ${
-												work.status === "confirmed"
-													? "from-blue-500 to-blue-600"
-													: work.status === "completed"
-													? "from-green-500 to-green-600"
-													: "from-red-500 to-red-600"
-											} text-white`}
-										>
-											<div className="flex justify-between items-start">
-												<div>
-													<h3 className="text-xl font-bold mb-1">
-														{work.workType || work.serviceType}
-													</h3>
-													<p className="text-sm opacity-90">
-														Work ID: {work._id.slice(-8).toUpperCase()}
-													</p>
-												</div>
-												<span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
-													{work.status.toUpperCase()}
-												</span>
-											</div>
-										</div>
-
-										<div className="p-6">
-											<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-												<div className="flex items-center text-gray-700">
-													<Calendar className="mr-2 text-green-600" size={18} />
-													<span className="font-semibold">{tr("Date:")}</span>
-													<span className="ml-2">
-														{formatDate(work.bookingDate)}
-													</span>
-												</div>
-
-												<div className="flex items-center text-gray-700">
-													<IndianRupee
-														className="mr-2 text-green-600"
-														size={18}
-													/>
-													<span className="font-semibold">{tr("Amount:")}</span>
-													<span className="ml-2 font-bold text-green-600">
-														₹{work.totalCost}
-													</span>
-												</div>
-
-												<div className="flex items-center text-gray-700">
-													<MapPin className="mr-2 text-green-600" size={18} />
-													<span className="font-semibold">
-														{tr("Location:")}
-													</span>
-													<span className="ml-2 text-sm">
-														{work.location?.district ||
-															work.location?.village ||
-															"N/A"}
-													</span>
-												</div>
-
-												<div className="flex items-center text-gray-700">
-													<Clock className="mr-2 text-green-600" size={18} />
-													<span className="font-semibold">
-														{tr("Duration:")}
-													</span>
-													<span className="ml-2">{work.duration} day(s)</span>
-												</div>
-											</div>
-
-											{/* Action Buttons for Active Work */}
-											{work.status === "confirmed" && (
-												<div className="flex gap-2 pt-4 border-t-2">
-													{new Date(work.bookingDate) > new Date() ? (
-														<button
-															disabled
-															className="flex-1 px-4 py-2 bg-gray-300 text-gray-600 rounded-lg font-semibold"
+												{paginatedWork.map((work) => (
+													<div
+														key={work._id}
+														className="bg-white rounded-xl shadow-lg overflow-hidden"
+													>
+														<div
+															className={`p-6 bg-gradient-to-r ${
+																work.status === "confirmed"
+																	? "from-blue-500 to-blue-600"
+																	: work.status === "completed"
+																	? "from-green-500 to-green-600"
+																	: "from-red-500 to-red-600"
+															} text-white`}
 														>
-															{tr("Starts on")} {formatDate(work.bookingDate)}
-														</button>
-													) : (
-														<button
-															onClick={() => handleCompleteWork(work._id)}
-															disabled={actionLoading === work._id}
-															className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
-														>
-															{actionLoading === work._id ? (
-																<Loader
-																	className="animate-spin mr-2"
-																	size={16}
-																/>
-															) : (
-																<CheckCircle className="mr-2" size={16} />
+															<div className="flex justify-between items-start">
+																<div>
+																	<h3 className="text-xl font-bold mb-1">
+																		{work.workType || work.serviceType}
+																	</h3>
+																	<p className="text-sm opacity-90">
+																		Work ID: {work._id.slice(-8).toUpperCase()}
+																	</p>
+																</div>
+																<span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-sm font-semibold">
+																	{work.status.toUpperCase()}
+																</span>
+															</div>
+														</div>
+
+														<div className="p-6">
+															<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+																<div className="flex items-center text-gray-700">
+																	<Calendar
+																		className="mr-2 text-green-600"
+																		size={18}
+																	/>
+																	<span className="font-semibold">
+																		{tr("Date:")}
+																	</span>
+																	<span className="ml-2">
+																		{formatDate(work.bookingDate)}
+																	</span>
+																</div>
+
+																<div className="flex items-center text-gray-700">
+																	<IndianRupee
+																		className="mr-2 text-green-600"
+																		size={18}
+																	/>
+																	<span className="font-semibold">
+																		{tr("Amount:")}
+																	</span>
+																	<span className="ml-2 font-bold text-green-600">
+																		₹{work.totalCost}
+																	</span>
+																</div>
+
+																<div className="flex items-center text-gray-700">
+																	<MapPin
+																		className="mr-2 text-green-600"
+																		size={18}
+																	/>
+																	<span className="font-semibold">
+																		{tr("Location:")}
+																	</span>
+																	<span className="ml-2 text-sm">
+																		{work.location?.district ||
+																			work.location?.village ||
+																			"N/A"}
+																	</span>
+																</div>
+
+																<div className="flex items-center text-gray-700">
+																	<Clock
+																		className="mr-2 text-green-600"
+																		size={18}
+																	/>
+																	<span className="font-semibold">
+																		{tr("Duration:")}
+																	</span>
+																	<span className="ml-2">
+																		{work.duration} day(s)
+																	</span>
+																</div>
+															</div>
+
+															{/* Action Buttons for Active Work */}
+															{work.status === "confirmed" && (
+																<div className="flex gap-2 pt-4 border-t-2">
+																	{new Date(work.bookingDate) > new Date() ? (
+																		<button
+																			disabled
+																			className="flex-1 px-4 py-2 bg-gray-300 text-gray-600 rounded-lg font-semibold"
+																		>
+																			{tr("Starts on")}{" "}
+																			{formatDate(work.bookingDate)}
+																		</button>
+																	) : (
+																		<button
+																			onClick={() =>
+																				handleCompleteWork(work._id)
+																			}
+																			disabled={actionLoading === work._id}
+																			className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold flex items-center justify-center disabled:opacity-50"
+																		>
+																			{actionLoading === work._id ? (
+																				<Loader
+																					className="animate-spin mr-2"
+																					size={16}
+																				/>
+																			) : (
+																				<CheckCircle
+																					className="mr-2"
+																					size={16}
+																				/>
+																			)}
+																			{tr("Mark as Completed")}
+																		</button>
+																	)}
+																</div>
 															)}
-															{tr("Mark as Completed")}
-														</button>
-													)}
-												</div>
-											)}
 
-											{work.paymentStatus === "paid" && (
-												<div className="bg-green-50 p-4 rounded-lg border-2 border-green-200 mt-4">
-													<p className="text-green-800 font-semibold flex items-center">
-														<CheckCircle className="mr-2" size={20} />
-														💰 {tr("Payment Received Successfully")}
-													</p>
-												</div>
-											)}
+															{work.paymentStatus === "paid" && (
+																<div className="bg-green-50 p-4 rounded-lg border-2 border-green-200 mt-4">
+																	<p className="text-green-800 font-semibold flex items-center">
+																		<CheckCircle className="mr-2" size={20} />
+																		💰 {tr("Payment Received Successfully")}
+																	</p>
+																</div>
+															)}
 
-											{work.paymentStatus !== "paid" &&
-												work.status === "completed" && (
-													<div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mt-4">
-														<p className="text-yellow-800 font-semibold flex items-center">
-															<Clock className="mr-2" size={20} />{" "}
-															{tr("Waiting for payment from farmer...")}
-														</p>
+															{work.paymentStatus !== "paid" &&
+																work.status === "completed" && (
+																	<div className="bg-yellow-50 p-4 rounded-lg border-2 border-yellow-200 mt-4">
+																		<p className="text-yellow-800 font-semibold flex items-center">
+																			<Clock className="mr-2" size={20} />{" "}
+																			{tr("Waiting for payment from farmer...")}
+																		</p>
+																	</div>
+																)}
+
+															{work.status === "completed" && (
+																<div className="mt-4">
+																	<button
+																		onClick={async () => {
+																			const farmerId =
+																				work.farmer?._id || work.farmer;
+																			const canRateData = await checkIfRated(
+																				farmerId,
+																				{ relatedBooking: work._id }
+																			);
+																			if (canRateData.canRate) {
+																				setRatingModal({
+																					isOpen: true,
+																					data: {
+																						rateeId: farmerId,
+																						rateeName:
+																							work.farmer?.name || "Farmer",
+																						rateeRole: "farmer",
+																						ratingType: "worker_to_farmer",
+																						relatedBooking: work._id,
+																					},
+																				});
+																			} else {
+																				toast.info(
+																					"You have already rated this farmer"
+																				);
+																			}
+																		}}
+																		className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition font-semibold shadow-md hover:shadow-lg"
+																	>
+																		<Star className="w-5 h-5" />
+																		{tr("Rate Farmer")}
+																	</button>
+																</div>
+															)}
+														</div>
 													</div>
-												)}
-
-												{work.status === "completed" && (
-													<div className="mt-4">
+												))}
+												{/* Pagination */}
+												{filteredWork.length > itemsPerPage && (
+													<div className="flex justify-end items-center gap-2 mt-4">
 														<button
-															onClick={async () => {
-																const farmerId = work.farmer?._id || work.farmer;
-																const canRateData = await checkIfRated(
-																	farmerId,
-																	{ relatedBooking: work._id }
-																);
-																if (canRateData.canRate) {
-																	setRatingModal({
-																		isOpen: true,
-																		data: {
-																			rateeId: farmerId,
-																			rateeName: work.farmer?.name || 'Farmer',
-																			rateeRole: 'farmer',
-																			ratingType: 'worker_to_farmer',
-																			relatedBooking: work._id,
-																		}
-																	});
-																} else {
-																	toast.info('You have already rated this farmer');
-																}
-															}}
-															className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white rounded-lg hover:from-yellow-600 hover:to-yellow-700 transition font-semibold shadow-md hover:shadow-lg"
+															onClick={() =>
+																setPageWork(Math.max(0, pageWork - 1))
+															}
+															disabled={pageWork === 0}
+															className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
 														>
-															<Star className="w-5 h-5" />
-															{tr("Rate Farmer")}
+															{tr("Prev")}
+														</button>
+														<button
+															onClick={() =>
+																setPageWork(
+																	(pageWork + 1) %
+																		Math.ceil(
+																			filteredWork.length / itemsPerPage
+																		)
+																)
+															}
+															disabled={
+																pageWork >=
+																Math.ceil(filteredWork.length / itemsPerPage) -
+																	1
+															}
+															className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+														>
+															{tr("Next")}
 														</button>
 													</div>
 												)}
-										</div>
-									</div>
-										))}
-										{/* Pagination */}
-										{filteredWork.length > itemsPerPage && (
-											<div className="flex justify-end items-center gap-2 mt-4">
-												<button
-													onClick={() => setPageWork(Math.max(0, pageWork - 1))}
-													disabled={pageWork === 0}
-													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-												>
-													{tr("Prev")}
-												</button>
-												<button
-													onClick={() =>
-														setPageWork(
-															(pageWork + 1) %
-																Math.ceil(filteredWork.length / itemsPerPage)
-														)
-													}
-													disabled={
-														pageWork >= Math.ceil(filteredWork.length / itemsPerPage) - 1
-													}
-													className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-												>
-													{tr("Next")}
-												</button>
-											</div>
+											</>
 										)}
-										</>
-									)}
-								</>
+									</>
 								);
 							})()}
 						</div>
@@ -2142,28 +2234,49 @@ function WorkerDashboard() {
 							{/* Summary */}
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 								<div className="bg-white rounded-xl shadow-lg p-6">
-									<p className="text-gray-600 font-semibold mb-1">{tr("Total Earned")}</p>
+									<p className="text-gray-600 font-semibold mb-1">
+										{tr("Total Earned")}
+									</p>
 									<p className="text-2xl font-bold text-green-600">
-										₹{transactions.filter(t => t.status === "completed").reduce((s, t) => s + (t.amount || 0), 0)}
+										₹
+										{transactions
+											.filter((t) => t.status === "completed")
+											.reduce((s, t) => s + (t.amount || 0), 0)}
 									</p>
 								</div>
 								<div className="bg-white rounded-xl shadow-lg p-6">
-									<p className="text-gray-600 font-semibold mb-1">{tr("Pending Amount")}</p>
+									<p className="text-gray-600 font-semibold mb-1">
+										{tr("Pending Amount")}
+									</p>
 									<p className="text-2xl font-bold text-yellow-600">
-										₹{transactions.filter(t => t.status === "pending").reduce((s, t) => s + (t.amount || 0), 0)}
+										₹
+										{transactions
+											.filter((t) => t.status === "pending")
+											.reduce((s, t) => s + (t.amount || 0), 0)}
 									</p>
 								</div>
 								<div className="bg-white rounded-xl shadow-lg p-6">
-									<p className="text-gray-600 font-semibold mb-1">{tr("Payments Received")}</p>
-									<p className="text-2xl font-bold text-gray-800">{transactions.filter(t => t.status === "completed").length}</p>
+									<p className="text-gray-600 font-semibold mb-1">
+										{tr("Payments Received")}
+									</p>
+									<p className="text-2xl font-bold text-gray-800">
+										{
+											transactions.filter((t) => t.status === "completed")
+												.length
+										}
+									</p>
 								</div>
 							</div>
 
 							{/* Transactions List */}
 							<div className="bg-white rounded-xl shadow-lg p-6">
-								<h4 className="text-lg font-bold text-gray-800 mb-4">{tr("Transactions")}</h4>
+								<h4 className="text-lg font-bold text-gray-800 mb-4">
+									{tr("Transactions")}
+								</h4>
 								{transactions.length === 0 ? (
-									<div className="text-center py-10 text-gray-500">{tr("No transactions yet")}</div>
+									<div className="text-center py-10 text-gray-500">
+										{tr("No transactions yet")}
+									</div>
 								) : (
 									<>
 										<div className="overflow-x-auto">
@@ -2183,16 +2296,28 @@ function WorkerDashboard() {
 															pageEarnings * itemsPerPage + itemsPerPage
 														)
 														.map((tx) => (
-													<tr key={tx._id} className="border-t">
-														<td className="py-2 text-sm">{formatDate(tx.createdAt)}</td>
-														<td className="py-2 text-sm">{tx.bookingId?.workType || tx.bookingId?.serviceType || "-"}</td>
-														<td className="py-2 font-semibold text-gray-800">₹{tx.amount || 0}</td>
-														<td className="py-2">
-															<span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(tx.status)}`}>
-																{(tx.status || "").toUpperCase()}
-															</span>
-														</td>
-													</tr>
+															<tr key={tx._id} className="border-t">
+																<td className="py-2 text-sm">
+																	{formatDate(tx.createdAt)}
+																</td>
+																<td className="py-2 text-sm">
+																	{tx.bookingId?.workType ||
+																		tx.bookingId?.serviceType ||
+																		"-"}
+																</td>
+																<td className="py-2 font-semibold text-gray-800">
+																	₹{tx.amount || 0}
+																</td>
+																<td className="py-2">
+																	<span
+																		className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+																			tx.status
+																		)}`}
+																	>
+																		{(tx.status || "").toUpperCase()}
+																	</span>
+																</td>
+															</tr>
 														))}
 												</tbody>
 											</table>
@@ -2201,7 +2326,9 @@ function WorkerDashboard() {
 										{transactions.length > itemsPerPage && (
 											<div className="flex justify-end items-center gap-2 mt-4">
 												<button
-													onClick={() => setPageEarnings(Math.max(0, pageEarnings - 1))}
+													onClick={() =>
+														setPageEarnings(Math.max(0, pageEarnings - 1))
+													}
 													disabled={pageEarnings === 0}
 													className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
 												>
@@ -2215,7 +2342,8 @@ function WorkerDashboard() {
 														)
 													}
 													disabled={
-														pageEarnings >= Math.ceil(transactions.length / itemsPerPage) - 1
+														pageEarnings >=
+														Math.ceil(transactions.length / itemsPerPage) - 1
 													}
 													className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
 												>

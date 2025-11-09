@@ -87,29 +87,44 @@ export const AuthProvider = ({ children }) => {
 	const login = useCallback(async (email, password) => {
 		try {
 			const response = await api.post("/auth/login", { email, password });
+
 			if (response.data.success) {
 				const { user, token } = response.data;
 
-				// Store in localStorage for persistence across tabs/refreshes
+				// Store in localStorage
 				localStorage.setItem("token", token);
 				localStorage.setItem("user", JSON.stringify(user));
 
-				// Set in API headers
+				// Set API header
 				api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
 
 				setUser(user);
 				setToken(token);
 
-				return { success: true, user };
+				return { success: true, user, token };
 			}
-		} catch (error) {
+
+			// Fallback (should never hit, but keep logic intact)
 			return {
 				success: false,
-				message: error.response?.data?.message || "Login failed",
+				message: response.data?.message || "Login failed",
+				status: response.status,
+			};
+		} catch (error) {
+			// IMPORTANT FIX HERE:
+			// api.js already normalizes errors to { status, message }
+			const status = error?.status || error?.response?.status || null;
+
+			const message =
+				error?.message || error?.response?.data?.message || "Login failed";
+
+			return {
+				success: false,
+				status,
+				message,
 			};
 		}
 	}, []);
-
 	const register = useCallback(async (userData) => {
 		try {
 			const response = await api.post("/auth/register", userData);
