@@ -2,19 +2,10 @@ import axios from "axios";
 import toast from "react-hot-toast";
 
 // Dynamically determine the API base URL
-const envUrl = import.meta.env.VITE_API_BASE_URL;
+const isDev = import.meta.env.MODE === "development";
+const envUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
 
-const defaultApiUrl = (() => {
-	if (typeof window === "undefined") return "http://localhost:8000/api";
-
-	// Use the same protocol, hostname, and port as the frontend
-	const protocol = window.location.protocol; // 'https:' or 'http:'
-	const host = window.location.hostname;
-	const port = 8000; // Backend port
-	return `${protocol}//${host}:${port}/api`;
-})();
-
-const API_BASE_URL = envUrl || defaultApiUrl;
+const API_BASE_URL = isDev ? "/api" : envUrl || "/api";
 const isDevelopment = import.meta.env.MODE === "development";
 
 const api = axios.create({
