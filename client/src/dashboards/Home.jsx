@@ -1,8 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useContext, useState } from "react";
-import React, { useEffect} from 'react';
+import React, { useEffect } from "react";
 import FarmerResourceCards from "../pages/FarmerResources.jsx";
-
 
 import { AuthContext } from "../context/AuthContext.jsx";
 import "../App.css";
@@ -13,15 +12,15 @@ import CropYieldPredictor from "../pages/CropYieldPredictor.jsx";
 import LanguageSelector from "../components/LanguageSelector.jsx";
 import { useLanguage } from "../context/LanguageContext";
 import Chatbot from "../components/ChatBot";
+import Calculator from "../components/Calculator";
 import { Sprout } from "lucide-react";
 // import WeatherWidget from "../components/WeatherWidget";
 // import LocationSelector from "../components/LocationSelector";
 import IndiaWeatherAdvanced from "../components/IndiaWeatherLocation";
 
-
 export default function FarmerDashboard() {
 	const { user, logout } = useContext(AuthContext);
-const nav = useNavigate();
+	const nav = useNavigate();
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 	const { tr } = useLanguage();
 
@@ -39,13 +38,13 @@ const nav = useNavigate();
 		nav("/sell-crop");
 	};
 
-
 	useEffect(() => {
-  function onKey(e) { if (e.key === 'Escape') setIsMobileMenuOpen(false); }
-  if (isMobileMenuOpen) window.addEventListener('keydown', onKey);
-  return () => window.removeEventListener('keydown', onKey);
-}, [isMobileMenuOpen]);
-	
+		function onKey(e) {
+			if (e.key === "Escape") setIsMobileMenuOpen(false);
+		}
+		if (isMobileMenuOpen) window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [isMobileMenuOpen]);
 
 	return (
 		<>
@@ -55,10 +54,16 @@ const nav = useNavigate();
 					<div className="w-full flex items-center">
 						{/* Scrolling Text - Ticker */}
 						<div className="w-full overflow-hidden">
-<div className="animate-marquee flex whitespace-nowrap gap-12">
-								<span className="text-gray-600 text-sm">🌾 {tr("Welcome to CropConnect")}</span>
-								<span className="text-gray-600 text-sm">{tr("Fresh Crops Direct from Farmers")}</span>
-								<span className="text-gray-600 text-sm">{tr("Quality Products at Best Prices")}</span>
+							<div className="animate-marquee flex whitespace-nowrap gap-12">
+								<span className="text-gray-600 text-sm">
+									🌾 {tr("Welcome to CropConnect")}
+								</span>
+								<span className="text-gray-600 text-sm">
+									{tr("Fresh Crops Direct from Farmers")}
+								</span>
+								<span className="text-gray-600 text-sm">
+									{tr("Quality Products at Best Prices")}
+								</span>
 							</div>
 						</div>
 					</div>
@@ -69,11 +74,14 @@ const nav = useNavigate();
 					<div className="max-w-[1920px] mx-auto px-4 md:px-8 flex items-center justify-between gap-4">
 						{/* Logo and Brand */}
 						<div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-						<div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 lg:w-10 lg:h-10 xl:w-11 xl:h-11 flex items-center justify-center">
+							<div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 lg:w-10 lg:h-10 xl:w-11 xl:h-11 flex items-center justify-center">
 								<div className="w-full h-full p-1.5 bg-green-600 rounded-2xl shadow flex items-center justify-center">
-									<Sprout className="w-full h-full text-white" strokeWidth={2.5} />
+									<Sprout
+										className="w-full h-full text-white"
+										strokeWidth={2.5}
+									/>
 								</div>
-						</div>
+							</div>
 							<div className="text-gray-900 text-base sm:text-lg md:text-xl lg:text-2xl xl:text-2xl 2xl:text-3xl font-semibold whitespace-nowrap cursor-pointer">
 								CropConnect
 							</div>
@@ -120,7 +128,7 @@ const nav = useNavigate();
 
 							{/* ===== BOOKINGS DROPDOWN WITH HOVER ===== */}
 							<div className="relative group">
-                                <button className="text-gray-500 text-base font-medium hover:text-gray-900 pb-1 transition-all flex items-center gap-1">
+								<button className="text-gray-500 text-base font-medium hover:text-gray-900 pb-1 transition-all flex items-center gap-1">
 									{tr("Booking")}
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
@@ -261,10 +269,10 @@ const nav = useNavigate();
 												<span className="text-2xl">💰</span>
 											</div>
 											<div className="flex-1">
-                                                       <h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
+												<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
 													{tr("Transaction History")}
 												</h4>
-                                                   <p className="text-xs text-gray-500 mt-0.5">
+												<p className="text-xs text-gray-500 mt-0.5">
 													{tr("Payment & transaction logs")}
 												</p>
 											</div>
@@ -291,10 +299,12 @@ const nav = useNavigate();
 												<span className="text-2xl">🕒</span>
 											</div>
 											<div className="flex-1">
-                                                    <h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
+												<h4 className="font-semibold text-gray-800 group-hover/item:text-purple-700 transition-colors">
 													{tr("My Booking")}
 												</h4>
-												<p className="text-xs text-gray-500 mt-0.5">{tr("Bookings")}</p>
+												<p className="text-xs text-gray-500 mt-0.5">
+													{tr("Bookings")}
+												</p>
 											</div>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
@@ -317,7 +327,7 @@ const nav = useNavigate();
 						</div>
 
 						{/* Right side - Icons & Buttons */}
-                          <div className="flex items-center gap-2 md:gap-3 xl:gap-6 flex-shrink-0">
+						<div className="flex items-center gap-2 md:gap-3 xl:gap-6 flex-shrink-0">
 							<LanguageSelector />
 							{/* Search Icon - Hidden on small mobile */}
 							<button className="hidden sm:block w-4 h-4 md:w-5 md:h-5 lg:w-6 lg:h-6 text-gray-500 hover:text-gray-700 transition-colors">
@@ -396,262 +406,283 @@ const nav = useNavigate();
 
 					{/* Mobile Menu - Responsive */}
 					{/* ---------- MOBILE MENU (Fully Responsive, Matches Desktop Links) ---------- */}
-{isMobileMenuOpen && (
-  <div
-    className="lg:hidden fixed inset-x-0 top-[64px] z-50 bg-white border-t border-gray-200 shadow-xl max-h-[calc(100vh-64px)] overflow-y-auto animate-fade-in"
-    role="dialog"
-    aria-modal="true"
-    aria-label={tr("Mobile menu")}
-  >
-    {/* Header */}
-    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-      <div className="flex items-center gap-2">
-        <div className="w-8 h-8 bg-green-600 rounded-xl flex items-center justify-center">
-          <Sprout className="w-5 h-5 text-white" />
-        </div>
-        <span className="text-lg font-semibold text-gray-900">CropConnect</span>
-      </div>
-      <button
-        onClick={() => setIsMobileMenuOpen(false)}
-        aria-label={tr("Close menu")}
-        className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-      >
-        ✕
-      </button>
-    </div>
+					{isMobileMenuOpen && (
+						<div
+							className="lg:hidden fixed inset-x-0 top-[64px] z-50 bg-white border-t border-gray-200 shadow-xl max-h-[calc(100vh-64px)] overflow-y-auto animate-fade-in"
+							role="dialog"
+							aria-modal="true"
+							aria-label={tr("Mobile menu")}
+						>
+							{/* Header */}
+							<div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+								<div className="flex items-center gap-2">
+									<div className="w-8 h-8 bg-green-600 rounded-xl flex items-center justify-center">
+										<Sprout className="w-5 h-5 text-white" />
+									</div>
+									<span className="text-lg font-semibold text-gray-900">
+										CropConnect
+									</span>
+								</div>
+								<button
+									onClick={() => setIsMobileMenuOpen(false)}
+									aria-label={tr("Close menu")}
+									className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
+								>
+									✕
+								</button>
+							</div>
 
-    {/* Navigation Links */}
-    <div className="px-4 py-4 space-y-2">
-      <Link
-        to="/"
-        className="block px-3 py-2 text-base font-medium text-gray-900 bg-green-50 rounded-md"
-        onClick={() => setIsMobileMenuOpen(false)}
-      >
-        {tr("Home")}
-      </Link>
-      <Link
-        to="/about"
-        className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-        onClick={() => setIsMobileMenuOpen(false)}
-      >
-        {tr("About")}
-      </Link>
-      <Link
-        to="/products"
-        className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-        onClick={() => setIsMobileMenuOpen(false)}
-      >
-        {tr("Products")}
-      </Link>
-      <Link
-        to="/my-crops"
-        className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-        onClick={() => setIsMobileMenuOpen(false)}
-      >
-        {tr("Crop Listings")}
-      </Link>
-      <Link
-        to="/farmer-crop-status"
-        className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-        onClick={() => setIsMobileMenuOpen(false)}
-      >
-        {tr("Crop Status")}
-      </Link>
-      <Link
-        to="/farmer-ratings"
-        className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
-        onClick={() => setIsMobileMenuOpen(false)}
-      >
-        {tr("My Ratings")}
-      </Link>
-    </div>
+							{/* Navigation Links */}
+							<div className="px-4 py-4 space-y-2">
+								<Link
+									to="/"
+									className="block px-3 py-2 text-base font-medium text-gray-900 bg-green-50 rounded-md"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("Home")}
+								</Link>
+								<Link
+									to="/about"
+									className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("About")}
+								</Link>
+								<Link
+									to="/products"
+									className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("Products")}
+								</Link>
+								<Link
+									to="/my-crops"
+									className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("Crop Listings")}
+								</Link>
+								<Link
+									to="/farmer-crop-status"
+									className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("Crop Status")}
+								</Link>
+								<Link
+									to="/farmer-ratings"
+									className="block px-3 py-2 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-md"
+									onClick={() => setIsMobileMenuOpen(false)}
+								>
+									{tr("My Ratings")}
+								</Link>
+							</div>
 
-    {/* Booking Services Section */}
-    <div className="mt-3 border-t border-gray-200 pt-4 px-4 pb-6 bg-gray-50">
-      <h3 className="text-sm font-semibold text-gray-600 mb-2">
-        {tr("Booking Services")}
-      </h3>
-      <div className="space-y-3">
-        <Link
-          to="/worker-bookings"
-          className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-green-50 transition"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <span className="text-2xl">👷</span>
-          <div>
-            <p className="font-semibold text-gray-800">{tr("Book Worker")}</p>
-            <p className="text-xs text-gray-500">{tr("Hire skilled farm workers")}</p>
-          </div>
-        </Link>
+							{/* Booking Services Section */}
+							<div className="mt-3 border-t border-gray-200 pt-4 px-4 pb-6 bg-gray-50">
+								<h3 className="text-sm font-semibold text-gray-600 mb-2">
+									{tr("Booking Services")}
+								</h3>
+								<div className="space-y-3">
+									<Link
+										to="/worker-bookings"
+										className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-green-50 transition"
+										onClick={() => setIsMobileMenuOpen(false)}
+									>
+										<span className="text-2xl">👷</span>
+										<div>
+											<p className="font-semibold text-gray-800">
+												{tr("Book Worker")}
+											</p>
+											<p className="text-xs text-gray-500">
+												{tr("Hire skilled farm workers")}
+											</p>
+										</div>
+									</Link>
 
-        <Link
-          to="/tractor-booking"
-          className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-emerald-50 transition"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <span className="text-2xl">🚜</span>
-          <div>
-            <p className="font-semibold text-gray-800">{tr("Book Tractor")}</p>
-            <p className="text-xs text-gray-500">{tr("Rent tractors & equipment")}</p>
-          </div>
-        </Link>
+									<Link
+										to="/tractor-booking"
+										className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-emerald-50 transition"
+										onClick={() => setIsMobileMenuOpen(false)}
+									>
+										<span className="text-2xl">🚜</span>
+										<div>
+											<p className="font-semibold text-gray-800">
+												{tr("Book Tractor")}
+											</p>
+											<p className="text-xs text-gray-500">
+												{tr("Rent tractors & equipment")}
+											</p>
+										</div>
+									</Link>
 
-        <Link
-          to="/farmer/my-bookings"
-          className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-purple-50 transition"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <span className="text-2xl">📋</span>
-          <div>
-            <p className="font-semibold text-gray-800">{tr("My Booking")}</p>
-            <p className="text-xs text-gray-500">{tr("Bookings")}</p>
-          </div>
-        </Link>
+									<Link
+										to="/farmer/my-bookings"
+										className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-purple-50 transition"
+										onClick={() => setIsMobileMenuOpen(false)}
+									>
+										<span className="text-2xl">📋</span>
+										<div>
+											<p className="font-semibold text-gray-800">
+												{tr("My Booking")}
+											</p>
+											<p className="text-xs text-gray-500">{tr("Bookings")}</p>
+										</div>
+									</Link>
 
-        <Link
-          to="/booking-history"
-          className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-indigo-50 transition"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <span className="text-2xl">🕒</span>
-          <div>
-            <p className="font-semibold text-gray-800">{tr("Booking History")}</p>
-            <p className="text-xs text-gray-500">{tr("Past bookings & records")}</p>
-          </div>
-        </Link>
+									<Link
+										to="/booking-history"
+										className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-indigo-50 transition"
+										onClick={() => setIsMobileMenuOpen(false)}
+									>
+										<span className="text-2xl">🕒</span>
+										<div>
+											<p className="font-semibold text-gray-800">
+												{tr("Booking History")}
+											</p>
+											<p className="text-xs text-gray-500">
+												{tr("Past bookings & records")}
+											</p>
+										</div>
+									</Link>
 
-        <Link
-          to="/transaction-history"
-          className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-yellow-50 transition"
-          onClick={() => setIsMobileMenuOpen(false)}
-        >
-          <span className="text-2xl">💰</span>
-          <div>
-            <p className="font-semibold text-gray-800">{tr("Transaction History")}</p>
-            <p className="text-xs text-gray-500">{tr("Payment & transaction logs")}</p>
-          </div>
-        </Link>
-      </div>
-    </div>
+									<Link
+										to="/transaction-history"
+										className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm hover:bg-yellow-50 transition"
+										onClick={() => setIsMobileMenuOpen(false)}
+									>
+										<span className="text-2xl">💰</span>
+										<div>
+											<p className="font-semibold text-gray-800">
+												{tr("Transaction History")}
+											</p>
+											<p className="text-xs text-gray-500">
+												{tr("Payment & transaction logs")}
+											</p>
+										</div>
+									</Link>
+								</div>
+							</div>
 
-    {/* Language Selector, Logout, etc. */}
-    <div className="px-4 py-4 border-t border-gray-200 flex flex-col gap-3 bg-white">
-      <LanguageSelector />
+							{/* Language Selector, Logout, etc. */}
+							<div className="px-4 py-4 border-t border-gray-200 flex flex-col gap-3 bg-white">
+								<LanguageSelector />
 
-      {user ? (
-        <button
-          onClick={() => {
-            handleLogout();
-            setIsMobileMenuOpen(false);
-          }}
-          className="w-full py-2 text-white bg-red-600 rounded-md text-sm font-medium hover:bg-red-700 transition"
-        >
-          {tr("Logout")}
-        </button>
-      ) : (
-        <div className="flex gap-3">
-          <Link
-            to="/login"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="flex-1 text-center py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 transition"
-          >
-            {tr("Login")}
-          </Link>
-          <Link
-            to="/register"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="flex-1 text-center py-2 rounded-md border border-green-600 text-green-700 font-medium hover:bg-green-50 transition"
-          >
-            {tr("Register")}
-          </Link>
-        </div>
-      )}
-    </div>
+								{user ? (
+									<button
+										onClick={() => {
+											handleLogout();
+											setIsMobileMenuOpen(false);
+										}}
+										className="w-full py-2 text-white bg-red-600 rounded-md text-sm font-medium hover:bg-red-700 transition"
+									>
+										{tr("Logout")}
+									</button>
+								) : (
+									<div className="flex gap-3">
+										<Link
+											to="/login"
+											onClick={() => setIsMobileMenuOpen(false)}
+											className="flex-1 text-center py-2 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 transition"
+										>
+											{tr("Login")}
+										</Link>
+										<Link
+											to="/register"
+											onClick={() => setIsMobileMenuOpen(false)}
+											className="flex-1 text-center py-2 rounded-md border border-green-600 text-green-700 font-medium hover:bg-green-50 transition"
+										>
+											{tr("Register")}
+										</Link>
+									</div>
+								)}
+							</div>
 
-    {/* Footer small note */}
-    <div className="text-center text-xs text-gray-400 py-3 bg-gray-50">
-      © {new Date().getFullYear()} CropConnect. All rights reserved.
-    </div>
-  </div>
-)}
-{/* ---------- END MOBILE MENU ---------- */}
+							{/* Footer small note */}
+							<div className="text-center text-xs text-gray-400 py-3 bg-gray-50">
+								© {new Date().getFullYear()} CropConnect. All rights reserved.
+							</div>
+						</div>
+					)}
+					{/* ---------- END MOBILE MENU ---------- */}
 				</nav>
-{/* ====== HERO SECTION (div-based, responsive, no extra gap) ====== */}
-<div
-  className="relative w-full overflow-hidden"
-  style={{
-    backgroundImage: "url('./nature.png')",
-    backgroundSize: "cover",
-    backgroundPosition: "center center",
-  }}
->
-  {/* Adaptive overlay */}
-  <div className="absolute inset-0 bg-black/20 sm:bg-black/15 md:bg-black/10 pointer-events-none" />
+				{/* ====== HERO SECTION (div-based, responsive, no extra gap) ====== */}
+				<div
+					className="relative w-full overflow-hidden"
+					style={{
+						backgroundImage: "url('./nature.png')",
+						backgroundSize: "cover",
+						backgroundPosition: "center center",
+					}}
+				>
+					{/* Adaptive overlay */}
+					<div className="absolute inset-0 bg-black/20 sm:bg-black/15 md:bg-black/10 pointer-events-none" />
 
-  {/* CONTENT WRAPPER
+					{/* CONTENT WRAPPER
       - On very small screens hero height = viewport minus header (change 64px if needed)
       - On larger screens use fixed heights to preserve desktop look
   */}
-  <div
-    className="relative z-10 mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-20
+					<div
+						className="relative z-10 mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 2xl:px-20
                h-[calc(100vh-64px)] sm:h-[460px] md:h-[520px] lg:h-[640px] xl:h-[720px] 2xl:h-[800px]
                flex items-center"
-  >
-    <div className="w-full max-w-[300px] xs:max-w-[350px] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl flex flex-col gap-3 sm:gap-5 md:gap-6 lg:gap-7 xl:gap-8">
-      
-      {/* Welcome Text */}
-      <p className="text-white text-[10px] xs:text-xs sm:text-sm md:text-sm lg:text-base xl:text-base font-semibold uppercase tracking-wide sm:tracking-wider leading-snug sm:leading-relaxed">
-        WELCOME TO AGRICULTURAL PRODUCTS RURAL ENTREPRENEURSHIP MANAGEMENT SYSTEM
-      </p>
+					>
+						<div className="w-full max-w-[300px] xs:max-w-[350px] sm:max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl flex flex-col gap-3 sm:gap-5 md:gap-6 lg:gap-7 xl:gap-8">
+							{/* Welcome Text */}
+							<p className="text-white text-[10px] xs:text-xs sm:text-sm md:text-sm lg:text-base xl:text-base font-semibold uppercase tracking-wide sm:tracking-wider leading-snug sm:leading-relaxed">
+								WELCOME TO AGRICULTURAL PRODUCTS RURAL ENTREPRENEURSHIP
+								MANAGEMENT SYSTEM
+							</p>
 
-      {/* Main Heading */}
-      <h1 className="text-white font-extrabold uppercase leading-tight text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl 2xl:text-[8rem] drop-shadow-md">
-        CROP
-        <br />
-        CONNECT
-      </h1>
+							{/* Main Heading */}
+							<h1 className="text-white font-extrabold uppercase leading-tight text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl 2xl:text-[8rem] drop-shadow-md">
+								CROP
+								<br />
+								CONNECT
+							</h1>
 
-      {/* Description */}
-      <p className="text-white text-xs xs:text-sm sm:text-base md:text-base lg:text-lg xl:text-xl font-normal leading-relaxed max-w-[90%] sm:max-w-none">
-        Empowering Rural Dreams, Nurturing Agricultural Growth — CropConnect cultivates prosperity from the roots up.
-      </p>
+							{/* Description */}
+							<p className="text-white text-xs xs:text-sm sm:text-base md:text-base lg:text-lg xl:text-xl font-normal leading-relaxed max-w-[90%] sm:max-w-none">
+								Empowering Rural Dreams, Nurturing Agricultural Growth —
+								CropConnect cultivates prosperity from the roots up.
+							</p>
 
-      {/* Action Buttons */}
-      <div className="flex flex-col xs:flex-row gap-3 sm:gap-4 mt-2 sm:mt-4">
-        <button
-          onClick={handleSellCrop}
-          className="px-6 py-3 sm:px-8 sm:py-4 bg-yellow-400 rounded-md text-white text-sm sm:text-base font-semibold uppercase hover:bg-yellow-500 hover:shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
-        >
-          SELL HERE
-        </button>
-      </div>
-    </div>
-  </div>
+							{/* Action Buttons */}
+							<div className="flex flex-col xs:flex-row gap-3 sm:gap-4 mt-2 sm:mt-4">
+								<button
+									onClick={handleSellCrop}
+									className="px-6 py-3 sm:px-8 sm:py-4 bg-yellow-400 rounded-md text-white text-sm sm:text-base font-semibold uppercase hover:bg-yellow-500 hover:shadow-lg transition-all transform hover:scale-105 whitespace-nowrap"
+								>
+									SELL HERE
+								</button>
+							</div>
+						</div>
+					</div>
 
-  {/* Decorative diamonds - hidden on small screens */}
-  <div className="hidden md:flex absolute top-[12%] right-[25%] sm:right-[28%] md:right-[30%] lg:right-[32%] xl:right-[34%] items-center gap-2 pointer-events-none">
-    <div className="w-2.5 h-2.5 md:w-3 md:h-3 lg:w-4 lg:h-4 bg-yellow-400 rotate-45" />
-    <div className="w-3.5 h-3.5 md:w-4 md:h-4 lg:w-5 lg:h-5 bg-yellow-400 rotate-45" />
-    <div className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 bg-yellow-400 rotate-45" />
-  </div>
-</div>
-{/* ====== END HERO SECTION ====== */}
-    <div>
-      {/* your existing hero section */}
-      <div className="mt-8 flex justify-center">
-        <IndiaWeatherAdvanced />
-      </div>
-    </div>
+					{/* Decorative diamonds - hidden on small screens */}
+					<div className="hidden md:flex absolute top-[12%] right-[25%] sm:right-[28%] md:right-[30%] lg:right-[32%] xl:right-[34%] items-center gap-2 pointer-events-none">
+						<div className="w-2.5 h-2.5 md:w-3 md:h-3 lg:w-4 lg:h-4 bg-yellow-400 rotate-45" />
+						<div className="w-3.5 h-3.5 md:w-4 md:h-4 lg:w-5 lg:h-5 bg-yellow-400 rotate-45" />
+						<div className="w-5 h-5 md:w-6 md:h-6 lg:w-7 lg:h-7 bg-yellow-400 rotate-45" />
+					</div>
+				</div>
+				{/* ====== END HERO SECTION ====== */}
+				<div>
+					{/* your existing hero section */}
+					<div className="mt-8 flex justify-center">
+						<IndiaWeatherAdvanced />
+					</div>
+				</div>
 			</div>
 			<FarmerCarousel />
-			  <div>
-     
-      <FarmerResourceCards /> {/* 👈 Add below the carousel */}
-    </div>
+			<div>
+				<FarmerResourceCards /> {/* 👈 Add below the carousel */}
+			</div>
 			<CropPriceSearch />
 			<CropYieldPredictor />
 			<Footer />
 			<Chatbot />
+			<Calculator />
 		</>
 	);
 }

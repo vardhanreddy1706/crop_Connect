@@ -33,6 +33,7 @@ import {
 import DashboardNavbar from "../components/DashboardNavbar";
 import DashboardFooter from "../components/DashboardFooter";
 import { useLanguage } from "../context/LanguageContext";
+import Calculator from "../components/Calculator";
 
 function WorkerDashboard() {
 	const { user, logout } = useAuth();
@@ -2627,6 +2628,7 @@ function WorkerDashboard() {
 					fetchWorkOrders();
 				}}
 			/>
+			<Calculator />
 		</div>
 	);
 }

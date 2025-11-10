@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MessageCircle, X, Send, Loader2 } from "lucide-react";
 
-
 export default function Chatbot() {
 	const [isOpen, setIsOpen] = useState(false);
 	const [messages, setMessages] = useState([]);
@@ -108,12 +107,13 @@ export default function Chatbot() {
 
 	return (
 		<>
-			{/* Chat Window (opens to the left of the bottom-right button) */}
+			{/* Chat Window (responsive: full-screen on mobile, fixed-size on desktop) */}
 			<div
-				className={`fixed z-50 w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col transition-all duration-300 transform ${
-					isOpen ? "opacity-100 translate-x-0" : "opacity-0 pointer-events-none translate-x-4"
-				}`}
-				style={{ bottom: 24, right: 96 }}
+				className={`fixed z-50 bg-white shadow-2xl flex flex-col transition-all duration-300 transform ${
+					isOpen
+						? "opacity-100 translate-x-0"
+						: "opacity-0 pointer-events-none translate-x-4"
+				} w-96 h-[500px] bottom-6 right-6 rounded-2xl max-sm:w-full max-sm:h-full max-sm:top-0 max-sm:left-0 max-sm:rounded-none`}
 			>
 				{/* Header */}
 				<div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-5 rounded-t-2xl flex justify-between items-center shadow-md">

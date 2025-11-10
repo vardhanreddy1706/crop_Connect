@@ -4,6 +4,7 @@ import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import Chatbot from "../components/ChatBot";
+import Calculator from "../components/Calculator";
 import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -11,7 +12,7 @@ import {
 	ShoppingCart,
 	Tractor,
 	Shield,
-	Calculator,
+	Calculator as CalculatorIcon,
 	TrendingUp,
 	Wheat,
 	Package,
@@ -25,6 +26,8 @@ import {
 	CheckCircle,
 	UserPlus,
 	Sprout,
+	Cloud,
+	Globe,
 } from "lucide-react";
 
 function CropConnectLanding() {
@@ -78,7 +81,7 @@ function CropConnectLanding() {
 				"Safe and encrypted payment gateway ensuring secure transactions for all users",
 		},
 		{
-			icon: <Calculator className="w-12 h-12 text-green-600" />,
+			icon: <CalculatorIcon className="w-12 h-12 text-green-600" />,
 			title: "Real-time Crop Calculator",
 			description:
 				"Calculate crop prices instantly based on 100kg standard with live market rates",
@@ -88,6 +91,24 @@ function CropConnectLanding() {
 			title: "Live Government API Prices",
 			description:
 				"Access real-time crop prices directly from government APIs for accurate market information",
+		},
+		{
+			icon: <Cloud className="w-12 h-12 text-green-600" />,
+			title: "Live Weather Forecasting",
+			description:
+				"Get real-time weather updates and forecasts to plan your farming activities effectively and avoid weather-related risks",
+		},
+		{
+			icon: <CalculatorIcon className="w-12 h-12 text-green-600" />,
+			title: "Crop Yield Predictor",
+			description:
+				"Predict crop yields based on soil conditions, weather patterns, and historical data to optimize your farming decisions",
+		},
+		{
+			icon: <Globe className="w-12 h-12 text-green-600" />,
+			title: "Access Government Websites",
+			description:
+				"Direct links and access to government agricultural websites for schemes, subsidies, and official resources",
 		},
 	];
 
@@ -189,7 +210,7 @@ function CropConnectLanding() {
 								</li>
 							</ul>
 
-{/* Language + Auth Buttons */}
+							{/* Language + Auth Buttons */}
 							<div className="flex items-center space-x-4 relative">
 								<LanguageSelector />
 								<button
@@ -295,9 +316,9 @@ function CropConnectLanding() {
 									navigate("/login");
 									setMobileMenuOpen(false);
 								}}
-							className="w-full px-6 py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all mt-4"
-						>
-							{tr("Login")}
+								className="w-full px-6 py-2 text-green-700 font-semibold hover:bg-green-50 rounded-lg transition-all mt-4"
+							>
+								{tr("Login")}
 							</button>
 							<button
 								onClick={() => {
@@ -329,7 +350,9 @@ function CropConnectLanding() {
 						{tr("Revolutionizing Agriculture")}
 					</h2>
 					<p className="text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
-						{tr("Connect farmers, merchants, and buyers on one powerful platform. Experience seamless crop trading, equipment booking, and real-time market prices.")}
+						{tr(
+							"Connect farmers, merchants, and buyers on one powerful platform. Experience seamless crop trading, equipment booking, and real-time market prices."
+						)}
 					</p>
 
 					{/* CTA Buttons */}
@@ -349,14 +372,14 @@ function CropConnectLanding() {
 							{tr("Register as Worker/Tractor Owner")}
 						</button>
 					</div>
-						<p className="text-green-100 text-lg">
-							{tr("Already have an account?")}{" "}
-							<button
-								onClick={() => navigate("/login")}
-								className="text-white font-bold underline hover:text-green-200 transition-colors"
-							>
-								{tr("Login here")}
-							</button>
+					<p className="text-green-100 text-lg">
+						{tr("Already have an account?")}{" "}
+						<button
+							onClick={() => navigate("/login")}
+							className="text-white font-bold underline hover:text-green-200 transition-colors"
+						>
+							{tr("Login here")}
+						</button>
 					</p>
 				</div>
 			</section>
@@ -368,9 +391,9 @@ function CropConnectLanding() {
 			>
 				<div className="max-w-7xl mx-auto">
 					<div className="text-center mb-12">
-							<h2 className="text-4xl font-bold text-gray-800 mb-4">
-								{tr("About Crop Connect")}
-							</h2>
+						<h2 className="text-4xl font-bold text-gray-800 mb-4">
+							{tr("About Crop Connect")}
+						</h2>
 						<div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-600 mx-auto rounded-full"></div>
 					</div>
 					<div className="bg-white rounded-2xl shadow-xl p-8 md:p-12">
@@ -421,9 +444,9 @@ function CropConnectLanding() {
 				className="py-16 px-4 bg-gradient-to-r from-green-600 to-emerald-600"
 			>
 				<div className="max-w-7xl mx-auto">
-						<h2 className="text-4xl font-bold text-center text-white mb-12">
-							{tr("Our Milestones")}
-						</h2>
+					<h2 className="text-4xl font-bold text-center text-white mb-12">
+						{tr("Our Milestones")}
+					</h2>
 					<div className="grid grid-cols-2 md:grid-cols-4 gap-8">
 						{milestones.map((milestone, index) => (
 							<div
@@ -450,7 +473,9 @@ function CropConnectLanding() {
 							{tr("Our Features")}
 						</h2>
 						<p className="text-xl text-gray-600 max-w-2xl mx-auto">
-							{tr("Everything you need for modern agriculture in one powerful platform")}
+							{tr(
+								"Everything you need for modern agriculture in one powerful platform"
+							)}
 						</p>
 						<div className="w-24 h-1 bg-gradient-to-r from-green-500 to-emerald-600 mx-auto rounded-full mt-4"></div>
 					</div>
@@ -486,7 +511,9 @@ function CropConnectLanding() {
 						{tr("Ready to Transform Your Farming Experience?")}
 					</h2>
 					<p className="text-xl mb-8">
-						{tr("Join thousands of farmers and merchants already using Crop Connect")}
+						{tr(
+							"Join thousands of farmers and merchants already using Crop Connect"
+						)}
 					</p>
 					<div className="flex flex-col sm:flex-row gap-4 justify-center">
 						<button
@@ -601,6 +628,9 @@ function CropConnectLanding() {
 					</div>
 				</div>
 			</footer>
+
+			{/* Calculator Component */}
+			<Calculator />
 		</div>
 	);
 }

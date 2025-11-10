@@ -21,6 +21,7 @@ import {
 	faTruck,
 	faStar,
 } from "@fortawesome/free-solid-svg-icons";
+import Calculator from "../components/Calculator";
 import { useAuth } from "../context/AuthContext";
 import { useLanguage } from "../context/LanguageContext";
 import DashboardNavbar from "../components/DashboardNavbar";
@@ -1665,6 +1666,7 @@ function BuyerDashboard() {
 						fetchOrders();
 					}}
 				/>
+				<Calculator />
 			</div>
 		</div>
 	);
